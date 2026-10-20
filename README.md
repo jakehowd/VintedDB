@@ -2,6 +2,8 @@
 
 A full-stack web application designed to track, record historical sales, and analyze pricing trends for popular searchable items on Vinted UK (`vinted.co.uk`).
 
+This is a largely vibe coded project made using Google Gemini Flash within Antigravity
+
 ## Features
 
 - **Multi-Period Analytics Graphs**:
