@@ -58,35 +58,25 @@
             UK MARKETPLACE
           </span>
         </div>
-        <p class="text-xs text-slate-400">Historical price analytics, verified sold values & live bargain radar</p>
+        <p class="text-xs text-slate-400 hidden md:block">Historical price analytics, verified sold values & live bargain radar</p>
       </div>
     </div>
 
-    <div class="flex items-center space-x-2 sm:space-x-2.5">
-      <!-- Unified Market Engine Mode Selector (Consolidated Scraper & Sniper Controls) -->
-      <div class="inline-flex items-center bg-slate-950/90 p-1 rounded-xl border border-slate-800 shadow-inner" id="unified-engine-selector" role="radiogroup" title="Unified Scanning Engine Mode">
-        <button type="button" onclick="app.setScanningMode('sniper')" id="mode-btn-sniper" class="px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5 cursor-pointer" title="Real-time continuous deal sniper (5s scan for fresh listings)">
-          <i data-lucide="crosshair" class="w-3.5 h-3.5 text-vinted"></i>
-          <span class="hidden sm:inline">Sniper Live</span>
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-live hidden" id="mode-sniper-dot"></span>
-        </button>
-
-        <button type="button" onclick="app.setScanningMode('poll')" id="mode-btn-poll" class="px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5 cursor-pointer active engine-mode-active-poll" title="Background market trend sync (every 30m)">
-          <i data-lucide="clock" class="w-3.5 h-3.5 text-cyan-400"></i>
-          <span class="hidden sm:inline">Trend Sync</span>
-          <span id="header-poll-interval-text" class="hidden">30m</span>
-          <span id="header-next-poll-timer" class="text-[10px] font-mono font-bold text-teal-300 ml-1">--:--</span>
-        </button>
-
-        <button type="button" onclick="app.setScanningMode('paused')" id="mode-btn-paused" class="px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5 cursor-pointer" title="Pause all background automated scans">
-          <i data-lucide="pause" class="w-3.5 h-3.5 text-slate-500"></i>
-          <span class="hidden sm:inline">Paused</span>
-        </button>
-
-        <button type="button" onclick="app.openScraperModal()" class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition cursor-pointer" title="Advanced Scheduler & Scraper Hub Settings">
-          <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
-        </button>
+    <div class="flex items-center space-x-1.5 sm:space-x-2.5">
+      <!-- Deal Sniper Quick Controller & Live Indicator -->
+      <div id="btn-header-sniper-status" onclick="app.handleHeaderSniperClick()" class="inline-flex items-center px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-semibold bg-slate-950/80 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-teal-500/40 transition shadow-sm cursor-pointer select-none" title="Deal Sniper (Click to view or toggle)">
+        <span class="w-2 h-2 rounded-full bg-slate-500 mr-1.5 sm:mr-2 shrink-0" id="header-sniper-dot"></span>
+        <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1.5 text-vinted shrink-0"></i>
+        <span class="truncate"><span class="hidden sm:inline">Deal </span>Sniper: <strong class="text-slate-400 font-medium" id="header-sniper-text">Idle</strong></span>
       </div>
+
+      <!-- Auto-Poll Scheduler Hub & Next Poll Countdown -->
+      <button id="btn-header-scraper-modal" onclick="app.openScraperModal()" class="inline-flex items-center text-xs text-slate-300 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/40 rounded-xl px-2.5 sm:px-3 py-1.5 sm:py-2 transition shadow-sm cursor-pointer select-none" title="Auto-Poll Background Sync (Click to configure or change interval)">
+        <i data-lucide="clock" class="w-3.5 h-3.5 mr-1.5 text-cyan-400 shrink-0"></i>
+        <span><span class="hidden sm:inline">Auto-Poll: </span><strong id="header-poll-interval-text" class="text-white">Every 30m</strong></span>
+        <span id="header-next-poll-timer" class="ml-1.5 sm:ml-2 px-1.5 sm:px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-900 text-teal-300 border border-slate-700" title="Countdown until next auto-poll scrape">--:--</span>
+        <span id="header-constant-badge" class="hidden ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 pulse-live">24/7</span>
+      </button>
 
       <!-- Live Scraper Terminal Toggle -->
       <button id="btn-toggle-scraper-terminal" onclick="app.toggleScraperTerminal()" class="hidden md:inline-flex items-center text-xs font-semibold text-emerald-400 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 rounded-xl px-3 py-2 transition shadow-sm cursor-pointer" title="Toggle Live Scraper Activity Terminal (Key: T)">

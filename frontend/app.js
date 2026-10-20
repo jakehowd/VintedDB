@@ -2004,6 +2004,21 @@ class VintedApp {
     }
   }
 
+  handleHeaderSniperClick() {
+    this.showSniperView();
+    if (!this.sniperActive) {
+      if (this.sniperTargets.size === 0 && this.searches && this.searches.length > 0) {
+        this.searches.forEach(s => this.sniperTargets.add(s.id));
+        this.renderSniperTargets();
+      }
+      if (this.sniperTargets.size > 0) {
+        this.startSniper();
+      } else {
+        this.showToast('Please add at least one tracked item before starting Deal Sniper.', 'info');
+      }
+    }
+  }
+
   toggleSniper() {
     if (this.sniperActive) {
       this.stopSniper();
@@ -2105,6 +2120,11 @@ class VintedApp {
     const navDot = document.getElementById('sniper-nav-dot');
     const navPing = document.getElementById('sniper-nav-ping');
 
+    // Header Deal Sniper Quick Controller
+    const headerSniperBtn = document.getElementById('btn-header-sniper-status');
+    const headerSniperDot = document.getElementById('header-sniper-dot');
+    const headerSniperText = document.getElementById('header-sniper-text');
+
     if (isActive) {
       if (toggleBtn) {
         toggleBtn.className = 'inline-flex items-center px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white transition shadow-lg shadow-rose-600/25 cursor-pointer';
@@ -2121,17 +2141,15 @@ class VintedApp {
       if (navDot) navDot.className = 'relative inline-flex rounded-full h-3 w-3 bg-emerald-400';
       if (navPing) navPing.classList.remove('hidden');
 
-      // Sync top header unified mode selector
-      const btnSniper = document.getElementById('mode-btn-sniper');
-      const btnPoll = document.getElementById('mode-btn-poll');
-      const btnPaused = document.getElementById('mode-btn-paused');
-      const dotSniper = document.getElementById('mode-sniper-dot');
-      if (btnSniper) {
-        btnSniper.className = 'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 cursor-pointer engine-mode-active-sniper text-white';
+      if (headerSniperBtn) {
+        headerSniperBtn.className = 'inline-flex items-center px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-semibold bg-emerald-950/40 hover:bg-emerald-900/40 text-emerald-300 border border-emerald-500/50 shadow-sm cursor-pointer transition select-none';
       }
-      if (btnPoll) btnPoll.className = 'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5 cursor-pointer';
-      if (btnPaused) btnPaused.className = 'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5 cursor-pointer';
-      if (dotSniper) dotSniper.classList.remove('hidden');
+      if (headerSniperDot) {
+        headerSniperDot.className = 'w-2 h-2 rounded-full bg-emerald-400 mr-1.5 sm:mr-2 pulse-live shrink-0';
+      }
+      if (headerSniperText) {
+        headerSniperText.innerHTML = `LIVE <button type="button" onclick="event.stopPropagation(); app.stopSniper();" class="ml-1.5 px-1.5 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white text-[10px] font-bold uppercase transition border border-rose-500/40 cursor-pointer" title="Stop live sniper">Stop</button>`;
+      }
     } else {
       if (toggleBtn) {
         toggleBtn.className = 'inline-flex items-center px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-lg shadow-emerald-600/25 cursor-pointer';
@@ -2148,17 +2166,15 @@ class VintedApp {
       if (navDot) navDot.className = 'relative inline-flex rounded-full h-3 w-3 bg-slate-500';
       if (navPing) navPing.classList.add('hidden');
 
-      // Sync top header unified mode selector
-      const btnSniper = document.getElementById('mode-btn-sniper');
-      const btnPoll = document.getElementById('mode-btn-poll');
-      const btnPaused = document.getElementById('mode-btn-paused');
-      const dotSniper = document.getElementById('mode-sniper-dot');
-      if (btnSniper) btnSniper.className = 'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5 cursor-pointer';
-      if (btnPoll) {
-        btnPoll.className = 'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 cursor-pointer engine-mode-active-poll text-white';
+      if (headerSniperBtn) {
+        headerSniperBtn.className = 'inline-flex items-center px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-semibold bg-slate-950/80 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-teal-500/40 transition shadow-sm cursor-pointer select-none';
       }
-      if (btnPaused) btnPaused.className = 'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5 cursor-pointer';
-      if (dotSniper) dotSniper.classList.add('hidden');
+      if (headerSniperDot) {
+        headerSniperDot.className = 'w-2 h-2 rounded-full bg-slate-500 mr-1.5 sm:mr-2 shrink-0';
+      }
+      if (headerSniperText) {
+        headerSniperText.innerHTML = `<span class="text-slate-400 font-medium">Idle</span>`;
+      }
     }
 
     if (window.lucide) lucide.createIcons();
@@ -5092,39 +5108,22 @@ class VintedApp {
   }
 
   async setScanningMode(mode) {
-    this.scanningMode = mode;
-    const btnSniper = document.getElementById('mode-btn-sniper');
-    const btnPoll = document.getElementById('mode-btn-poll');
-    const btnPaused = document.getElementById('mode-btn-paused');
-    const dotSniper = document.getElementById('mode-sniper-dot');
-
-    if (btnSniper) btnSniper.className = 'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5 cursor-pointer';
-    if (btnPoll) btnPoll.className = 'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5 cursor-pointer';
-    if (btnPaused) btnPaused.className = 'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5 cursor-pointer';
-
     if (mode === 'sniper') {
-      if (btnSniper) btnSniper.classList.add('engine-mode-active-sniper', 'text-white');
-      if (dotSniper) dotSniper.classList.remove('hidden');
+      this.showSniperView();
       if (!this.sniperActive) {
-        this.showSniperView();
         await this.startSniper();
       }
     } else if (mode === 'poll') {
-      if (btnPoll) btnPoll.classList.add('engine-mode-active-poll', 'text-white');
-      if (dotSniper) dotSniper.classList.add('hidden');
       if (this.sniperActive) {
         await this.stopSniper();
       }
-      this.showToast('Trend Sync Active: Background scheduler scanning every 30m.', 'info');
+      this.openScraperModal();
     } else if (mode === 'paused') {
-      if (btnPaused) btnPaused.classList.add('engine-mode-active-paused', 'text-white');
-      if (dotSniper) dotSniper.classList.add('hidden');
       if (this.sniperActive) {
         await this.stopSniper();
       }
-      this.showToast('Market Scanner Paused. All automated scanning stopped.', 'info');
+      this.showToast('Market Scanner Paused.', 'info');
     }
-
     if (window.lucide) lucide.createIcons();
   }
 }
