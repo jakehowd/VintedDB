@@ -536,3 +536,60 @@ input[type="number"]::-webkit-inner-spin-button {
   transform-origin: center center !important;
   display: inline-block !important;
 }
+
+/* ── Unified Engine Mode Selector ────────────────────────────────────────── */
+.engine-mode-active-sniper {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.3) 0%, rgba(6, 182, 212, 0.25) 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(16, 185, 129, 0.65) !important;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.35) !important;
+}
+
+.engine-mode-active-poll {
+  background: linear-gradient(135deg, rgba(9, 177, 186, 0.3) 0%, rgba(99, 102, 241, 0.25) 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(9, 177, 186, 0.65) !important;
+  box-shadow: 0 0 16px rgba(9, 177, 186, 0.35) !important;
+}
+
+.engine-mode-active-paused {
+  background: rgba(51, 65, 85, 0.45) !important;
+  color: #e2e8f0 !important;
+  border: 1px solid rgba(100, 116, 139, 0.5) !important;
+}
+
+/* ── Power Trader Keyboard Navigation Focus ──────────────────────────────── */
+.deal-card-focused {
+  border-color: var(--vinted-teal-light) !important;
+  box-shadow: 0 0 28px rgba(56, 203, 212, 0.55), 0 16px 36px rgba(0, 0, 0, 0.8) !important;
+  transform: translateY(-4px) scale(1.015) !important;
+}
+
+/* ── Credential Masking for Security Auditor ─────────────────────────────── */
+.secret-mask {
+  -webkit-text-security: disc;
+  letter-spacing: 2px;
+  filter: blur(2px);
+  transition: filter 0.2s ease;
+}
+
+.secret-mask.unmasked {
+  -webkit-text-security: none;
+  letter-spacing: normal;
+  filter: none;
+}
+
+/* ── Mobile Ergonomics ───────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  #scraper-terminal-container {
+    max-height: 52vh !important;
+    height: 52vh !important;
+    margin-left: 0 !important;
+  }
+
+  .mobile-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+

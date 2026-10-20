@@ -29,6 +29,8 @@ class VintedApp {
     this.audioCtx = null;
     this.sniperTargetInfo = new Map();
     this.itemMaxPrices = new Map();
+    this.focusedDealIndex = -1;
+    this.scanningMode = 'poll';
 
     // Scraper Hub & Batch state
     this.batchTargets = new Set();
@@ -152,6 +154,53 @@ class VintedApp {
         }
       }
     }, { passive: false });
+
+    // Unlock Web Audio API context on first user interaction (bypasses browser autoplay policy)
+    const unlockAudio = () => {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext && !this.audioCtx) this.audioCtx = new AudioContext();
+        if (this.audioCtx && this.audioCtx.state === 'suspended') {
+          this.audioCtx.resume();
+        }
+      } catch (e) {}
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('keydown', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+    };
+    document.addEventListener('click', unlockAudio, { passive: true });
+    document.addEventListener('keydown', unlockAudio, { passive: true });
+    document.addEventListener('touchstart', unlockAudio, { passive: true });
+
+    // Global Power Trader Keyboard Shortcuts (J/K/S/T/?/Esc)
+    window.addEventListener('keydown', (e) => {
+      // Do not capture if typing in an input, textarea, or select
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || e.target.isContentEditable) {
+        if (e.key === 'Escape') {
+          e.target.blur();
+        }
+        return;
+      }
+
+      if (e.key === 'j' || e.key === 'J') {
+        e.preventDefault();
+        this.navigateDealCards(1);
+      } else if (e.key === 'k' || e.key === 'K') {
+        e.preventDefault();
+        this.navigateDealCards(-1);
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        this.snipeFocusedDeal();
+      } else if (e.key === 't' || e.key === 'T') {
+        e.preventDefault();
+        this.toggleScraperTerminal();
+      } else if (e.key === 'Escape') {
+        this.closeAllModals();
+      } else if (e.key === '?') {
+        e.preventDefault();
+        this.showKeyboardShortcutsModal();
+      }
+    });
   }
 
   async loadAvailableCategories() {
@@ -985,6 +1034,26 @@ class VintedApp {
         </div>
       `;
     }).join('');
+
+    const mobListEl = document.getElementById('mobile-tracked-searches-list');
+    if (mobListEl) {
+      mobListEl.innerHTML = listEl.innerHTML;
+    }
+
+    const mobSniper = document.getElementById('mob-nav-sniper');
+    const mobDb = document.getElementById('mob-nav-db');
+    if (mobSniper && mobDb) {
+      if (this.isDbExplorerActive) {
+        mobSniper.className = 'mobile-nav-btn flex flex-col items-center justify-center text-slate-400 hover:text-teal-400 p-1 min-h-[44px] min-w-[56px] transition cursor-pointer';
+        mobDb.className = 'mobile-nav-btn flex flex-col items-center justify-center text-indigo-400 p-1 min-h-[44px] min-w-[56px] transition cursor-pointer';
+      } else if (!this.currentSearchId) {
+        mobSniper.className = 'mobile-nav-btn flex flex-col items-center justify-center text-teal-400 p-1 min-h-[44px] min-w-[56px] transition cursor-pointer';
+        mobDb.className = 'mobile-nav-btn flex flex-col items-center justify-center text-slate-400 hover:text-white p-1 min-h-[44px] min-w-[56px] transition cursor-pointer';
+      } else {
+        mobSniper.className = 'mobile-nav-btn flex flex-col items-center justify-center text-slate-400 hover:text-teal-400 p-1 min-h-[44px] min-w-[56px] transition cursor-pointer';
+        mobDb.className = 'mobile-nav-btn flex flex-col items-center justify-center text-slate-400 hover:text-white p-1 min-h-[44px] min-w-[56px] transition cursor-pointer';
+      }
+    }
 
     if (window.lucide) lucide.createIcons();
   }
@@ -2046,11 +2115,23 @@ class VintedApp {
       if (statusPill) {
         statusPill.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 radar-sweep-active';
       }
-      if (statusText) statusText.textContent = 'SNIPING ACTIVE';
+      if (statusText) statusText.textContent = 'SNIPER LIVE';
       if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-emerald-400 mr-1.5 pulse-live';
 
       if (navDot) navDot.className = 'relative inline-flex rounded-full h-3 w-3 bg-emerald-400';
       if (navPing) navPing.classList.remove('hidden');
+
+      // Sync top header unified mode selector
+      const btnSniper = document.getElementById('mode-btn-sniper');
+      const btnPoll = document.getElementById('mode-btn-poll');
+      const btnPaused = document.getElementById('mode-btn-paused');
+      const dotSniper = document.getElementById('mode-sniper-dot');
+      if (btnSniper) {
+        btnSniper.className = 'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 cursor-pointer engine-mode-active-sniper text-white';
+      }
+      if (btnPoll) btnPoll.className = 'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5 cursor-pointer';
+      if (btnPaused) btnPaused.className = 'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5 cursor-pointer';
+      if (dotSniper) dotSniper.classList.remove('hidden');
     } else {
       if (toggleBtn) {
         toggleBtn.className = 'inline-flex items-center px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-lg shadow-emerald-600/25 cursor-pointer';
@@ -2061,11 +2142,23 @@ class VintedApp {
       if (statusPill) {
         statusPill.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700';
       }
-      if (statusText) statusText.textContent = 'RADAR IDLE';
+      if (statusText) statusText.textContent = 'SCANNER IDLE';
       if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-slate-500 mr-1.5';
 
       if (navDot) navDot.className = 'relative inline-flex rounded-full h-3 w-3 bg-slate-500';
       if (navPing) navPing.classList.add('hidden');
+
+      // Sync top header unified mode selector
+      const btnSniper = document.getElementById('mode-btn-sniper');
+      const btnPoll = document.getElementById('mode-btn-poll');
+      const btnPaused = document.getElementById('mode-btn-paused');
+      const dotSniper = document.getElementById('mode-sniper-dot');
+      if (btnSniper) btnSniper.className = 'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5 cursor-pointer';
+      if (btnPoll) {
+        btnPoll.className = 'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 cursor-pointer engine-mode-active-poll text-white';
+      }
+      if (btnPaused) btnPaused.className = 'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5 cursor-pointer';
+      if (dotSniper) dotSniper.classList.add('hidden');
     }
 
     if (window.lucide) lucide.createIcons();
@@ -2268,8 +2361,16 @@ class VintedApp {
         vintedUrl = 'https://www.vinted.co.uk' + (vintedUrl.startsWith('/') ? '' : '/') + vintedUrl;
       }
 
+      const askingPrice = Number(deal.price) || 0;
+      const buyerFee = 0.70 + (askingPrice * 0.05);
+      const estShipping = 2.70;
+      const totalBuyCost = askingPrice + buyerFee + estShipping;
+      const estResaleVal = Number(deal.market_avg_price) || (askingPrice + Number(deal.savings || 15));
+      const netProfit = Math.max(0, estResaleVal - totalBuyCost);
+      const roiPct = totalBuyCost > 0 ? (netProfit / totalBuyCost) * 100 : 0;
+
       return `
-        <div class="deal-card deal-card-new p-4 rounded-2xl flex flex-col justify-between space-y-3.5 relative group" data-deal-id="${deal.id}">
+        <div class="deal-card deal-card-new p-4 rounded-2xl flex flex-col justify-between space-y-3 relative group" data-deal-id="${deal.id}" tabindex="0" onclick="app.setFocusedDealById('${deal.id}')">
           <!-- Dismiss button -->
           <button onclick="event.stopPropagation(); app.dismissSniperDeal('${deal.id}')" 
                   class="absolute top-3 right-3 w-7 h-7 rounded-lg bg-slate-950/80 hover:bg-rose-500/20 border border-slate-800 hover:border-rose-500/40 flex items-center justify-center text-slate-400 hover:text-rose-300 transition shadow-sm z-10 cursor-pointer" 
@@ -2309,6 +2410,25 @@ class VintedApp {
                 ${deal.market_avg_price ? `<span>Market: <strong class="text-slate-300 font-mono">£${deal.market_avg_price.toFixed(2)}</strong></span>` : ''}
                 ${deal.savings && deal.savings > 0 ? `<span class="text-teal-400 font-semibold">• Save £${deal.savings.toFixed(2)}</span>` : ''}
               </div>
+            </div>
+          </div>
+
+          <!-- Reseller Net Margin & Fee Breakdown (Persona 1 & 4 UX improvement) -->
+          <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-1 text-[11px]">
+            <div class="flex items-center justify-between text-slate-400">
+              <span class="flex items-center">
+                <i data-lucide="calculator" class="w-3 h-3 mr-1 text-teal-400"></i>
+                Vinted Fee + Shipping:
+              </span>
+              <span class="font-mono text-slate-300 tabular-nums">+£${(buyerFee + estShipping).toFixed(2)}</span>
+            </div>
+            <div class="flex items-center justify-between text-slate-400">
+              <span>Total Landed Cost:</span>
+              <span class="font-mono text-slate-200 tabular-nums font-semibold">£${totalBuyCost.toFixed(2)}</span>
+            </div>
+            <div class="flex items-center justify-between pt-1 border-t border-slate-800/80 font-bold">
+              <span class="text-emerald-400">Est. Resale Profit:</span>
+              <span class="font-mono text-emerald-400 font-extrabold tabular-nums">+£${netProfit.toFixed(2)} <span class="text-[10px] text-emerald-400/80 font-normal">(${roiPct.toFixed(0)}% ROI)</span></span>
             </div>
           </div>
 
@@ -4853,6 +4973,159 @@ class VintedApp {
     if (output) {
       output.scrollTop = output.scrollHeight;
     }
+  }
+
+  // ── Power Trader Keyboard Navigation & Unified Modes ──────────────────────
+
+  navigateDealCards(direction) {
+    const cards = Array.from(document.querySelectorAll('#sniper-deals-grid .deal-card'));
+    if (cards.length === 0) return;
+
+    if (this.focusedDealIndex === -1) {
+      this.focusedDealIndex = direction > 0 ? 0 : cards.length - 1;
+    } else {
+      this.focusedDealIndex = Math.max(0, Math.min(cards.length - 1, this.focusedDealIndex + direction));
+    }
+
+    cards.forEach((c, idx) => {
+      if (idx === this.focusedDealIndex) {
+        c.classList.add('deal-card-focused');
+        c.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else {
+        c.classList.remove('deal-card-focused');
+      }
+    });
+  }
+
+  setFocusedDealById(id) {
+    const cards = Array.from(document.querySelectorAll('#sniper-deals-grid .deal-card'));
+    cards.forEach((c, idx) => {
+      if (c.dataset.dealId === String(id)) {
+        this.focusedDealIndex = idx;
+        c.classList.add('deal-card-focused');
+      } else {
+        c.classList.remove('deal-card-focused');
+      }
+    });
+  }
+
+  snipeFocusedDeal() {
+    const cards = Array.from(document.querySelectorAll('#sniper-deals-grid .deal-card'));
+    if (cards.length === 0) {
+      this.showToast('No deal cards in stream to snipe', 'info');
+      return;
+    }
+    const targetIdx = this.focusedDealIndex >= 0 ? this.focusedDealIndex : 0;
+    const card = cards[targetIdx];
+    const link = card.querySelector('a[href]');
+    if (link && link.href) {
+      window.open(link.href, '_blank');
+      this.showToast('Opening sniped deal on Vinted UK...', 'success');
+    }
+  }
+
+  showKeyboardShortcutsModal() {
+    const modal = document.getElementById('shortcuts-modal');
+    if (modal) modal.classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+  }
+
+  closeShortcutsModal() {
+    const modal = document.getElementById('shortcuts-modal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  closeAllModals() {
+    this.closeAddModal();
+    this.closeEditModal();
+    this.closeScraperModal();
+    this.closeDatabaseModal();
+    this.closeAntiBanModal();
+    this.closeShortcutsModal();
+    this.closeScraperTerminal();
+    const mobDrawer = document.getElementById('mobile-items-drawer');
+    if (mobDrawer) mobDrawer.classList.add('hidden');
+  }
+
+  toggleMobileItemsDrawer() {
+    const drawer = document.getElementById('mobile-items-drawer');
+    if (!drawer) return;
+    const isHidden = drawer.classList.contains('hidden');
+    if (isHidden) {
+      const desktopList = document.getElementById('tracked-searches-list');
+      const mobileList = document.getElementById('mobile-tracked-searches-list');
+      if (desktopList && mobileList) {
+        mobileList.innerHTML = desktopList.innerHTML;
+        mobileList.querySelectorAll('button').forEach(btn => {
+          btn.addEventListener('click', () => {
+            drawer.classList.add('hidden');
+          });
+        });
+      }
+      drawer.classList.remove('hidden');
+    } else {
+      drawer.classList.add('hidden');
+    }
+    if (window.lucide) lucide.createIcons();
+  }
+
+  toggleCredentialMasking() {
+    const proxyInput = document.getElementById('antiban-proxies-input');
+    const cookieInput = document.getElementById('antiban-cookies-input');
+    const textEl = document.getElementById('credential-mask-text');
+    const iconEl = document.getElementById('credential-mask-icon');
+    if (!proxyInput) return;
+
+    const isMasked = proxyInput.classList.contains('secret-mask') && !proxyInput.classList.contains('unmasked');
+    if (isMasked) {
+      proxyInput.classList.add('unmasked');
+      if (cookieInput) cookieInput.classList.add('unmasked');
+      if (textEl) textEl.textContent = 'Hide Secrets';
+      if (iconEl) iconEl.setAttribute('data-lucide', 'eye-off');
+    } else {
+      proxyInput.classList.remove('unmasked');
+      if (cookieInput) cookieInput.classList.remove('unmasked');
+      if (textEl) textEl.textContent = 'Show Secrets';
+      if (iconEl) iconEl.setAttribute('data-lucide', 'eye');
+    }
+    if (window.lucide) lucide.createIcons();
+  }
+
+  async setScanningMode(mode) {
+    this.scanningMode = mode;
+    const btnSniper = document.getElementById('mode-btn-sniper');
+    const btnPoll = document.getElementById('mode-btn-poll');
+    const btnPaused = document.getElementById('mode-btn-paused');
+    const dotSniper = document.getElementById('mode-sniper-dot');
+
+    if (btnSniper) btnSniper.className = 'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5 cursor-pointer';
+    if (btnPoll) btnPoll.className = 'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5 cursor-pointer';
+    if (btnPaused) btnPaused.className = 'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5 cursor-pointer';
+
+    if (mode === 'sniper') {
+      if (btnSniper) btnSniper.classList.add('engine-mode-active-sniper', 'text-white');
+      if (dotSniper) dotSniper.classList.remove('hidden');
+      if (!this.sniperActive) {
+        this.showSniperView();
+        await this.startSniper();
+      }
+    } else if (mode === 'poll') {
+      if (btnPoll) btnPoll.classList.add('engine-mode-active-poll', 'text-white');
+      if (dotSniper) dotSniper.classList.add('hidden');
+      if (this.sniperActive) {
+        await this.stopSniper();
+      }
+      this.showToast('Trend Sync Active: Background scheduler scanning every 30m.', 'info');
+    } else if (mode === 'paused') {
+      if (btnPaused) btnPaused.classList.add('engine-mode-active-paused', 'text-white');
+      if (dotSniper) dotSniper.classList.add('hidden');
+      if (this.sniperActive) {
+        await this.stopSniper();
+      }
+      this.showToast('Market Scanner Paused. All automated scanning stopped.', 'info');
+    }
+
+    if (window.lucide) lucide.createIcons();
   }
 }
 
