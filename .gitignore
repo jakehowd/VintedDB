@@ -1,0 +1,42 @@
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite3
+
+# Runtime storage & user profiles (contains private session cookies, proxies, and profile caches)
+storage/*
+!storage/.gitkeep
+
+# Environment variables & secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Operating System & IDE
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.vscode/
+.idea/
+
+# Agent & AI Tooling caches
+.gemini/

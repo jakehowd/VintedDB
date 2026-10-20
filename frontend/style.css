@@ -1,0 +1,538 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   VINTED TRACKER & DEAL RADAR — DESIGN SYSTEM & VISUAL UPGRADES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  --vinted-teal: #09b1ba;
+  --vinted-teal-dark: #078e95;
+  --vinted-teal-light: #38cbd4;
+  --vinted-teal-glow: rgba(9, 177, 186, 0.35);
+
+  --emerald-neon: #10b981;
+  --emerald-glow: rgba(16, 185, 129, 0.35);
+
+  --cyan-neon: #06b6d4;
+  --cyan-glow: rgba(6, 182, 212, 0.35);
+
+  --indigo-neon: #6366f1;
+  --indigo-glow: rgba(99, 102, 241, 0.35);
+
+  --amber-neon: #f59e0b;
+  --amber-glow: rgba(245, 158, 11, 0.35);
+
+  --rose-neon: #f43f5e;
+  --rose-glow: rgba(244, 63, 94, 0.35);
+
+  --bg-deep: #060911;
+  --bg-panel: rgba(13, 20, 36, 0.72);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-highlight: rgba(255, 255, 255, 0.16);
+}
+
+/* ── Global Page Atmosphere ──────────────────────────────────────────────── */
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-deep);
+  background-image:
+    radial-gradient(ellipse 90% 50% at 50% -15%, rgba(9, 177, 186, 0.14), transparent 70%),
+    radial-gradient(circle 600px at 95% 5%, rgba(99, 102, 241, 0.08), transparent 60%),
+    radial-gradient(circle 450px at 5% 40%, rgba(16, 185, 129, 0.06), transparent 50%);
+  background-attachment: fixed;
+  color: #f1f5f9;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code, .font-mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-feature-settings: "tnum" 1, "cv05" 1;
+}
+
+/* ── Modern Glassmorphism & High-Tech Cards ──────────────────────────────── */
+.glass-panel {
+  background: var(--bg-panel);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.55), inset 0 1px 0 0 rgba(255, 255, 255, 0.07);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.glass-panel:hover {
+  border-color: var(--border-highlight);
+}
+
+/* Elevated KPI Stat Cards */
+.stat-card {
+  position: relative;
+  background: linear-gradient(135deg, rgba(17, 26, 46, 0.85) 0%, rgba(10, 15, 28, 0.95) 100%);
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+  transition: background 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.65);
+}
+
+/* Themed Stat Card Accents */
+.stat-card-teal::before {
+  background: linear-gradient(90deg, transparent, var(--vinted-teal), transparent);
+}
+.stat-card-teal:hover {
+  border-color: rgba(9, 177, 186, 0.4);
+  box-shadow: 0 12px 28px -6px rgba(9, 177, 186, 0.2);
+}
+
+.stat-card-emerald::before {
+  background: linear-gradient(90deg, transparent, var(--emerald-neon), transparent);
+}
+.stat-card-emerald:hover {
+  border-color: rgba(16, 185, 129, 0.4);
+  box-shadow: 0 12px 28px -6px rgba(16, 185, 129, 0.2);
+}
+
+.stat-card-indigo::before {
+  background: linear-gradient(90deg, transparent, var(--indigo-neon), transparent);
+}
+.stat-card-indigo:hover {
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 12px 28px -6px rgba(99, 102, 241, 0.2);
+}
+
+.stat-card-amber::before {
+  background: linear-gradient(90deg, transparent, var(--amber-neon), transparent);
+}
+.stat-card-amber:hover {
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: 0 12px 28px -6px rgba(245, 158, 11, 0.2);
+}
+
+.stat-card-cyan::before {
+  background: linear-gradient(90deg, transparent, var(--cyan-neon), transparent);
+}
+.stat-card-cyan:hover {
+  border-color: rgba(6, 182, 212, 0.4);
+  box-shadow: 0 12px 28px -6px rgba(6, 182, 212, 0.2);
+}
+
+/* ── Refined Custom Scrollbars ───────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(6, 9, 17, 0.6);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #25334c;
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--vinted-teal);
+}
+
+/* ── Interactive Nav & Filter Tabs ───────────────────────────────────────── */
+.filter-btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.filter-btn.active {
+  background: linear-gradient(135deg, var(--vinted-teal) 0%, var(--vinted-teal-dark) 100%) !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  box-shadow: 0 2px 14px var(--vinted-teal-glow);
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.sidebar-item {
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-item:hover {
+  background-color: rgba(30, 41, 59, 0.6);
+  transform: translateX(2px);
+}
+
+.sidebar-item.active {
+  background: linear-gradient(90deg, rgba(9, 177, 186, 0.18) 0%, rgba(9, 177, 186, 0.04) 100%);
+  color: #ffffff;
+  border-left: 3px solid var(--vinted-teal);
+  box-shadow: inset 0 0 16px -4px rgba(9, 177, 186, 0.15);
+}
+
+/* ── Pulse & Live Radar Animations ───────────────────────────────────────── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.85); }
+}
+
+.pulse-live {
+  animation: pulse-dot 2s infinite ease-in-out;
+}
+
+/* Radar Ripple Effect for Deal Sniper */
+@keyframes radar-ripple-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.radar-sweep-active {
+  position: relative;
+}
+
+.radar-sweep-active::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  border: 2px solid var(--emerald-neon);
+  animation: radar-ripple-ring 2.2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+  pointer-events: none;
+}
+
+/* ── Sniper Deal Trading Card ────────────────────────────────────────────── */
+.deal-card {
+  position: relative;
+  background: linear-gradient(135deg, rgba(16, 25, 45, 0.95) 0%, rgba(6, 32, 28, 0.85) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 1rem;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 0 16px -4px rgba(16, 185, 129, 0.12);
+  overflow: hidden;
+}
+
+.deal-card:hover {
+  transform: translateY(-4px) scale(1.01);
+  border-color: rgba(16, 185, 129, 0.65);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7), 0 0 28px -4px rgba(16, 185, 129, 0.3);
+}
+
+.deal-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--emerald-neon), transparent);
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 16px rgba(16, 185, 129, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 28px rgba(16, 185, 129, 0.55);
+  }
+}
+
+.deal-card-new {
+  animation: pulseGlow 3.5s infinite ease-in-out;
+}
+
+/* Image Zoom on Deal Card Hover */
+.deal-card img {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.deal-card:hover img {
+  transform: scale(1.06);
+}
+
+/* ── Live Scraper Terminal Drawer & Item Cards ───────────────────────────── */
+.terminal-item-card {
+  position: relative;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.terminal-item-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -4px rgba(16, 185, 129, 0.3);
+}
+
+#scraper-terminal-output::-webkit-scrollbar {
+  width: 5px;
+}
+
+#scraper-terminal-output::-webkit-scrollbar-track {
+  background: #020617;
+}
+
+#scraper-terminal-output::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 9999px;
+}
+
+#scraper-terminal-output::-webkit-scrollbar-thumb:hover {
+  background: #10b981;
+}
+
+/* ── Themed High-Visibility Checkboxes ───────────────────────────────────── */
+.custom-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 0.35rem;
+  background-color: #0b1329;
+  border: 1.5px solid #475569;
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  flex-shrink: 0;
+  accent-color: var(--vinted-teal);
+}
+
+.custom-checkbox:hover {
+  border-color: var(--vinted-teal);
+  box-shadow: 0 0 8px rgba(9, 177, 186, 0.35);
+}
+
+.custom-checkbox:checked {
+  background-color: var(--vinted-teal);
+  border-color: var(--vinted-teal);
+  box-shadow: 0 0 10px rgba(9, 177, 186, 0.5);
+}
+
+.custom-checkbox::before {
+  content: "";
+  width: 0.65rem;
+  height: 0.65rem;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+  transform: scale(0);
+  transform-origin: bottom left;
+  transition: 120ms transform ease-in-out;
+  box-shadow: inset 1em 1em white;
+  background-color: white;
+}
+
+.custom-checkbox:checked::before {
+  transform: scale(1);
+}
+
+/* ── Toast with Actionable Resolution Styling ────────────────────────────── */
+#toast {
+  max-width: 28rem;
+  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  background: rgba(15, 23, 42, 0.95);
+}
+
+.toast-resolution-box {
+  background: rgba(15, 23, 42, 0.8);
+  border-left: 3px solid #f43f5e;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.72rem;
+  color: #cbd5e1;
+  margin-top: 0.35rem;
+  line-height: 1.35;
+}
+
+/* ── Segmented Interval Pills ────────────────────────────────────────────── */
+.interval-pill.active {
+  background: linear-gradient(135deg, var(--vinted-teal) 0%, var(--vinted-teal-dark) 100%) !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  border-color: var(--vinted-teal) !important;
+  box-shadow: 0 0 14px var(--vinted-teal-glow);
+}
+
+/* ── Database Explorer Specific Styles ───────────────────────────────────── */
+.db-reason-chip {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.db-reason-chip:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+.db-reason-chip.active {
+  border-color: var(--vinted-teal) !important;
+  box-shadow: 0 0 12px var(--vinted-teal-glow);
+  background-color: rgba(9, 177, 186, 0.18) !important;
+}
+
+.db-table-row {
+  transition: background-color 0.15s ease-in-out;
+}
+
+.db-table-row:hover {
+  background-color: rgba(30, 41, 59, 0.55);
+}
+
+.db-thumb-wrapper {
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.db-thumb-wrapper:hover {
+  transform: scale(1.12);
+  z-index: 20;
+}
+
+/* ── Wheel Scrolling & Table Overflow Preservation ────────────────────────── */
+.db-table-scroll-container {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* ── Sleek Modern Toggle Switch ──────────────────────────────────────────── */
+.sleek-switch {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 22px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.sleek-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.sleek-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #1e293b;
+  border: 1.5px solid #475569;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 9999px;
+}
+
+.sleek-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 2.5px;
+  background-color: #94a3b8;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.sleek-switch input:checked + .sleek-slider {
+  background-color: rgba(245, 158, 11, 0.25);
+  border-color: #f59e0b;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.4);
+}
+
+.sleek-switch input:checked + .sleek-slider:before {
+  transform: translateX(18px);
+  background-color: #fbbf24;
+}
+
+.sleek-switch.teal input:checked + .sleek-slider {
+  background-color: rgba(9, 177, 186, 0.25);
+  border-color: var(--vinted-teal);
+  box-shadow: 0 0 14px var(--vinted-teal-glow);
+}
+
+.sleek-switch.teal input:checked + .sleek-slider:before {
+  transform: translateX(18px);
+  background-color: var(--vinted-teal);
+}
+
+/* ── Primary Action Glow Button ──────────────────────────────────────────── */
+.btn-primary-glow {
+  background: linear-gradient(135deg, #0bb8c2 0%, #06888e 100%);
+  box-shadow: 0 4px 18px rgba(9, 177, 186, 0.35);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-primary-glow:hover {
+  background: linear-gradient(135deg, #13d6e1 0%, #08a1a8 100%);
+  box-shadow: 0 8px 24px rgba(9, 177, 186, 0.55);
+  transform: translateY(-1px);
+}
+
+.btn-primary-glow:active {
+  transform: scale(0.98);
+}
+
+/* ── Modern Frosted Glass Modals ─────────────────────────────────────────── */
+.glass-modal {
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.96) 0%, rgba(9, 13, 24, 0.98) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05), inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* ── Fade In Animation ───────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Explicit spin animation for rotating icons */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite !important;
+  transform-origin: center center !important;
+  display: inline-block !important;
+}

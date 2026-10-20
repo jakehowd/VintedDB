@@ -1,0 +1,1767 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vinted UK Sales & Price Tracker</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            vinted: {
+              DEFAULT: '#09b1ba',
+              dark: '#078e95',
+              light: '#38cbd4',
+              soft: 'rgba(9, 177, 186, 0.15)'
+            },
+            slate: {
+              850: '#151f32',
+              900: '#0f172a',
+              950: '#090d16'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="/static/style.css?v=2.5">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-vinted selection:text-white">
+
+  <!-- Top Navigation Header -->
+  <header class="border-b border-slate-800/80 bg-slate-900/90 backdrop-blur-xl sticky top-0 z-40 px-6 py-3 flex items-center justify-between shadow-lg shadow-black/30">
+    <div class="flex items-center space-x-4">
+      <div class="relative group">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-500 via-vinted to-cyan-400 flex items-center justify-center shadow-lg shadow-vinted/30 transition-transform duration-300 group-hover:scale-105">
+          <i data-lucide="trending-up" class="w-5 h-5 text-white drop-shadow"></i>
+        </div>
+        <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-slate-900 pulse-live"></span>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2.5">
+          <h1 class="text-lg font-black tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">Vinted Tracker</h1>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/10 text-teal-300 border border-teal-500/30 uppercase tracking-wider">
+            <span class="w-1.5 h-1.5 rounded-full bg-teal-400 mr-1.5 pulse-live"></span>
+            UK MARKETPLACE
+          </span>
+        </div>
+        <p class="text-xs text-slate-400">Historical price analytics, verified sold values & live bargain radar</p>
+      </div>
+    </div>
+
+    <div class="flex items-center space-x-2.5">
+      <!-- Live Scraper Terminal Toggle -->
+      <button id="btn-toggle-scraper-terminal" onclick="app.toggleScraperTerminal()" class="inline-flex items-center text-xs font-semibold text-emerald-400 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 rounded-xl px-3 py-2 transition shadow-sm cursor-pointer" title="Toggle Live Scraper Activity Terminal">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 mr-2 pulse-live" id="header-terminal-pulse"></span>
+        <i data-lucide="terminal" class="w-3.5 h-3.5 mr-1.5 text-emerald-400"></i>
+        <span>Live Terminal</span>
+        <span id="header-terminal-db-badge" class="ml-2 px-1.5 py-0.2 rounded font-mono text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">0</span>
+      </button>
+
+      <!-- Auto-Poll Scheduler Hub -->
+      <button id="btn-header-scraper-modal" onclick="app.openScraperModal()" class="inline-flex items-center text-xs text-slate-300 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 rounded-xl px-3 py-2 transition cursor-pointer" title="Configure auto-polling & continuous scraping">
+        <i data-lucide="cpu" class="w-3.5 h-3.5 mr-1.5 text-vinted"></i>
+        <span>Auto-Poll: <strong id="header-poll-interval-text" class="text-white">Every 30m</strong></span>
+        <span id="header-next-poll-timer" class="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-900 text-teal-300 border border-slate-700" title="Countdown until next auto-poll scrape">--:--</span>
+        <span id="header-constant-badge" class="hidden ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 pulse-live">24/7</span>
+      </button>
+
+      <!-- Anti-Ban Shield -->
+      <button id="btn-open-antiban-modal" onclick="app.openAntiBanModal()" class="inline-flex items-center px-3 py-2 rounded-xl text-xs font-semibold bg-slate-950/80 hover:bg-slate-800 text-cyan-300 border border-slate-800 transition cursor-pointer" title="Anti-Ban Shield & Proxy Status">
+        <i data-lucide="shield-check" class="w-3.5 h-3.5 mr-1.5 text-cyan-400"></i>
+        <span id="header-antiban-badge" class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">TLS OK</span>
+      </button>
+
+      <!-- Primary Action: Track New Item -->
+      <button id="btn-open-add-modal" onclick="app.openAddModal()" class="btn-primary-glow inline-flex items-center px-4 py-2 rounded-xl text-xs font-bold text-white transition cursor-pointer">
+        <i data-lucide="plus" class="w-4 h-4 mr-1.5"></i>
+        Track New Item
+      </button>
+    </div>
+  </header>
+
+  <!-- Main App Layout -->
+  <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+
+    <!-- Left Sidebar: Tracked Items Navigation -->
+    <aside class="w-full md:w-72 bg-slate-900/90 border-r border-slate-800/80 flex flex-col shrink-0 shadow-lg shadow-black/20">
+      
+      <div class="p-3.5 border-b border-slate-800/60 flex items-center justify-between">
+        <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center">
+          <i data-lucide="layout-grid" class="w-3.5 h-3.5 mr-1.5 text-teal-400"></i>
+          Command Center
+        </span>
+        <span id="search-count-badge" class="px-2 py-0.5 text-xs font-mono font-bold rounded-full bg-slate-800 text-slate-300 border border-slate-700">0</span>
+      </div>
+
+      <!-- Navigation items list -->
+      <nav class="flex-1 overflow-y-auto p-3 space-y-1.5" id="sidebar-nav">
+        <!-- Deal Sniper Live Radar Button -->
+        <button id="nav-sniper-btn" onclick="app.showSniperView()" class="sidebar-item w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-200 hover:bg-slate-800 hover:text-white transition group active">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-7 h-7 rounded-lg bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400 group-hover:scale-105 transition-transform">
+              <i data-lucide="crosshair" class="w-4 h-4 text-vinted"></i>
+            </div>
+            <span>Deal Sniper</span>
+          </div>
+          <span id="sniper-deals-badge" class="px-2 py-0.5 text-[11px] font-mono font-bold rounded-full bg-slate-800 text-emerald-400 border border-slate-700">0</span>
+        </button>
+
+        <!-- Advanced Database Explorer Page Button -->
+        <button id="nav-db-explorer-btn" onclick="app.showDatabaseExplorerView()" class="sidebar-item w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition group">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-7 h-7 rounded-lg bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 group-hover:scale-105 transition-transform">
+              <i data-lucide="database" class="w-4 h-4 text-indigo-400"></i>
+            </div>
+            <span>Database Explorer</span>
+          </div>
+          <div class="flex items-center space-x-1.5">
+            <span id="sidebar-db-replica-badge" class="hidden px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">0 REP</span>
+            <span id="sidebar-db-count-badge" class="px-2 py-0.5 text-[11px] font-mono font-bold rounded-full bg-slate-800 text-slate-300 border border-slate-700">0</span>
+          </div>
+        </button>
+
+        <!-- Live Scraper Activity Terminal Button -->
+        <button id="nav-scraper-terminal-btn" onclick="app.toggleScraperTerminal()" class="sidebar-item w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition group">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
+              <i data-lucide="terminal" class="w-4 h-4 text-emerald-400"></i>
+            </div>
+            <span>Scraper Terminal</span>
+          </div>
+          <div class="flex items-center space-x-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-live"></span>
+            <span id="sidebar-terminal-db-badge" class="px-2 py-0.5 text-[11px] font-mono font-bold rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">0</span>
+          </div>
+        </button>
+
+        <!-- Scraper & Scheduling Hub Button -->
+        <button id="nav-scraper-btn" onclick="app.openScraperModal()" class="sidebar-item w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition group">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-6 h-6 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+              <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+            </div>
+            <span>Batch & Scheduler Hub</span>
+          </div>
+          <span id="sidebar-next-poll-timer" class="text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold bg-slate-800 text-teal-400 border border-slate-700">--:--</span>
+        </button>
+
+        <!-- Storage & Pruning Hub Button -->
+        <button id="nav-database-btn" onclick="app.openDatabaseModal()" class="sidebar-item w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition group">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-6 h-6 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+              <i data-lucide="hard-drive" class="w-3.5 h-3.5"></i>
+            </div>
+            <span>Storage & Pruning</span>
+          </div>
+          <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300 transition"></i>
+        </button>
+
+        <!-- Anti-Ban & Proxies Hub Button -->
+        <button id="nav-antiban-btn" onclick="app.openAntiBanModal()" class="sidebar-item w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition group">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-6 h-6 rounded-md bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+            </div>
+            <span>Anti-Ban & Proxies</span>
+          </div>
+          <span id="sidebar-antiban-pill" class="text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold bg-slate-800 text-cyan-400 border border-slate-700">SHIELD</span>
+        </button>
+
+        <!-- Tracked Items Section -->
+        <div class="pt-4 pb-1 px-1 flex items-center justify-between">
+          <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Tracked Searches</span>
+          <span class="text-[10px] text-slate-500">Live Sync</span>
+        </div>
+
+        <!-- Quick Search Filter Input for Tracked Items -->
+        <div class="pt-1 pb-2">
+          <div class="relative">
+            <i data-lucide="search" class="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-500"></i>
+            <input type="text" id="sidebar-search-filter" placeholder="Filter tracked items..." oninput="app.filterSidebarItems(this.value)" class="w-full bg-slate-950/80 border border-slate-800 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-vinted focus:ring-1 focus:ring-vinted/30 transition">
+          </div>
+        </div>
+
+        <!-- Dynamic list of items inserted by app.js -->
+        <div id="tracked-searches-list" class="space-y-1">
+          <div class="text-xs text-slate-500 px-3 py-4 text-center">Loading items...</div>
+        </div>
+      </nav>
+
+      <!-- Sidebar footer / Quick Status & System Health -->
+      <div class="p-3.5 border-t border-slate-800/80 bg-slate-950/60">
+        <div class="flex items-center justify-between text-[11px] text-slate-400">
+          <span class="flex items-center">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 pulse-live"></span>
+            System Engine
+          </span>
+          <span class="font-mono text-emerald-400 font-semibold">Active</span>
+        </div>
+        <div class="text-[10px] text-slate-500 mt-1 flex items-center justify-between font-mono">
+          <span>Engine: Uvicorn / SQLite</span>
+          <span>v2.4 PRO</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto bg-slate-950 p-4 md:p-8">
+
+      <!-- View Container 1: Single Item Detail Dashboard -->
+      <div id="item-detail-view" class="space-y-6 hidden animate-fade-in">
+        
+        <!-- Header Bar for Item -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+          <div>
+            <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
+              <button onclick="app.showSniperView()" class="hover:text-vinted transition flex items-center cursor-pointer">
+                <i data-lucide="crosshair" class="w-3 h-3 mr-1 text-vinted"></i>
+                Deal Sniper
+              </button>
+              <span>/</span>
+              <span class="text-slate-300">Vinted UK</span>
+            </div>
+            <h2 id="item-title" class="text-2xl font-bold text-white tracking-tight">Search Item</h2>
+            <div id="item-filters-badge-row" class="flex flex-wrap items-center gap-1.5 mt-1.5">
+              <!-- Dynamically populated Brand & Category badges -->
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <!-- 1-Click Child Sizes Quick Toggle -->
+            <button id="btn-toggle-child-filter" onclick="app.toggleCurrentItemChildFilter()" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition cursor-pointer" title="1-click toggle: exclude or allow child & youth sizes">
+              <i data-lucide="baby" class="w-3.5 h-3.5 mr-1.5 text-amber-400"></i>
+              <span id="btn-toggle-child-filter-text">No Kids: OFF</span>
+            </button>
+
+            <!-- Edit Filters Button with Live Child Filter Status Pill -->
+            <button id="btn-edit-search" onclick="app.openEditModal()" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-slate-700 transition cursor-pointer" title="Edit Brand, Categories, Anti-Rep and Size Filters">
+              <i data-lucide="sliders" class="w-3.5 h-3.5 mr-1.5 text-slate-400"></i>
+              <span>Filters</span>
+              <span id="btn-edit-child-pill" class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">All Sizes</span>
+            </button>
+
+            <!-- Scrape Vinted Button -->
+            <button id="btn-scrape-now" onclick="app.scrapeCurrentItem()" class="inline-flex items-center px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 transition shadow-sm cursor-pointer">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1.5 inline-block shrink-0" id="scrape-icon"></i>
+              <span id="scrape-btn-text">Scrape</span>
+            </button>
+
+            <!-- Delete Search Button -->
+            <button id="btn-delete-search" onclick="app.deleteCurrentItem()" class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer" title="Delete Search">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- KPI Stat Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="stat-card stat-card-teal p-4 rounded-xl">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <span class="font-semibold text-slate-300">Total Recorded Sales</span>
+              <div class="w-7 h-7 rounded-lg bg-teal-500/10 flex items-center justify-center text-teal-400">
+                <i data-lucide="shopping-bag" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div id="stat-total-count" class="text-2xl font-black text-white font-mono tracking-tight">0</div>
+            <div class="text-[11px] text-slate-500 mt-1">Unique item listings</div>
+          </div>
+
+          <div class="stat-card stat-card-emerald p-4 rounded-xl">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <span class="font-semibold text-slate-300">Average Price Sold</span>
+              <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                <i data-lucide="pound-sterling" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div id="stat-avg-price" class="text-2xl font-black text-emerald-400 font-mono tracking-tight">£0.00</div>
+            <div class="text-[11px] text-slate-500 mt-1">Mean sold value</div>
+          </div>
+
+          <div class="stat-card stat-card-indigo p-4 rounded-xl">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <span class="font-semibold text-slate-300">Price Range</span>
+              <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                <i data-lucide="arrow-up-down" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div id="stat-price-range" class="text-2xl font-black text-slate-200 font-mono tracking-tight">£0 - £0</div>
+            <div class="text-[11px] text-slate-500 mt-1">Min to Max observed</div>
+          </div>
+
+          <div class="stat-card stat-card-amber p-4 rounded-xl">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <span class="font-semibold text-slate-300">Gross Volume Value</span>
+              <div class="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
+                <i data-lucide="coins" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div id="stat-gross-value" class="text-2xl font-black text-amber-400 font-mono tracking-tight">£0.00</div>
+            <div class="text-[11px] text-slate-500 mt-1">Cumulative sales total</div>
+          </div>
+        </div>
+
+        <!-- Period Granularity Toggle Bar -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/90 p-2.5 rounded-xl border border-slate-800">
+          <div class="flex items-center space-x-2 text-xs font-semibold text-slate-400 px-2">
+            <i data-lucide="calendar" class="w-4 h-4 text-vinted"></i>
+            <span>Chart Aggregation Timeframe:</span>
+          </div>
+          
+          <div class="inline-flex bg-slate-950 p-1 rounded-lg border border-slate-800" id="period-toggles">
+            <button onclick="app.setPeriod('day')" class="filter-btn px-3 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-white transition" data-period="day">Days</button>
+            <button onclick="app.setPeriod('week')" class="filter-btn px-3 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-white transition active" data-period="week">Weeks</button>
+            <button onclick="app.setPeriod('month')" class="filter-btn px-3 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-white transition" data-period="month">Months</button>
+            <button onclick="app.setPeriod('year')" class="filter-btn px-3 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-white transition" data-period="year">Years</button>
+          </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- Chart 1: Sales Quantity Trend -->
+          <div class="glass-panel p-5 rounded-2xl">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-base font-bold text-white flex items-center">
+                  <i data-lucide="bar-chart-3" class="w-4 h-4 mr-2 text-vinted"></i>
+                  Sales Quantity Trend
+                </h3>
+                <p class="text-xs text-slate-400">Total volume of sales across selected periods</p>
+              </div>
+              <span id="chart1-period-badge" class="px-2 py-0.5 text-[11px] font-mono rounded bg-slate-800 text-teal-400 border border-slate-700">WEEKLY</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="salesQuantityChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Chart 2: Average Price Trend -->
+          <div class="glass-panel p-5 rounded-2xl">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-base font-bold text-white flex items-center">
+                  <i data-lucide="line-chart" class="w-4 h-4 mr-2 text-emerald-400"></i>
+                  Average Price Sold For (£)
+                </h3>
+                <p class="text-xs text-slate-400">Average sold price with min & max price corridor</p>
+              </div>
+              <span id="chart2-period-badge" class="px-2 py-0.5 text-[11px] font-mono rounded bg-slate-800 text-emerald-400 border border-slate-700">WEEKLY</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="avgPriceChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Sales Feed Table -->
+        <div class="glass-panel p-5 rounded-2xl space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center">
+                <i data-lucide="list-ordered" class="w-4 h-4 mr-2 text-indigo-400"></i>
+                Recent Sales & Item Listings
+              </h3>
+              <p class="text-xs text-slate-400">Individual captured items with brand, size, and sold price</p>
+            </div>
+            <span id="table-count-label" class="text-xs text-slate-400">Showing latest sales</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-900/90 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
+                <tr>
+                  <th class="py-3 px-3">Item</th>
+                  <th class="py-3 px-3">Brand</th>
+                  <th class="py-3 px-3">Size</th>
+                  <th class="py-3 px-3">Sold Price</th>
+                  <th class="py-3 px-3">Recorded Date</th>
+                  <th class="py-3 px-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="recent-sales-tbody" class="divide-y divide-slate-800/60 text-slate-300">
+                <tr>
+                  <td colspan="6" class="text-center py-8 text-slate-500">No sales recorded yet. Click "Scrape Vinted (.co.uk)" above.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- View Container 2: Deal Sniper Live Command Center -->
+      <div id="sniper-view" class="space-y-6 animate-fade-in">
+        
+        <!-- Header Bar for Sniper -->
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+          <div>
+            <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
+              <span class="text-teal-400 font-semibold uppercase tracking-wider flex items-center">
+                <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1 text-vinted"></i>
+                Live Deal Radar
+              </span>
+              <span>/</span>
+              <span class="text-slate-300">Continuous Auto-Sniper</span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <h2 class="text-2xl font-bold text-white tracking-tight">Vinted Deal Sniper</h2>
+              <span id="sniper-status-pill" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+                <span class="w-2 h-2 rounded-full bg-slate-500 mr-1.5" id="sniper-status-dot"></span>
+                <span id="sniper-status-text">RADAR IDLE</span>
+              </span>
+              <button id="sniper-antiban-badge" onclick="app.openAntiBanModal()" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 cursor-pointer hover:bg-cyan-500/20 transition" title="Anti-Ban Shield Status (Click to configure)">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5 mr-1 text-cyan-400" id="sniper-shield-icon"></i>
+                <span id="sniper-antiban-text">Chrome TLS</span>
+              </button>
+            </div>
+            <p class="text-xs text-slate-400 mt-1 max-w-2xl">
+              Rapidly polls newest listings across selected tracked items. High-value bargain deals under your price and time limits appear instantly below. 
+              <span class="text-teal-400/90 font-medium">All valid market items are automatically stored to the database so price analytics remain accurate and unskewed.</span>
+            </p>
+          </div>
+
+          <div class="flex items-center space-x-3 shrink-0">
+            <button id="btn-sniper-clear" onclick="app.clearSniperDeals()" class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5 mr-1.5 text-slate-400"></i>
+              Clear Stream
+            </button>
+
+            <button id="btn-sniper-toggle" onclick="app.toggleSniper()" class="inline-flex items-center px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-lg shadow-emerald-600/25 cursor-pointer">
+              <i data-lucide="play" class="w-4 h-4 mr-1.5 fill-current" id="sniper-toggle-icon"></i>
+              <span id="sniper-toggle-text">Start Sniping</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Sniper Configuration Panel -->
+        <div class="glass-panel p-5 rounded-2xl border border-slate-800 space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-800/80">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="sliders-horizontal" class="w-4 h-4 text-vinted"></i>
+              <h3 class="text-xs font-bold text-white uppercase tracking-wider">Sniper Target & Price Rules</h3>
+            </div>
+            <div class="flex items-center space-x-4">
+              <label class="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer">
+                <input type="checkbox" id="sniper-sound-alert" checked class="custom-checkbox">
+                <span class="flex items-center"><i data-lucide="volume-2" class="w-3.5 h-3.5 mr-1 text-teal-400"></i> Audio Alert Chime</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Global Fallback Controls -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Global Default Max Price -->
+            <div class="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-semibold text-slate-300 flex items-center">
+                  <i data-lucide="tag" class="w-3.5 h-3.5 mr-1.5 text-emerald-400"></i>
+                  Default Max Buy Price
+                </label>
+                <span class="text-[10px] text-slate-500">Fallback for items without custom price</span>
+              </div>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm font-bold">£</span>
+                <input type="number" id="sniper-max-price" value="50" min="1" max="10000" step="1" onchange="app.handleGlobalMaxPriceChange(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-7 pr-3 py-2 text-sm font-bold font-mono text-emerald-400 focus:outline-none focus:border-vinted">
+              </div>
+              <div class="flex items-center space-x-1.5 pt-1">
+                <button type="button" onclick="app.setQuickMaxPrice(20)" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">£20</button>
+                <button type="button" onclick="app.setQuickMaxPrice(35)" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">£35</button>
+                <button type="button" onclick="app.setQuickMaxPrice(50)" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">£50</button>
+                <button type="button" onclick="app.setQuickMaxPrice(100)" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">£100</button>
+              </div>
+            </div>
+
+            <!-- Max Age -->
+            <div class="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-semibold text-slate-300 flex items-center">
+                  <i data-lucide="clock" class="w-3.5 h-3.5 mr-1.5 text-vinted"></i>
+                  Max Listing Age
+                </label>
+                <span class="text-[10px] text-slate-500">Minutes live</span>
+              </div>
+              <div class="relative">
+                <input type="number" id="sniper-max-age" value="15" min="1" max="1440" step="1" onchange="app.handleMaxAgeChange(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm font-bold font-mono text-cyan-300 focus:outline-none focus:border-vinted">
+                <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 text-xs">mins</span>
+              </div>
+              <div class="flex items-center space-x-1.5 pt-1">
+                <button type="button" onclick="app.setQuickMaxAge(5)" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">5m</button>
+                <button type="button" onclick="app.setQuickMaxAge(15)" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">15m</button>
+                <button type="button" onclick="app.setQuickMaxAge(30)" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">30m</button>
+                <button type="button" onclick="app.setQuickMaxAge(60)" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">1h</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Individual Item Targets & Price Ranges -->
+          <div class="space-y-2 pt-2 border-t border-slate-800/80">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <label class="block text-xs font-semibold text-slate-200">Tracked Target Products & Custom Price Limits:</label>
+                <p class="text-[10px] text-slate-400">Set individual max buy prices per item, or apply recommended profitable prices calculated from stored sales data.</p>
+              </div>
+              <div class="flex items-center space-x-2 text-[11px] shrink-0">
+                <button type="button" onclick="app.selectAllSniperTargets(true)" class="text-teal-400 hover:underline cursor-pointer font-medium">Select All</button>
+                <span class="text-slate-600">•</span>
+                <button type="button" onclick="app.selectAllSniperTargets(false)" class="text-slate-400 hover:underline cursor-pointer font-medium">Deselect All</button>
+                <span class="text-slate-600">•</span>
+                <button type="button" onclick="app.applyAllRecommendedPrices()" class="text-amber-400 hover:underline cursor-pointer font-medium flex items-center">
+                  <i data-lucide="sparkles" class="w-3 h-3 mr-1 text-amber-400"></i>
+                  Apply Recommended Prices
+                </button>
+              </div>
+            </div>
+
+            <div id="sniper-target-chips-container" class="space-y-2 p-2.5 bg-slate-950/80 rounded-xl border border-slate-800 max-h-64 overflow-y-auto">
+              <div class="text-xs text-slate-500 py-4 text-center">Loading tracked items…</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live KPI Stats Grid -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="stat-card stat-card-teal p-4 rounded-xl">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <span class="font-semibold text-slate-300">Target Items</span>
+              <div class="w-7 h-7 rounded-lg bg-teal-500/10 flex items-center justify-center text-teal-400">
+                <i data-lucide="target" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div id="sniper-stat-targets" class="text-2xl font-black text-white font-mono tracking-tight">0</div>
+            <div class="text-[11px] text-slate-500 mt-1">Simultaneous products polled</div>
+          </div>
+
+          <div class="stat-card stat-card-cyan p-4 rounded-xl">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <span class="font-semibold text-slate-300">Radar Scan Cycles</span>
+              <div class="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div id="sniper-stat-checks" class="text-2xl font-black text-cyan-400 font-mono tracking-tight">0</div>
+            <div class="text-[11px] text-slate-500 mt-1">High-frequency page 1 passes</div>
+          </div>
+
+          <div class="stat-card stat-card-indigo p-4 rounded-xl">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <span class="font-semibold text-slate-300">Items Added to DB</span>
+              <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                <i data-lucide="database" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div id="sniper-stat-scraped" class="text-2xl font-black text-indigo-400 font-mono tracking-tight">0</div>
+            <div id="sniper-stat-db-sub" class="text-[11px] text-emerald-400 mt-1 flex items-center">
+              <i data-lucide="check-circle" class="w-3 h-3 text-emerald-400 mr-1"></i>
+              Live Database Synced
+            </div>
+          </div>
+
+          <div class="stat-card stat-card-emerald p-4 rounded-xl">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <span class="font-semibold text-slate-300">Sniped Deals Found</span>
+              <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                <i data-lucide="zap" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div id="sniper-stat-deals" class="text-2xl font-black text-emerald-400 font-mono tracking-tight">0</div>
+            <div class="text-[11px] text-emerald-400/90 mt-1 font-semibold flex items-center">
+              <i data-lucide="sparkles" class="w-3 h-3 text-emerald-400 mr-1"></i>
+              Verified Bargains Matching Rules
+            </div>
+          </div>
+        </div>
+
+        <!-- Sniped Deals Stream -->
+        <div class="glass-panel p-5 rounded-2xl space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center">
+                <i data-lucide="zap" class="w-4 h-4 mr-2 text-emerald-400"></i>
+                Live Deal Stream
+                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 pulse-live"></span>
+                  STREAMING
+                </span>
+              </h3>
+              <p class="text-xs text-slate-400">Instantly displayed when a listing meets your maximum price and age limits</p>
+            </div>
+            <div class="flex items-center space-x-3">
+              <span id="sniper-stream-count" class="text-xs font-mono text-slate-400">0 sniped deals</span>
+              <button onclick="app.clearSniperDeals()" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/30 transition cursor-pointer" title="Clear current live deals feed">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5 mr-1.5 text-slate-400"></i>
+                Clear Feed
+              </button>
+            </div>
+          </div>
+
+          <!-- Deals Cards Grid -->
+          <div id="sniper-deals-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Empty state default -->
+            <div class="col-span-full py-12 text-center space-y-3">
+              <div class="w-12 h-12 mx-auto rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500">
+                <i data-lucide="crosshair" class="w-6 h-6 text-vinted"></i>
+              </div>
+              <h4 class="text-sm font-semibold text-slate-300">Radar Standby</h4>
+              <p class="text-xs text-slate-500 max-w-md mx-auto">
+                Configure your targets, max price and age limits above, then click <strong>"Start Sniping"</strong> to begin scanning.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Radar Activity Terminal Logs -->
+        <div class="glass-panel p-4 rounded-2xl space-y-2 border border-slate-800/80">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="terminal" class="w-4 h-4 text-teal-400"></i>
+              <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Live Activity Log</span>
+            </div>
+            <span class="text-[10px] font-mono text-slate-500">Real-time scan audit</span>
+          </div>
+          <div id="sniper-logs-terminal" class="bg-slate-950 p-3 rounded-xl border border-slate-900 font-mono text-[11px] text-slate-400 h-28 overflow-y-auto space-y-1">
+            <div class="text-slate-600">[System] Deal Sniper ready. Waiting to launch.</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- View Container 3: Advanced Database Explorer -->
+      <div id="database-explorer-view" class="space-y-6 hidden animate-fade-in">
+        
+        <!-- Header Bar -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+          <div>
+            <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
+              <span class="text-indigo-400 flex items-center font-semibold">
+                <i data-lucide="database" class="w-3.5 h-3.5 mr-1.5"></i>
+                Database Archive & Explorer
+              </span>
+              <span>/</span>
+              <span class="text-slate-300">Live & Historical Records</span>
+            </div>
+            <h2 class="text-2xl font-bold text-white tracking-tight flex items-center">
+              <span>Database Explorer</span>
+              <span id="db-view-total-badge" class="ml-3 px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">0 records</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">
+              Search, filter, inspect and prune any item listing or caught counterfeit across all tracked searches.
+            </p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="btn-db-toggle-mgmt" onclick="app.toggleReplicaManagementPanel()" class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30 transition cursor-pointer" title="Monthly Replica Pruning Controls">
+              <i data-lucide="calendar-x" class="w-3.5 h-3.5 mr-1.5 text-rose-400"></i>
+              <span id="btn-db-toggle-mgmt-text">Monthly Cleanup</span>
+            </button>
+
+            <button id="btn-db-rescan" onclick="app.rescanDatabaseReplicas()" class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-500/30 transition cursor-pointer" title="Re-evaluate all stored items against anti-rep heuristics">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5 mr-1.5 text-teal-400" id="db-rescan-icon"></i>
+              <span id="db-rescan-text">Audit Anti-Rep</span>
+            </button>
+
+            <button id="btn-db-verify-statuses" onclick="app.auditDatabaseSoldStatuses()" class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 transition cursor-pointer" title="Verify active items live against Vinted UK to detect completed sales">
+              <i data-lucide="check-check" class="w-3.5 h-3.5 mr-1.5 text-cyan-400" id="db-verify-statuses-icon"></i>
+              <span id="db-verify-statuses-text">Verify Live Status</span>
+            </button>
+
+            <button onclick="app.loadDatabaseExplorerData()" class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer" title="Refresh all records">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1.5"></i>
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Section 1: Specialized Analytics KPI Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="stat-card stat-card-indigo p-4 rounded-xl">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <span class="font-semibold text-slate-300">Total Records Stored</span>
+              <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                <i data-lucide="database" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div id="db-kpi-total" class="text-2xl font-black text-white font-mono tracking-tight">0</div>
+            <div class="flex items-center space-x-1.5 text-[11px] text-slate-400 mt-1">
+              <span id="db-kpi-sold-count" class="text-emerald-400 font-semibold">0 Sold</span>
+              <span>•</span>
+              <span id="db-kpi-active-count" class="text-cyan-400 font-semibold">0 Active</span>
+            </div>
+          </div>
+
+          <div class="stat-card stat-card-emerald p-4 rounded-xl">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <span class="font-semibold text-slate-300">Clean Market Items</span>
+              <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div id="db-kpi-clean" class="text-2xl font-black text-emerald-400 font-mono tracking-tight">0</div>
+            <div class="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
+              <span>Avg: <strong id="db-kpi-clean-avg" class="text-white font-mono">£0.00</strong></span>
+              <span id="db-kpi-child-count" class="text-amber-400 font-semibold" title="Child / Youth listings in database">0 Child</span>
+            </div>
+          </div>
+
+          <div class="stat-card stat-card-amber p-4 rounded-xl border-rose-500/30">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <span class="font-semibold text-slate-300">Caught Replicas</span>
+              <span id="db-kpi-replica-rate" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">0% FLAG</span>
+            </div>
+            <div id="db-kpi-replicas" class="text-2xl font-black text-rose-400 font-mono tracking-tight">0</div>
+            <div class="text-[11px] text-slate-400 mt-1">
+              Avg Rep: <strong id="db-kpi-replica-avg" class="text-rose-300 font-mono">£0.00</strong>
+            </div>
+          </div>
+
+          <div class="stat-card stat-card-cyan p-4 rounded-xl">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <span class="font-semibold text-slate-300">Total Stored Value</span>
+              <div class="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400">
+                <i data-lucide="pound-sterling" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div id="db-kpi-volume" class="text-2xl font-black text-cyan-400 font-mono tracking-tight">£0.00</div>
+            <div class="text-[11px] text-slate-400 mt-1">Across all historical scrapes</div>
+          </div>
+        </div>
+
+        <!-- Section 2: Replica Diagnostic Flag Reasons Breakdown -->
+        <div class="glass-panel p-4 rounded-xl space-y-3 border border-slate-800">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-rose-400"></i>
+              <h3 class="text-xs font-bold text-white uppercase tracking-wider">Replica Flag Reasons & Heuristic Analytics</h3>
+              <span class="text-[10px] text-slate-400">(Click any chip to filter items below)</span>
+            </div>
+            <div class="text-[11px] text-slate-400">
+              Active Reason Filter: <span id="db-active-reason-label" class="text-teal-300 font-semibold font-mono">All Reasons</span>
+            </div>
+          </div>
+
+          <div id="db-reasons-chips-container" class="flex flex-wrap gap-2">
+            <!-- Dynamic Reason Chips inserted by app.js -->
+          </div>
+        </div>
+
+        <!-- Section 3: Monthly Replica Management & Pruning (Collapsible) -->
+        <div id="db-replica-management-panel" class="p-5 rounded-2xl bg-slate-900/90 border border-rose-500/30 shadow-xl space-y-4 hidden">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+            <div class="flex items-start space-x-3">
+              <div class="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0 mt-0.5">
+                <i data-lucide="calendar-x" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                  <span>Monthly Replica Pruning & Cleanup</span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 uppercase">Zero Impact on Market Sales</span>
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">
+                  Clear counterfeit listings stored by specific months to reclaim database space while strictly preserving genuine sales and price trend curves.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-center space-x-2">
+              <button onclick="app.purgeAllReplicas()" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition cursor-pointer">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5 mr-1.5"></i>
+                Purge All Replicas
+              </button>
+              <button onclick="app.toggleReplicaManagementPanel()" class="text-slate-400 hover:text-white p-1 cursor-pointer">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <div id="db-monthly-replicas-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div class="text-xs text-slate-500 py-4 col-span-full text-center">Loading monthly replica metrics…</div>
+          </div>
+        </div>
+
+        <!-- Section 4: Advanced Filters & Search Bar -->
+        <div class="glass-panel p-4 rounded-xl space-y-3.5 border border-slate-800">
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+            
+            <!-- Text Search Input -->
+            <div class="md:col-span-5 relative">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+              <input type="text" 
+                     id="db-filter-query" 
+                     placeholder="Search title, brand, seller, or ID…" 
+                     oninput="app.handleDbSearchInput(this.value)"
+                     class="w-full bg-slate-950 border border-slate-700/80 rounded-lg pl-9 pr-8 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition">
+              <button type="button" 
+                      onclick="app.clearDbQueryInput()" 
+                      id="db-query-clear-btn" 
+                      class="hidden absolute right-2.5 top-2.5 text-slate-400 hover:text-white">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+
+            <!-- Tracked Search Term Dropdown -->
+            <div class="md:col-span-4">
+              <select id="db-filter-search-id" 
+                      onchange="app.handleDbFilterChange()" 
+                      class="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 transition cursor-pointer">
+                <option value="">All Tracked Searches</option>
+              </select>
+            </div>
+
+            <!-- Month Dropdown -->
+            <div class="md:col-span-3">
+              <select id="db-filter-month" 
+                      onchange="app.handleDbFilterChange()" 
+                      class="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 transition cursor-pointer">
+                <option value="">All Months</option>
+              </select>
+            </div>
+
+          </div>
+
+          <!-- Secondary Filters Row: Status, Replica State, Price Range, Sort & Reset -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800/60">
+            
+            <!-- Status & Replica Pills -->
+            <div class="flex flex-wrap items-center gap-2">
+              
+              <!-- Sold Status Pills -->
+              <div class="inline-flex rounded-lg bg-slate-950 border border-slate-800 p-0.5 text-xs">
+                <button type="button" onclick="app.setDbStatusFilter('all')" id="db-status-btn-all" class="px-2.5 py-1 rounded-md text-[11px] font-semibold text-white bg-slate-800 transition">All</button>
+                <button type="button" onclick="app.setDbStatusFilter('sold')" id="db-status-btn-sold" class="px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-white transition">Sold Only</button>
+                <button type="button" onclick="app.setDbStatusFilter('active')" id="db-status-btn-active" class="px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-white transition">Active Only</button>
+              </div>
+
+              <!-- Replica Filter Pills -->
+              <div class="inline-flex rounded-lg bg-slate-950 border border-slate-800 p-0.5 text-xs">
+                <button type="button" onclick="app.setDbReplicaFilter('all')" id="db-replica-btn-all" class="px-2.5 py-1 rounded-md text-[11px] font-semibold text-white bg-slate-800 transition">All Records</button>
+                <button type="button" onclick="app.setDbReplicaFilter('clean')" id="db-replica-btn-clean" class="px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-emerald-300 transition">Clean Only</button>
+                <button type="button" onclick="app.setDbReplicaFilter('replica')" id="db-replica-btn-replica" class="px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-rose-300 transition">Replicas Only</button>
+              </div>
+
+              <!-- Size Demographic Pills -->
+              <div class="inline-flex rounded-lg bg-slate-950 border border-slate-800 p-0.5 text-xs">
+                <button type="button" onclick="app.setDbChildFilter('all')" id="db-child-btn-all" class="px-2.5 py-1 rounded-md text-[11px] font-semibold text-white bg-slate-800 transition">All Sizes</button>
+                <button type="button" onclick="app.setDbChildFilter('adult')" id="db-child-btn-adult" class="px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-cyan-300 transition">Adult Only</button>
+                <button type="button" onclick="app.setDbChildFilter('child')" id="db-child-btn-child" class="px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-amber-300 transition">Child / Youth Only</button>
+              </div>
+
+            </div>
+
+            <!-- Price & Sort & Reset -->
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="flex items-center space-x-1.5 text-xs text-slate-400">
+                <span>Price:</span>
+                <input type="number" id="db-filter-min-price" placeholder="Min £" min="0" onchange="app.handleDbFilterChange()" class="w-20 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500">
+                <span>-</span>
+                <input type="number" id="db-filter-max-price" placeholder="Max £" min="0" onchange="app.handleDbFilterChange()" class="w-20 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500">
+              </div>
+
+              <select id="db-filter-sort" onchange="app.handleDbFilterChange()" class="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 transition cursor-pointer">
+                <option value="newest">Newest Captured</option>
+                <option value="oldest">Oldest Captured</option>
+                <option value="price_desc">Price: High to Low</option>
+                <option value="price_asc">Price: Low to High</option>
+              </select>
+
+              <button type="button" onclick="app.resetDbFilters()" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer" title="Reset all filters">
+                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+
+          </div>
+
+          <!-- Active Duplicate Photo Filter Banner -->
+          <div id="db-photo-key-banner" class="hidden flex flex-wrap items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs">
+            <div class="flex items-center space-x-2.5">
+              <div class="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 shrink-0">
+                <i data-lucide="images" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <span class="font-bold text-amber-200">Repeating Image Filter Active</span>
+                <span class="text-amber-300/80 ml-1.5">Showing all database items sharing image <code id="db-photo-key-label" class="px-1.5 py-0.5 rounded bg-slate-950/80 border border-amber-500/30 font-mono text-[11px] text-amber-300"></code></span>
+              </div>
+            </div>
+            <button type="button" onclick="app.clearDuplicatePhotoFilter()" class="inline-flex items-center px-3 py-1 rounded-lg text-[11px] font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 transition cursor-pointer">
+              <i data-lucide="x" class="w-3.5 h-3.5 mr-1"></i>
+              Clear Image Filter
+            </button>
+          </div>
+        </div>
+
+        <!-- Section 5: Database Items Table (Flush & Modern) -->
+        <div class="glass-panel rounded-2xl border border-slate-800/80 overflow-hidden shadow-xl">
+          <div class="px-4 py-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-950/60">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="table" class="w-4 h-4 text-indigo-400"></i>
+              <span class="text-xs font-bold text-white uppercase tracking-wider">Database Records</span>
+              <span id="db-table-count-label" class="text-xs font-mono text-slate-400">Loading…</span>
+            </div>
+
+            <!-- Page Size Selector -->
+            <div class="flex items-center space-x-2 text-xs text-slate-400">
+              <span>Show:</span>
+              <select id="db-filter-pagesize" onchange="app.handleDbPageSizeChange(this.value)" class="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-white focus:outline-none cursor-pointer">
+                <option value="25">25</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Table Container -->
+          <div id="db-table-scroll-container" class="overflow-x-auto db-table-scroll-container">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-800 bg-slate-950/40 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  <th class="py-3 px-4 w-16">Preview</th>
+                  <th class="py-3 px-4 min-w-[280px]">Item Title & Details</th>
+                  <th class="py-3 px-4 min-w-[140px]">Tracked Search</th>
+                  <th class="py-3 px-4 min-w-[120px]">Price & Status</th>
+                  <th class="py-3 px-4 min-w-[260px]">Anti-Rep Verification</th>
+                  <th class="py-3 px-4 min-w-[130px]">Captured At</th>
+                  <th class="py-3 px-4 w-16 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="db-items-table-body" class="divide-y divide-slate-850 text-xs">
+                <tr>
+                  <td colspan="7" class="py-12 text-center text-slate-500">
+                    <div class="flex flex-col items-center justify-center space-y-2">
+                      <div class="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span class="text-xs">Loading database records…</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Bar -->
+          <div id="db-pagination-bar" class="px-4 py-3 border-t border-slate-800/80 bg-slate-950/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-400">
+            <div id="db-pagination-summary">
+              Showing 0 to 0 of 0 items
+            </div>
+            <div class="flex items-center space-x-1.5" id="db-pagination-buttons">
+              <!-- Buttons dynamically generated -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Add New Item Modal -->
+  <div id="add-modal" onclick="if(event.target === this) app.closeAddModal()" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="glass-modal rounded-2xl max-w-lg w-full p-6 space-y-4 animate-fade-in max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+        <h3 class="text-lg font-bold text-white flex items-center">
+          <i data-lucide="search" class="w-5 h-5 mr-2 text-vinted"></i>
+          Track New Vinted Item
+        </h3>
+        <button onclick="app.closeAddModal()" class="text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      
+      <p class="text-xs text-slate-400">
+        Enter the item name (e.g. <em>"Margiela gats"</em>, <em>"North Face Nuptse"</em>). The local classifier will auto-detect the category and brand to eliminate junk and tag-spam.
+      </p>
+
+      <form id="add-item-form" onsubmit="app.handleCreateSearch(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Search Phrase</label>
+          <input type="text" id="input-search-text" required placeholder="e.g. Margiela gats" oninput="app.handleSearchInputDebounced(this.value)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-vinted focus:ring-1 focus:ring-vinted transition">
+        </div>
+
+        <!-- AI Classification / Suggestion Banner -->
+        <div id="ai-suggestion-badge" class="hidden p-2.5 rounded-xl bg-teal-500/10 border border-teal-500/30 text-xs text-teal-300 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="sparkles" class="w-4 h-4 text-teal-400 shrink-0"></i>
+            <span id="ai-suggestion-text" class="font-medium">Detected: Sneakers & Trainers by Maison Margiela</span>
+          </div>
+          <span class="text-[10px] text-teal-400/90 font-mono uppercase bg-teal-500/20 px-2 py-0.5 rounded">Auto-Filled</span>
+        </div>
+
+        <!-- Brand Hard Filter -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-semibold text-slate-300">Brand (Hard Filter)</label>
+            <span class="text-[10px] text-amber-400 font-medium">Strictly ignores irrelevant tag spam</span>
+          </div>
+          <input type="text" id="input-brand" placeholder="e.g. Maison Margiela" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs text-white focus:outline-none focus:border-vinted focus:ring-1 focus:ring-vinted transition">
+        </div>
+
+        <!-- Vinted Category Hierarchy Selector -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block text-xs font-semibold text-slate-300 flex items-center">
+              <i data-lucide="folder-tree" class="w-3.5 h-3.5 mr-1.5 text-vinted"></i>
+              Vinted Category Hierarchy
+            </label>
+            <span class="text-[10px] text-slate-400">Browse departments or pick specific subcategories</span>
+          </div>
+          <div id="category-chips-container" class="p-2.5 bg-slate-950/90 rounded-xl border border-slate-800 space-y-2.5">
+            <div class="text-xs text-slate-500 py-2 text-center">Loading Vinted categories…</div>
+          </div>
+        </div>
+
+        <!-- Optional Exclusions -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Negative Keywords (Optional Exclusion)</label>
+          <input type="text" id="input-must-exclude" placeholder="e.g. vest, box only, laces only, poster" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs text-white focus:outline-none focus:border-vinted focus:ring-1 focus:ring-vinted transition">
+        </div>
+
+        <!-- Anti-Rep Filters Section for Add Item -->
+        <div class="p-3.5 rounded-xl bg-slate-950/80 border border-teal-500/30 space-y-3">
+          <div class="flex items-center justify-between pb-1.5 border-b border-slate-800/80">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-vinted"></i>
+              <div>
+                <h4 class="text-xs font-bold text-white uppercase tracking-wider">Anti-Replica Filters</h4>
+                <p class="text-[10px] text-slate-400">Automatic counterfeit protection pushed onto every scrape</p>
+              </div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="add-antirep-enabled" checked class="sr-only peer">
+              <div class="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-vinted"></div>
+            </label>
+          </div>
+
+          <div class="grid grid-cols-1 gap-2 pt-1">
+            <label class="flex items-center space-x-2.5 text-xs text-slate-300 cursor-pointer">
+              <input type="checkbox" id="add-antirep-block-bnwt" checked class="custom-checkbox">
+              <span>Block "New with Tags" (BNWT & description clues)</span>
+            </label>
+            <label class="flex items-center space-x-2.5 text-xs text-slate-300 cursor-pointer">
+              <input type="checkbox" id="add-antirep-block-no-reviews" checked class="custom-checkbox">
+              <span>Block Sellers with Zero Reviews</span>
+            </label>
+            <label class="flex items-center space-x-2.5 text-xs text-slate-300 cursor-pointer">
+              <input type="checkbox" id="add-antirep-block-duplicate-photos" checked class="custom-checkbox">
+              <span>Block Duplicate / Stock Photos</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Remove Child Sizes Filter Section for Add Item -->
+        <div id="add-child-card" onclick="app.toggleAddChildSizes()" class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 hover:border-amber-500/50 transition cursor-pointer select-none">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-start space-x-3">
+              <div class="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
+                <i data-lucide="baby" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <div class="flex items-center space-x-2">
+                  <h4 class="text-xs font-bold text-white uppercase tracking-wider">Remove Child & Youth Sizes</h4>
+                  <span id="add-child-status-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">ALLOWED (OFF)</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">Auto-block kids, baby, junior & youth listings so they don't drag down authentic adult pricing curves.</p>
+              </div>
+            </div>
+            
+            <label class="sleek-switch" onclick="event.stopPropagation()">
+              <input type="checkbox" id="add-exclude-child-sizes" onchange="app.handleAddChildToggle(this.checked)">
+              <span class="sleek-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="flex justify-end space-x-2 pt-2 border-t border-slate-800">
+          <button type="button" onclick="app.closeAddModal()" class="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer">Cancel</button>
+          <button type="submit" id="btn-submit-add-search" class="px-4 py-2 rounded-lg text-xs font-semibold bg-vinted hover:bg-vinted-dark text-white transition shadow-md shadow-vinted/20 flex items-center cursor-pointer">
+            <i data-lucide="plus" class="w-3.5 h-3.5 mr-1.5"></i>
+            Add & Track Item
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Tracked Item Modal -->
+  <div id="edit-modal" onclick="if(event.target === this) app.closeEditModal()" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="glass-modal rounded-2xl max-w-lg w-full p-6 space-y-4 animate-fade-in max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+        <h3 class="text-lg font-bold text-white flex items-center">
+          <i data-lucide="sliders" class="w-5 h-5 mr-2 text-vinted"></i>
+          Edit Tracked Item & Filters
+        </h3>
+        <button onclick="app.closeEditModal()" class="text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="edit-item-form" onsubmit="app.handleUpdateSearch(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Search Phrase</label>
+          <input type="text" id="edit-search-text" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs text-white focus:outline-none focus:border-vinted transition">
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-semibold text-slate-300">Brand (Hard Filter)</label>
+            <span class="text-[10px] text-amber-400 font-medium">Strictly ignores irrelevant tag spam</span>
+          </div>
+          <input type="text" id="edit-brand" placeholder="e.g. Maison Margiela" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs text-white focus:outline-none focus:border-vinted transition">
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block text-xs font-semibold text-slate-300 flex items-center">
+              <i data-lucide="folder-tree" class="w-3.5 h-3.5 mr-1.5 text-vinted"></i>
+              Vinted Category Hierarchy
+            </label>
+            <span class="text-[10px] text-slate-400">Browse departments or pick specific subcategories</span>
+          </div>
+          <div id="edit-category-chips-container" class="p-2.5 bg-slate-950/90 rounded-xl border border-slate-800 space-y-2.5">
+            <div class="text-xs text-slate-500 py-2 text-center">Loading Vinted categories…</div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Negative Keywords (Optional Exclusion)</label>
+          <input type="text" id="edit-must-exclude" placeholder="e.g. vest, box only, laces only" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs text-white focus:outline-none focus:border-vinted transition">
+        </div>
+
+        <!-- Anti-Rep Filters Section -->
+        <div class="p-4 rounded-xl bg-slate-950/80 border border-teal-500/30 space-y-3.5">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-vinted"></i>
+              <div>
+                <h4 class="text-xs font-bold text-white uppercase tracking-wider">Anti-Replica Filters</h4>
+                <p class="text-[10px] text-slate-400">Strictly blocks replica sellers and counterfeit listings</p>
+              </div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="edit-antirep-enabled" checked class="sr-only peer" onchange="app.toggleEditAntiRepFields(this.checked)">
+              <div class="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-vinted"></div>
+            </label>
+          </div>
+
+          <div id="edit-antirep-fields" class="space-y-3">
+            <!-- 1. BNWT Filter -->
+            <label class="flex items-start space-x-2.5 cursor-pointer">
+              <input type="checkbox" id="edit-antirep-block-bnwt" checked class="custom-checkbox">
+              <div class="text-xs">
+                <span class="font-semibold text-slate-200">Block "New with Tags" (BNWT)</span>
+                <p class="text-[10px] text-slate-400 leading-relaxed">Filters items listed as New with Tags, and scans titles & descriptions for hidden tag clues (e.g. <em>"BNWT"</em>, <em>"comes with tags"</em>, <em>"sealed with tags"</em>).</p>
+              </div>
+            </label>
+
+            <!-- 2. Zero Reviews Filter -->
+            <div class="flex items-start justify-between gap-2">
+              <label class="flex items-start space-x-2.5 cursor-pointer">
+                <input type="checkbox" id="edit-antirep-block-no-reviews" checked class="custom-checkbox">
+                <div class="text-xs">
+                  <span class="font-semibold text-slate-200">Block Sellers with Zero Reviews</span>
+                  <p class="text-[10px] text-slate-400 leading-relaxed">Eliminates burner / throwaway accounts with no seller reviews.</p>
+                </div>
+              </label>
+              <div class="flex items-center space-x-1 shrink-0 mt-0.5">
+                <span class="text-[10px] text-slate-400">Min:</span>
+                <input type="number" id="edit-antirep-min-reviews" value="1" min="1" max="100" class="w-12 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-white text-center focus:outline-none focus:border-vinted">
+              </div>
+            </div>
+
+            <!-- 3. Similar Items per Seller Filter -->
+            <div class="flex items-start justify-between gap-2">
+              <label class="flex items-start space-x-2.5 cursor-pointer">
+                <input type="checkbox" id="edit-antirep-block-multiple" checked class="custom-checkbox">
+                <div class="text-xs">
+                  <span class="font-semibold text-slate-200">Limit Similar Items per Seller</span>
+                  <p class="text-[10px] text-slate-400 leading-relaxed">Flags replica resellers mass-listing multiple quantities of the same item.</p>
+                </div>
+              </label>
+              <div class="flex items-center space-x-1 shrink-0 mt-0.5">
+                <span class="text-[10px] text-slate-400">Max:</span>
+                <input type="number" id="edit-antirep-max-seller-listings" value="2" min="1" max="20" class="w-12 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-white text-center focus:outline-none focus:border-vinted">
+              </div>
+            </div>
+
+            <!-- 4. Duplicate / Stock Photo Filter -->
+            <label class="flex items-start space-x-2.5 cursor-pointer">
+              <input type="checkbox" id="edit-antirep-block-duplicate-photos" checked class="custom-checkbox">
+              <div class="text-xs">
+                <span class="font-semibold text-slate-200">Block Duplicate / Stock Photos</span>
+                <p class="text-[10px] text-slate-400 leading-relaxed">Cross-checks photo fingerprint database across every scrape; blocks any listing reusing photos from other posts.</p>
+              </div>
+            </label>
+
+            <!-- 5. Dormant Accounts Filter -->
+            <div class="flex items-start justify-between gap-2">
+              <label class="flex items-start space-x-2.5 cursor-pointer">
+                <input type="checkbox" id="edit-antirep-block-dormant" class="custom-checkbox">
+                <div class="text-xs">
+                  <span class="font-semibold text-slate-200">Block Dormant Accounts (Likely Acquired)</span>
+                  <p class="text-[10px] text-slate-400 leading-relaxed">Flags accounts whose only reviews were a long time ago (identifies purchased legacy accounts).</p>
+                </div>
+              </label>
+              <div class="flex items-center space-x-1 shrink-0 mt-0.5">
+                <span class="text-[10px] text-slate-400">Days:</span>
+                <input type="number" id="edit-antirep-dormant-days" value="90" min="7" max="1000" class="w-14 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-white text-center focus:outline-none focus:border-vinted">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Remove Child Sizes Filter Section for Edit Item -->
+        <div id="edit-child-card" onclick="app.toggleEditChildSizes()" class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 hover:border-amber-500/50 transition cursor-pointer select-none">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-start space-x-3">
+              <div class="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
+                <i data-lucide="baby" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <div class="flex items-center space-x-2">
+                  <h4 class="text-xs font-bold text-white uppercase tracking-wider">Remove Child & Youth Sizes</h4>
+                  <span id="edit-child-status-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">ALLOWED (OFF)</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">Exclude baby, kids, junior & youth listings (ages 0-16 yrs, 100-176cm, YS-YXL). Purges child clothes on save.</p>
+              </div>
+            </div>
+            
+            <label class="sleek-switch" onclick="event.stopPropagation()">
+              <input type="checkbox" id="edit-exclude-child-sizes" onchange="app.handleEditChildToggle(this.checked)">
+              <span class="sleek-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+          <button type="button" onclick="app.closeEditModal()" class="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer">Cancel</button>
+          
+          <button type="submit" id="btn-save-filters" class="px-5 py-2.5 rounded-lg text-xs font-semibold bg-vinted hover:bg-vinted-dark text-white transition shadow-md shadow-vinted/20 flex items-center cursor-pointer">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5 mr-1.5"></i>
+            Save & Apply Filters
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Cleaned Scraper Hub & Scheduling Modal -->
+  <div id="scraper-modal" onclick="if(event.target === this) app.closeScraperModal()" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="glass-modal rounded-2xl max-w-lg w-full p-6 space-y-5 animate-fade-in max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-vinted">
+            <i data-lucide="cpu" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">Scheduler & Scraper Hub</h3>
+            <p class="text-xs text-slate-400">Configure automated background polling and continuous scraping</p>
+          </div>
+        </div>
+        <button onclick="app.closeScraperModal()" class="text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Section 1: Auto-Poll Regularity & Live Countdown -->
+      <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center">
+              <i data-lucide="clock" class="w-3.5 h-3.5 mr-1.5 text-vinted"></i>
+              Auto-Poll Regularity
+            </h4>
+            <p class="text-[10px] text-slate-400">Interval for automated background scans</p>
+          </div>
+          <span id="scheduler-current-interval-badge" class="px-2 py-0.5 text-[10px] font-mono font-bold rounded bg-teal-500/10 text-teal-300 border border-teal-500/30">Every 30m</span>
+        </div>
+
+        <!-- Live Countdown Until Next Auto-Poll Scrape -->
+        <div class="p-3 rounded-xl bg-slate-900/95 border border-slate-800/90 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <span id="scheduler-countdown-dot" class="w-2 h-2 rounded-full bg-teal-400 pulse-live"></span>
+              <span id="scheduler-countdown-label" class="text-[11px] font-semibold text-slate-300">Next Auto-Poll Scrape In:</span>
+            </div>
+            <span id="scheduler-countdown-display" class="text-sm font-mono font-bold text-teal-300 tracking-wide">--:--</span>
+          </div>
+          <div class="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800/80">
+            <div id="scheduler-countdown-progress" class="h-full bg-gradient-to-r from-teal-500 to-vinted transition-all duration-500" style="width: 0%"></div>
+          </div>
+          <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono">
+            <span id="scheduler-last-run-summary">Last scrape: Waiting for first cycle</span>
+            <span id="scheduler-next-run-clock">--:--</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-4 gap-1.5 pt-1" id="scheduler-interval-pills">
+          <button type="button" onclick="app.setScheduleInterval(5)" class="interval-pill px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-xs text-slate-300 hover:border-slate-700 transition cursor-pointer" data-minutes="5">5m (Fast)</button>
+          <button type="button" onclick="app.setScheduleInterval(10)" class="interval-pill px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-xs text-slate-300 hover:border-slate-700 transition cursor-pointer" data-minutes="10">10m</button>
+          <button type="button" onclick="app.setScheduleInterval(15)" class="interval-pill px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-xs text-slate-300 hover:border-slate-700 transition cursor-pointer" data-minutes="15">15m</button>
+          <button type="button" onclick="app.setScheduleInterval(30)" class="interval-pill px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-xs text-slate-300 hover:border-slate-700 transition active cursor-pointer" data-minutes="30">30m (Default)</button>
+          <button type="button" onclick="app.setScheduleInterval(60)" class="interval-pill px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-xs text-slate-300 hover:border-slate-700 transition cursor-pointer" data-minutes="60">1 Hour</button>
+          <button type="button" onclick="app.setScheduleInterval(120)" class="interval-pill px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-xs text-slate-300 hover:border-slate-700 transition cursor-pointer" data-minutes="120">2 Hours</button>
+          <button type="button" onclick="app.setScheduleInterval(360)" class="interval-pill px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-xs text-slate-300 hover:border-slate-700 transition cursor-pointer" data-minutes="360">6 Hours</button>
+          <button type="button" onclick="app.setScheduleInterval(720)" class="interval-pill px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-xs text-slate-300 hover:border-slate-700 transition cursor-pointer" data-minutes="720">12 Hours</button>
+        </div>
+      </div>
+
+      <!-- Section 2: Constant Continuous Scrape -->
+      <div id="constant-scrape-card" onclick="app.toggleConstantScrapeCard()" class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-amber-500/40 transition space-y-2.5 cursor-pointer select-none">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <i data-lucide="infinity" class="w-4 h-4 text-amber-400 shrink-0"></i>
+            <div>
+              <div class="flex items-center space-x-2">
+                <h4 class="text-xs font-bold text-white uppercase tracking-wider">Constant Continuous Scrape</h4>
+                <span id="constant-scrape-status-pill" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">OFF</span>
+              </div>
+              <p class="text-[10px] text-slate-400">Runs 24/7 in an endless background loop across all tracked items</p>
+            </div>
+          </div>
+          <label class="sleek-switch shrink-0" onclick="event.stopPropagation()">
+            <input type="checkbox" id="toggle-constant-scrape" onchange="app.toggleConstantScrape(this.checked)">
+            <span class="sleek-slider"></span>
+          </label>
+        </div>
+
+        <!-- Live Constant Scrape Activity Telemetry -->
+        <div id="constant-scrape-live-panel" class="hidden p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] space-y-1.5" onclick="event.stopPropagation()">
+          <div class="flex items-center justify-between text-amber-200 font-medium">
+            <span id="constant-scrape-live-activity" class="truncate">Starting continuous loop…</span>
+            <span id="constant-scrape-live-badge" class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 shrink-0 ml-2">ACTIVE</span>
+          </div>
+          <div class="flex items-center justify-between text-[10px] font-mono text-amber-300/80 pt-1 border-t border-amber-500/20">
+            <span>Cycles completed: <strong id="constant-scrape-cycles-count" class="text-white">0</strong></span>
+            <span>New items found: <strong id="constant-scrape-new-count" class="text-emerald-300">0</strong></span>
+          </div>
+        </div>
+
+        <p class="text-[10px] text-slate-500 leading-relaxed pt-1 border-t border-slate-900">
+          Operates safely with polite delays between items to avoid IP rate-limiting.
+        </p>
+      </div>
+
+      <!-- Section 3: Batch Scrape Multiple Items -->
+      <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center">
+              <i data-lucide="layers" class="w-3.5 h-3.5 mr-1.5 text-indigo-400"></i>
+              Batch Scrape On Demand
+            </h4>
+            <p class="text-[10px] text-slate-400">Immediately scrape multiple selected items right now</p>
+          </div>
+          <div class="flex items-center space-x-2 text-[10px]">
+            <button type="button" onclick="app.selectAllBatchTargets(true)" class="text-teal-400 hover:underline cursor-pointer font-medium">Select All</button>
+            <span class="text-slate-600">•</span>
+            <button type="button" onclick="app.selectAllBatchTargets(false)" class="text-slate-400 hover:underline cursor-pointer font-medium">Deselect All</button>
+          </div>
+        </div>
+
+        <div id="batch-scrape-checklist" class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 p-2 bg-slate-900/90 rounded-xl border border-slate-800 max-h-36 overflow-y-auto">
+          <div class="text-xs text-slate-500 col-span-2 py-2 text-center">Loading items…</div>
+        </div>
+
+        <button type="button" id="btn-run-batch-scrape" onclick="app.runBatchScrape()" class="w-full py-2.5 rounded-xl text-xs font-bold bg-vinted hover:bg-vinted-dark text-white transition flex items-center justify-center shadow-md shadow-vinted/20 cursor-pointer">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-2" id="batch-scrape-icon"></i>
+          <span id="batch-scrape-btn-text">Run Batch Scrape Now</span>
+        </button>
+      </div>
+
+      <div class="flex items-center justify-between pt-1 border-t border-slate-800">
+        <button type="button" onclick="app.closeScraperModal(); app.openScraperTerminal();" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition cursor-pointer">
+          <i data-lucide="terminal" class="w-3.5 h-3.5 mr-1.5 text-emerald-400"></i>
+          <span>Open Live Scraper Terminal</span>
+        </button>
+        <button type="button" onclick="app.closeScraperModal()" class="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Database Controls & Monthly Deletion Modal -->
+  <div id="database-modal" onclick="if(event.target === this) app.closeDatabaseModal()" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="glass-modal rounded-2xl max-w-2xl w-full p-6 space-y-5 animate-fade-in max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+            <i data-lucide="database" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">Database Management & Monthly Controls</h3>
+            <p class="text-xs text-slate-400">Prune historical data, delete entire months, or manage disk storage</p>
+          </div>
+        </div>
+        <button onclick="app.closeDatabaseModal()" class="text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Quick Link to Full Database Explorer -->
+      <div class="flex items-center justify-between p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs">
+        <div class="flex items-center space-x-2 text-indigo-300">
+          <i data-lucide="table" class="w-4 h-4 text-indigo-400"></i>
+          <span>Looking to search, inspect, or audit individual listings and caught replicas?</span>
+        </div>
+        <button type="button" onclick="app.closeDatabaseModal(); app.showDatabaseExplorerView();" class="px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition cursor-pointer text-xs shrink-0 ml-2">
+          Open DB Explorer
+        </button>
+      </div>
+
+      <!-- Quick Storage Metrics -->
+      <div class="grid grid-cols-3 gap-3">
+        <div class="p-3.5 bg-slate-950/80 rounded-xl border border-slate-800">
+          <div class="text-[11px] text-slate-400">Total Recorded Sales</div>
+          <div id="db-stat-total-items" class="text-2xl font-bold font-mono text-white mt-1">0</div>
+          <div class="text-[10px] text-slate-500">Stored listings</div>
+        </div>
+        <div class="p-3.5 bg-slate-950/80 rounded-xl border border-slate-800">
+          <div class="text-[11px] text-slate-400">Database Size</div>
+          <div id="db-stat-size" class="text-2xl font-bold font-mono text-cyan-400 mt-1">0 MB</div>
+          <div class="text-[10px] text-slate-500">SQLite file on disk</div>
+        </div>
+        <div class="p-3.5 bg-slate-950/80 rounded-xl border border-slate-800">
+          <div class="text-[11px] text-slate-400">Active Marketplaces</div>
+          <div id="db-stat-searches" class="text-2xl font-bold font-mono text-indigo-400 mt-1">0</div>
+          <div class="text-[10px] text-slate-500">Tracked search terms</div>
+        </div>
+      </div>
+
+      <!-- Section: Delete Whole Months of Data -->
+      <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+        <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
+          <div>
+            <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center">
+              <i data-lucide="calendar-x" class="w-3.5 h-3.5 mr-1.5 text-rose-400"></i>
+              Delete Entire Months of Data
+            </h4>
+            <p class="text-[10px] text-slate-400">Permanently purge historical sales records month-by-month</p>
+          </div>
+          <span class="text-[10px] text-rose-400/80 font-mono font-medium">Permanent Cleanup</span>
+        </div>
+
+        <div id="db-monthly-list" class="space-y-2 max-h-56 overflow-y-auto">
+          <div class="text-xs text-slate-500 py-4 text-center">Loading monthly data…</div>
+        </div>
+      </div>
+
+      <!-- Section: Bulk Age Pruning -->
+      <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+        <div>
+          <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center">
+            <i data-lucide="history" class="w-3.5 h-3.5 mr-1.5 text-amber-400"></i>
+            Quick Age Pruning
+          </h4>
+          <p class="text-[10px] text-slate-400">Clean up old listings older than a chosen threshold across all items</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" onclick="app.pruneOlderData(30)" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border border-slate-700 transition cursor-pointer">
+            Older than 30 Days
+          </button>
+          <button type="button" onclick="app.pruneOlderData(60)" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border border-slate-700 transition cursor-pointer">
+            Older than 60 Days
+          </button>
+          <button type="button" onclick="app.pruneOlderData(90)" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border border-slate-700 transition cursor-pointer">
+            Older than 90 Days
+          </button>
+          <button type="button" onclick="app.pruneOlderData(180)" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border border-slate-700 transition cursor-pointer">
+            Older than 6 Months
+          </button>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-1 border-t border-slate-800">
+        <button type="button" onclick="app.closeDatabaseModal()" class="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Anti-Ban & Cloudflare Shield Configuration Modal -->
+  <div id="antiban-modal" onclick="if(event.target === this) app.closeAntiBanModal()" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="glass-modal rounded-2xl max-w-2xl w-full p-6 space-y-5 animate-fade-in max-h-[92vh] overflow-y-auto" onclick="event.stopPropagation()">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+            <i data-lucide="shield-check" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">Anti-Ban Protection & Cloudflare Shield</h3>
+            <p class="text-xs text-slate-400">Chrome 124 TLS Impersonation, Rotating Proxies & Cloudflare Clearance</p>
+          </div>
+        </div>
+        <button type="button" onclick="app.closeAntiBanModal()" class="text-slate-400 hover:text-white cursor-pointer p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Live Cooldown Alert Banner (shown when circuit breaker is tripped) -->
+      <div id="antiban-cooldown-banner" class="hidden p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 space-y-2">
+        <div class="flex items-start justify-between">
+          <div class="flex items-start space-x-2">
+            <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-400 shrink-0 mt-0.5"></i>
+            <div>
+              <span class="font-bold text-xs block text-white">Circuit Breaker Cooldown Active</span>
+              <span id="antiban-cooldown-msg" class="text-[11px] text-rose-300 block">Scraping paused to protect your IP from bans.</span>
+            </div>
+          </div>
+          <button type="button" onclick="app.resetAntiBanCooldown()" class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-rose-600 hover:bg-rose-500 text-white cursor-pointer transition shrink-0">
+            Resume Now
+          </button>
+        </div>
+      </div>
+
+      <!-- Shield Metrics Bar -->
+      <div class="grid grid-cols-3 gap-3">
+        <div class="p-3 bg-slate-950/80 rounded-xl border border-slate-800">
+          <div class="text-[11px] text-slate-400">TLS Fingerprint</div>
+          <div class="text-sm font-bold font-mono text-cyan-400 mt-1 flex items-center">
+            <i data-lucide="check" class="w-3.5 h-3.5 mr-1 text-cyan-400"></i>
+            Chrome 124
+          </div>
+          <div class="text-[10px] text-slate-500">JA3/JA4 Impersonation</div>
+        </div>
+        <div class="p-3 bg-slate-950/80 rounded-xl border border-slate-800">
+          <div class="text-[11px] text-slate-400">Active Proxy Pool</div>
+          <div id="antiban-stat-proxies" class="text-sm font-bold font-mono text-indigo-400 mt-1 truncate">Direct IP</div>
+          <div id="antiban-stat-proxies-sub" class="text-[10px] text-slate-500">0 proxies loaded</div>
+        </div>
+        <div class="p-3 bg-slate-950/80 rounded-xl border border-slate-800">
+          <div class="text-[11px] text-slate-400">Cloudflare Auth</div>
+          <div id="antiban-stat-cookies" class="text-sm font-bold font-mono text-emerald-400 mt-1">Direct Guest</div>
+          <div id="antiban-stat-cookies-sub" class="text-[10px] text-slate-500">Standard web session</div>
+        </div>
+      </div>
+
+      <!-- Live Connection Test Panel -->
+      <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center">
+              <i data-lucide="activity" class="w-3.5 h-3.5 mr-1.5 text-cyan-400"></i>
+              Live Vinted Connection Diagnostic
+            </h4>
+            <p class="text-[10px] text-slate-400">Send an authentic probe request to vinted.co.uk to check for Cloudflare mitigation</p>
+          </div>
+          <button type="button" id="btn-test-antiban" onclick="app.testAntiBanConnection()" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 transition cursor-pointer">
+            <i data-lucide="refresh-cw" class="w-3 h-3 mr-1.5" id="antiban-test-icon"></i>
+            <span>Test Probe</span>
+          </button>
+        </div>
+
+        <div id="antiban-test-results" class="p-3 rounded-lg bg-slate-900 border border-slate-800 text-xs space-y-1.5">
+          <div class="flex items-center justify-between text-[11px]">
+            <span class="text-slate-400">Current Status:</span>
+            <span id="antiban-test-status" class="font-mono font-semibold text-slate-300">Click "Test Probe" to run diagnostic</span>
+          </div>
+          <div id="antiban-test-detail" class="text-[11px] text-slate-500">
+            Probe measures roundtrip latency and verifies whether your current IP is flagged with Cloudflare challenge challenges.
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 1: Proxy Pool -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center">
+            <i data-lucide="network" class="w-3.5 h-3.5 mr-1.5 text-indigo-400"></i>
+            Rotating Proxy Pool (HTTP / SOCKS5)
+          </label>
+          <span class="text-[10px] text-slate-400">One proxy per line</span>
+        </div>
+        <p class="text-[11px] text-slate-400">
+          Enter residential or datacenter rotating proxy URLs. The scraper will automatically rotate between them on each search cycle to eliminate rate limits.
+        </p>
+        <textarea id="antiban-proxies-input" rows="3" placeholder="http://username:password@proxy.example.com:8080&#10;socks5://user:pass@192.168.1.1:1080" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-400 placeholder:text-slate-600"></textarea>
+      </div>
+
+      <!-- Section 2: Browser Cookie Injection & Automated Harvester -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center">
+            <i data-lucide="cookie" class="w-3.5 h-3.5 mr-1.5 text-amber-400"></i>
+            Browser Session Cookies (Cloudflare Clearance & Token)
+          </label>
+          <span class="text-[10px] text-teal-400 font-semibold">Automated or Manual</span>
+        </div>
+
+        <!-- Automated 1-Click Harvester Card -->
+        <div class="p-3.5 rounded-xl bg-gradient-to-r from-cyan-950/60 to-slate-900 border border-cyan-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-cyan-950/20">
+          <div class="space-y-0.5">
+            <div class="text-xs font-bold text-white flex items-center">
+              <i data-lucide="sparkles" class="w-4 h-4 mr-1.5 text-cyan-400"></i>
+              Automated 1-Click Session Harvester
+            </div>
+            <p class="text-[11px] text-slate-300 leading-relaxed">
+              Solves Cloudflare challenges in the background using your local Chromium engine and refreshes clearance tokens automatically without DevTools.
+            </p>
+          </div>
+          <button type="button" id="btn-auto-harvest" onclick="app.autoHarvestSession()" class="inline-flex items-center justify-center px-3.5 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition shadow-md shadow-cyan-600/20 shrink-0 cursor-pointer">
+            <i data-lucide="zap" class="w-3.5 h-3.5 mr-1.5" id="auto-harvest-icon"></i>
+            <span id="auto-harvest-text">Auto-Harvest Now</span>
+          </button>
+        </div>
+
+        <p class="text-[11px] text-slate-400">
+          Or paste cookies manually if you prefer using your regular browser session:
+        </p>
+        
+        <div class="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 text-[10px] text-slate-400 space-y-1">
+          <div class="font-semibold text-slate-300 flex items-center">
+            <i data-lucide="help-circle" class="w-3 h-3 mr-1 text-teal-400"></i>
+            How to get your clearance cookie:
+          </div>
+          <div>1. Open <a href="https://www.vinted.co.uk" target="_blank" class="text-teal-400 underline">vinted.co.uk</a> in Chrome and complete any verification if shown.</div>
+          <div>2. Press <code class="px-1 py-0.5 bg-slate-800 rounded text-cyan-300">F12</code> &rarr; <strong>Network</strong> tab &rarr; click any request to vinted.co.uk.</div>
+          <div>3. Under <strong>Request Headers</strong>, copy the entire <code class="px-1 py-0.5 bg-slate-800 rounded text-cyan-300">cookie</code> string and paste below.</div>
+        </div>
+
+        <textarea id="antiban-cookies-input" rows="2" placeholder="cf_clearance=...; access_token_web=...; _vinted_fr_session=..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-400 placeholder:text-slate-600"></textarea>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center justify-end space-x-2.5 pt-2 border-t border-slate-800">
+        <button type="button" onclick="app.closeAntiBanModal()" class="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer">
+          Close
+        </button>
+        <button type="button" id="btn-save-antiban" onclick="app.saveAntiBanConfig()" class="px-4 py-2 rounded-lg text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition flex items-center cursor-pointer shadow-md shadow-cyan-600/20">
+          <i data-lucide="save" class="w-3.5 h-3.5 mr-1.5"></i>
+          <span>Save Shield Settings</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Live Scraper Activity Terminal & Feed Window -->
+  <div id="scraper-terminal-drawer" class="fixed z-40 transition-all duration-300 hidden font-sans" style="bottom: 0; left: 0; right: 0;">
+    <!-- Backdrop for maximize mode (only visible when maximized) -->
+    <div id="scraper-terminal-backdrop" onclick="app.closeScraperTerminal()" class="fixed inset-0 bg-black/75 backdrop-blur-sm -z-10 hidden"></div>
+
+    <div id="scraper-terminal-container" class="bg-slate-950/98 border-t border-slate-700 shadow-2xl backdrop-blur-md flex flex-col transition-all duration-300 md:ml-72 h-[380px]">
+      
+      <!-- Terminal Header / Control Bar -->
+      <div class="px-4 py-2.5 bg-slate-900/95 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <!-- Title & Status Dot -->
+        <div class="flex items-center space-x-3">
+          <div class="flex items-center space-x-2">
+            <span class="relative flex h-2.5 w-2.5">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
+            </span>
+            <span class="text-xs font-bold text-white uppercase tracking-wider flex items-center">
+              <i data-lucide="terminal" class="w-3.5 h-3.5 mr-1.5 text-emerald-400"></i>
+              Live Scraper Terminal
+            </span>
+          </div>
+
+          <!-- Active Search / State Indicator -->
+          <span id="terminal-live-status-pill" class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-slate-800 text-teal-300 border border-slate-700 truncate max-w-[220px]">
+            Ready
+          </span>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-xs">
+          <button type="button" onclick="app.setTerminalFilter('all')" id="terminal-filter-all" class="px-2.5 py-1 rounded-md text-[11px] font-semibold text-white bg-slate-800 shadow-sm transition cursor-pointer">
+            All Activity
+          </button>
+          <button type="button" onclick="app.setTerminalFilter('db_added')" id="terminal-filter-db_added" class="px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-emerald-300 transition cursor-pointer flex items-center">
+            <i data-lucide="database" class="w-3 h-3 mr-1 text-emerald-400"></i>
+            ⭐ Added to DB Only
+          </button>
+          <button type="button" onclick="app.setTerminalFilter('scans')" id="terminal-filter-scans" class="px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-slate-200 transition cursor-pointer">
+            Scans & Cycles
+          </button>
+        </div>
+
+        <!-- Telemetry Counters & Window Controls -->
+        <div class="flex items-center space-x-2.5">
+          <div class="flex items-center space-x-1.5 text-[10px] font-mono">
+            <span id="terminal-stat-added-badge" class="px-2 py-0.5 rounded font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+              0 Added to DB
+            </span>
+            <span id="terminal-stat-inspected-badge" class="hidden sm:inline-block px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+              0 Inspected
+            </span>
+            <span id="terminal-stat-price-badge" class="hidden sm:inline-block px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+              0 Drops
+            </span>
+          </div>
+
+          <div class="h-4 w-px bg-slate-800 hidden sm:block"></div>
+
+          <!-- Auto Scroll Toggle -->
+          <button type="button" id="btn-terminal-autoscroll" onclick="app.toggleTerminalAutoScroll()" class="px-2 py-1 rounded text-[11px] font-mono font-semibold text-emerald-400 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition cursor-pointer" title="Toggle automatic scrolling on new events">
+            Auto-Scroll: ON
+          </button>
+
+          <!-- Clear Feed -->
+          <button type="button" onclick="app.clearTerminalFeed()" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition cursor-pointer" title="Clear Terminal Feed">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
+
+          <!-- Maximize / Restore Toggle -->
+          <button type="button" id="btn-terminal-maximize" onclick="app.toggleTerminalMaximize()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer" title="Maximize / Restore Terminal Size">
+            <i data-lucide="maximize-2" class="w-3.5 h-3.5" id="terminal-max-icon"></i>
+          </button>
+
+          <!-- Close Button -->
+          <button type="button" onclick="app.closeScraperTerminal()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer" title="Close Terminal">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Terminal Output Scrollable Feed -->
+      <div id="scraper-terminal-output" class="flex-1 overflow-y-auto p-4 space-y-2.5 font-mono text-xs text-slate-300 selection:bg-emerald-500 selection:text-black">
+        <!-- Default Empty State -->
+        <div id="terminal-empty-placeholder" class="py-12 text-center text-slate-500 space-y-2">
+          <i data-lucide="terminal" class="w-8 h-8 mx-auto text-slate-700 mb-2"></i>
+          <p class="font-semibold text-slate-400 text-xs">Live Scraper Terminal Ready</p>
+          <p class="text-[11px] text-slate-600 max-w-sm mx-auto">
+            Listening for scrape events from Auto-Poll, Constant Scrape, and Deal Sniper. Newly scraped items added to the database will appear highlighted here in real-time.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Global Actionable Toast / Alert Notification -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 max-w-md p-4 rounded-2xl shadow-2xl border text-xs font-medium space-y-2 backdrop-blur-md">
+    <div class="flex items-start justify-between gap-3">
+      <div class="flex items-start space-x-2.5">
+        <i data-lucide="info" class="w-4 h-4 shrink-0 mt-0.5" id="toast-icon"></i>
+        <div>
+          <span id="toast-title" class="font-bold block text-white text-xs mb-0.5">Notification</span>
+          <span id="toast-message" class="text-slate-300 leading-relaxed block">Notification message</span>
+        </div>
+      </div>
+      <button onclick="app.dismissToast()" class="text-slate-400 hover:text-white shrink-0 p-1 cursor-pointer">
+        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+      </button>
+    </div>
+    <div id="toast-resolution-container" class="hidden toast-resolution-box flex items-start space-x-2">
+      <i data-lucide="lightbulb" class="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5"></i>
+      <span id="toast-resolution" class="leading-relaxed">Actionable resolution advice goes here.</span>
+    </div>
+  </div>
+
+  <!-- Application Logic -->
+  <script src="/static/app.js?v=2.5"></script>
+</body>
+</html>
+
