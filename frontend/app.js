@@ -6077,7 +6077,9 @@ class VintedApp {
         : Math.round(Math.min(...selectedSubs.map(v => v.recommended_snipe_price || 40)));
       const tierBadge = focusNode ? focusNode.resale_tier : activeModel.resale_tier;
       const modeBadge = focusNode
-        ? (focusNode.modality === 'label' ? 'Tag OCR + Text' : 'CLIP Vision + Text')
+        ? (focusNode.modality === 'label'
+            ? 'Tag OCR + Text'
+            : (focusNode.modality === 'feature' ? 'Rare Feature · needs proof' : 'CLIP Vision + Text'))
         : 'Combined Styles';
 
       inspector.classList.remove('hidden');
@@ -6445,7 +6447,7 @@ class VintedApp {
         text_keywords: keywords.map(k => k.toLowerCase()),
         ocr_signatures: keywords,
         negative_keywords: negatives.map(k => k.toLowerCase()),
-        visual_cues: modality === 'visual' ? [desc || name] : [],
+        visual_cues: modality !== 'label' ? [desc || name] : [],
         target_max_price: (!isNaN(maxPriceRaw) && maxPriceRaw > 0) ? maxPriceRaw : null,
       };
       const res = await fetch(`/api/searches/${this.currentSearchId}/variants`, {

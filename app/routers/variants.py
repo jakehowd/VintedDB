@@ -519,7 +519,7 @@ def _batch_classify_stored_items(
         return 0
 
     stop_tokens = _build_stop_tokens(search)
-    visual_variants = [v for v in variants if (v.modality or "visual") == "visual" and bool(v.prototype_embedding)]
+    visual_variants = [v for v in variants if (v.modality or "visual") in ("visual", "feature") and bool(v.prototype_embedding)]
     has_ocr_sigs = any(bool(v.parsed_list("ocr_signatures")) for v in variants)
 
     q = db.query(SoldItem).filter(SoldItem.tracked_search_id == search.id)
@@ -806,7 +806,7 @@ def create_custom_variant(
 
     dim = "Style" if parent_id is not None else "Model"
     mod = (data.modality or "visual").strip().lower()
-    if mod not in ("visual", "label"):
+    if mod not in ("visual", "label", "feature"):
         mod = "visual"
 
     slug = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_") or "custom_variant"
@@ -861,7 +861,7 @@ def update_variant(
         elif data.parent_variant_id != v.id:
             v.parent_variant_id = int(data.parent_variant_id)
             v.dimension = "Style"
-    if data.modality is not None and data.modality.strip().lower() in ("visual", "label"):
+    if data.modality is not None and data.modality.strip().lower() in ("visual", "label", "feature"):
         v.modality = data.modality.strip().lower()
     if data.short_description is not None:
         v.short_description = data.short_description.strip()

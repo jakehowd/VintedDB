@@ -37,6 +37,18 @@ logger = logging.getLogger(__name__)
 TIER_RANK = {"PREMIUM": 4, "HIGH": 3, "STANDARD": 2, "BUDGET": 1}
 
 
+def _is_photo_modality(v: ProductVariant) -> bool:
+    """Variants that carry a CLIP photo prototype ('visual' and distinctive 'feature' variants)."""
+    return (v.modality or "visual") in ("visual", "feature")
+
+
+def _is_feature_gated(v: ProductVariant) -> bool:
+    """'feature' variants are defined by one distinctive physical feature (hood, cropped hem, sleeveless,
+    reversible...). They are NEVER assigned by relative photo ranking against siblings — only by explicit
+    title/OCR evidence or by passing an absolute zero-shot photo check for that feature."""
+    return (v.modality or "visual") == "feature"
+
+
 def _l2_normalize(vec: np.ndarray) -> np.ndarray:
     norm = float(np.linalg.norm(vec))
     if norm < 1e-9:
@@ -92,6 +104,7 @@ class LocalVariantVisionService:
         self._clip_error_msg: str = ""
         self._total_images_classified: int = 0
         self._last_inference_ms: Optional[int] = None
+        self._text_vec_cache: Dict[str, np.ndarray] = {}
 
         os.makedirs(VISION_CACHE_DIR, exist_ok=True)
         os.makedirs(VISION_MODELS_DIR, exist_ok=True)
@@ -218,6 +231,71 @@ class LocalVariantVisionService:
                 logger.debug("CLIP text embed error: %s", exc)
                 return None
 
+    def embed_texts_cached(self, texts: List[str]) -> Optional[np.ndarray]:
+        """CLIP text embeddings with an in-memory cache (zero-shot feature prompts are reused per item)."""
+        if not texts:
+            return None
+        missing = [t for t in dict.fromkeys(texts) if t not in self._text_vec_cache]
+        if missing:
+            mat = self.embed_texts(missing)
+            if mat is None:
+                return None
+            for t, vec in zip(missing, mat):
+                self._text_vec_cache[t] = vec
+            if len(self._text_vec_cache) > 4000:
+                self._text_vec_cache.clear()
+                return self.embed_texts(texts)
+        return np.stack([self._text_vec_cache[t] for t in texts])
+
+    # Zero-shot gate for distinctive-feature variants: the photo must look clearly MORE like
+    # "<product> with <feature>" than like the ordinary product / sibling models.
+    # Measured on real Superdry listings: zero-shot CLIP alone cannot reliably separate "henley with hood" from a
+    # plain henley (plain henleys scored higher than genuine hooded ones). So photo-only assignment of a rare
+    # feature additionally requires a learned prototype built from >= N verified examples (explicitly titled or
+    # manually tagged) that clearly beats every ordinary sibling. Until then, rare features need text/OCR proof.
+    FEATURE_GATE_MIN_PROB = 0.90       # sigmoid(100 * (sim_feature - sim_baseline))
+    FEATURE_GATE_MIN_SAMPLES = 5       # verified photos needed before vision alone may assign a rare feature
+    FEATURE_GATE_PROTO_MARGIN = 0.03   # learned-prototype margin over best ordinary sibling
+
+    def _feature_gate_score(
+        self,
+        item_vec: np.ndarray,
+        feature_variant: ProductVariant,
+        baseline_prompts: List[str],
+        ordinary_siblings: List[ProductVariant],
+        search_text: str,
+    ) -> Optional[float]:
+        """Return gate probability if the photo passes the absolute feature check, else None."""
+        if not feature_variant.prototype_embedding or int(feature_variant.training_sample_count or 0) < self.FEATURE_GATE_MIN_SAMPLES:
+            return None
+        pos_prompts = [
+            f"a Vinted listing photo of {c}" for c in (feature_variant.parsed_list("visual_cues") or [])
+        ] or [f"a Vinted listing photo of a {search_text} {feature_variant.variant_name}"]
+        pos_mat = self.embed_texts_cached(pos_prompts)
+        base_mat = self.embed_texts_cached(baseline_prompts)
+        if pos_mat is None or base_mat is None:
+            return None
+        sim_pos = float(np.max(pos_mat @ item_vec))
+        sim_base = float(np.max(base_mat @ item_vec))
+        prob = 1.0 / (1.0 + float(np.exp(-100.0 * (sim_pos - sim_base))))
+        if prob < self.FEATURE_GATE_MIN_PROB:
+            return None
+
+        # The learned feature prototype must also clearly beat every ordinary sibling's prototype.
+        try:
+            f_raw = np.array(json.loads(feature_variant.prototype_embedding)["raw"], dtype=np.float32)
+            f_sim = float(np.dot(item_vec, f_raw))
+            other_sims = [
+                float(np.dot(item_vec, np.array(json.loads(sv.prototype_embedding)["raw"], dtype=np.float32)))
+                for sv in ordinary_siblings
+                if sv.prototype_embedding
+            ]
+            if other_sims and f_sim - max(other_sims) < self.FEATURE_GATE_PROTO_MARGIN:
+                return None
+        except Exception:
+            return None
+        return prob
+
     def embed_images(self, image_paths: List[str]) -> Optional[np.ndarray]:
         valid = [p for p in image_paths if p and os.path.exists(p)]
         if not valid or not self._ensure_clip_loaded():
@@ -340,17 +418,17 @@ class LocalVariantVisionService:
 
         # Build strictly isolated visual sibling groups (Stage 1 root models + Stage 2 per-model sub-styles)
         sibling_groups: Dict[str, List[ProductVariant]] = {}
-        vis_roots = [v for v in top_models if (v.modality or "visual") == "visual"]
+        vis_roots = [v for v in top_models if _is_photo_modality(v)]
         if vis_roots:
             sibling_groups["root"] = vis_roots
 
         for v in variants:
-            if (v.modality or "visual") != "visual":
+            if not _is_photo_modality(v):
                 v.prototype_embedding = None
                 v.training_sample_count = 0
 
         for pid, children in children_by_parent.items():
-            vis_children = [c for c in children if (c.modality or "visual") == "visual"]
+            vis_children = [c for c in children if _is_photo_modality(c)]
             if len(vis_children) >= 2:
                 sibling_groups[f"parent_{pid}"] = vis_children
             else:
@@ -360,6 +438,13 @@ class LocalVariantVisionService:
                     vc.training_sample_count = 0
 
         seed_urls_by_vid: Dict[int, List[str]] = {v.id: [] for v in variants}
+        # Manually verified tags are the strongest seeds (this is how rare feature variants earn photo-only matching)
+        for item in stored_items:
+            if item.variant_method == "manual" and item.photo_url:
+                for vid in item.parsed_variant_ids():
+                    bucket = seed_urls_by_vid.get(vid)
+                    if bucket is not None and len(bucket) < 12 and item.photo_url not in bucket:
+                        bucket.append(item.photo_url)
         for group_key, grp_vars in sibling_groups.items():
             parent_obj = None
             if group_key.startswith("parent_"):
@@ -398,7 +483,10 @@ class LocalVariantVisionService:
                             extracted = _extract_item(raw)
                             if not extracted or not extracted.get("photo_url"):
                                 continue
-                            if self._score_seed_match(extracted.get("title", ""), v, stop_tokens) >= 0.0:
+                            # Distinctive-feature variants (e.g. Hooded Henley) only learn from listings that
+                            # explicitly name the feature, so ordinary listings never pollute the rare prototype.
+                            min_seed = 2.5 if _is_feature_gated(v) else 0.0
+                            if self._score_seed_match(extracted.get("title", ""), v, stop_tokens) >= min_seed:
                                 p_url = extracted["photo_url"]
                                 if p_url not in seed_urls_by_vid[v.id]:
                                     seed_urls_by_vid[v.id].append(p_url)
@@ -408,6 +496,7 @@ class LocalVariantVisionService:
                         logger.debug("Live seed harvest skipped for '%s': %s", query_str, exc)
 
         raw_centroids: Dict[int, np.ndarray] = {}
+        accept_sims: Dict[int, float] = {}
         sample_counts: Dict[int, int] = {v.id: 0 for v in variants}
 
         for group_key, grp_vars in sibling_groups.items():
@@ -440,6 +529,11 @@ class LocalVariantVisionService:
                     else:
                         fused = mean_img
                     raw_centroids[v.id] = fused
+                    # Out-of-distribution floor: a photo must look at least as much like this model as its
+                    # weaker verified examples do, otherwise it is left unclassified instead of forced in.
+                    if img_mat.shape[0] >= 3:
+                        seed_sims = img_mat @ fused
+                        accept_sims[v.id] = float(np.percentile(seed_sims, 15)) - 0.01
                 elif text_vec is not None:
                     raw_centroids[v.id] = text_vec
 
@@ -465,6 +559,7 @@ class LocalVariantVisionService:
                         "contrast": [round(float(x), 6) for x in contrast_vec.tolist()],
                         "family_mean": [round(float(x), 6) for x in grp_mean.tolist()],
                         "group": group_key,
+                        "accept_sim": round(accept_sims[v.id], 4) if v.id in accept_sims else None,
                     }
                     v.prototype_embedding = json.dumps(payload)
                     v.training_sample_count = sample_counts.get(v.id, 0)
@@ -608,7 +703,7 @@ class LocalVariantVisionService:
                 ocr_lower = " | ".join(all_ocr_lines).lower()
 
                 has_any_visual_proto = any(
-                    (v.modality or "visual") == "visual" and bool(v.prototype_embedding)
+                    _is_photo_modality(v) and bool(v.prototype_embedding)
                     for v in active_variants
                 )
                 if has_any_visual_proto and self._ensure_clip_loaded():
@@ -646,11 +741,17 @@ class LocalVariantVisionService:
         methods_used: set[str] = set()
         evidence_parts: List[str] = []
 
-        def _select_from_sibling_group(candidates: List[ProductVariant]) -> Tuple[Optional[ProductVariant], float]:
+        search_label = (tracked_search.search_text or "").strip()
+
+        def _select_from_sibling_group(
+            candidates: List[ProductVariant],
+            parent: Optional[ProductVariant] = None,
+        ) -> Tuple[Optional[ProductVariant], float]:
             if not candidates:
                 return None, 0.0
 
             vis_metrics: Dict[int, Tuple[float, float, float]] = {}
+            accept_floor: Dict[int, Optional[float]] = {}
             visual_candidates = [
                 v for v in candidates
                 if (v.modality or "visual") == "visual" and bool(v.prototype_embedding)
@@ -668,6 +769,7 @@ class LocalVariantVisionService:
                         sim_r = float(np.dot(mean_item_vec, r_proto))
                         comb = 0.72 * sim_c + 0.28 * sim_r
                         vis_metrics[v.id] = (comb, sim_c, sim_r)
+                        accept_floor[v.id] = pdata.get("accept_sim")
                     except Exception:
                         pass
 
@@ -695,7 +797,34 @@ class LocalVariantVisionService:
                     methods_used.add("vision")
                 return winner, conf
 
-            # (b) Pure Contrastive Vision fallback within this sibling group
+            # (b) Distinctive-feature variants (Hooded, Cropped, Sleeveless, Reversible...) — never won by
+            #     relative ranking. They need an absolute zero-shot photo check against the ordinary product.
+            feature_cands = [v for v in candidates if _is_feature_gated(v) and v.id not in disqualified]
+            if mean_item_vec is not None and feature_cands:
+                ordinary = [v for v in candidates if not _is_feature_gated(v)]
+                baseline_prompts = [
+                    f"a Vinted listing photo of a plain standard {search_label}",
+                    f"a Vinted listing photo of a long sleeve {search_label}",
+                    "a Vinted listing photo of a long sleeve top",
+                ]
+                if parent is not None:
+                    baseline_prompts += [f"a Vinted listing photo of {c}" for c in parent.parsed_list("visual_cues")[:3]]
+                for ov in ordinary:
+                    baseline_prompts += [f"a Vinted listing photo of {c}" for c in ov.parsed_list("visual_cues")[:2]]
+                gated: List[Tuple[float, ProductVariant]] = []
+                for fv in feature_cands:
+                    prob = self._feature_gate_score(mean_item_vec, fv, baseline_prompts, ordinary, search_label)
+                    if prob is not None:
+                        gated.append((prob, fv))
+                if gated:
+                    gated.sort(key=lambda x: x[0], reverse=True)
+                    prob, fv = gated[0]
+                    f_conf = round(min(0.9, 0.55 + 0.35 * prob), 2)
+                    methods_used.add("vision")
+                    evidence_parts.append(f"Photo shows distinctive feature ({int(round(prob * 100))}% zero-shot)")
+                    return fv, f_conf
+
+            # (c) Pure Contrastive Vision fallback among ORDINARY visual siblings only
             if vis_metrics and len(vis_metrics) >= 2:
                 ranked_vis = sorted(
                     [v for v in visual_candidates if v.id in vis_metrics],
@@ -709,8 +838,11 @@ class LocalVariantVisionService:
                 contrast_gap = best_sim_c - sec_sim_c
                 min_gap = 0.28 if len(vis_metrics) == 2 else 0.25
 
+                floor = accept_floor.get(best_v.id)
                 if (
                     best_v.id not in disqualified
+                    and floor is not None          # model must have real photo examples to judge against
+                    and best_sim_r >= floor        # ...and the photo must genuinely resemble them
                     and best_sim_c >= 0.18
                     and contrast_gap >= min_gap
                     and best_sim_r >= 0.21
@@ -733,7 +865,7 @@ class LocalVariantVisionService:
         winning_style: Optional[ProductVariant] = None
         style_conf: float = 0.0
         if exclusive_children:
-            winning_style, style_conf = _select_from_sibling_group(exclusive_children)
+            winning_style, style_conf = _select_from_sibling_group(exclusive_children, parent=winning_model)
 
         self._last_inference_ms = int((time.perf_counter() - t0) * 1000)
 
@@ -840,7 +972,7 @@ class LocalVariantVisionService:
         item.variant_evidence = "Verified manually"
 
         # Online learning: blend item's photo vector into selected visual node's prototype within its exact sibling group
-        visual_targets = [v for v in v_list if (v.modality or "visual") == "visual"]
+        visual_targets = [v for v in v_list if _is_photo_modality(v)]
         if visual_targets and item.photo_url and self._ensure_clip_loaded():
             local_p = self._download_image_cached(item.photo_url)
             if local_p:
@@ -851,7 +983,7 @@ class LocalVariantVisionService:
                         grp_key = f"parent_{tv.parent_variant_id}" if tv.parent_variant_id is not None else "root"
                         grp_siblings = [
                             sv for sv in all_siblings
-                            if (sv.modality or "visual") == "visual"
+                            if _is_photo_modality(sv)
                             and sv.parent_variant_id == tv.parent_variant_id
                         ]
                         if len(grp_siblings) < 2 and tv.parent_variant_id is not None:

@@ -52,6 +52,26 @@ DEFAULT_AI_CONFIG: Dict[str, Any] = {
 # High-Precision Specialist Knowledge Base (Instant Seed + Zero-Key Fallback)
 # ---------------------------------------------------------------------------
 
+# Distinctive physical features that define a rarer variant. If a variant's name carries one of these
+# and the tracked search itself does not (e.g. "Hooded Henley" inside a "Superdry henley" search), the
+# variant is feature-gated: it needs explicit evidence and is never assigned by relative photo ranking.
+_FEATURE_GROUPS: List[set] = [
+    {"hood", "hooded", "hoodie", "hoody"},
+    {"cropped", "crop"},
+    {"gilet", "vest", "bodywarmer", "sleeveless"},
+    {"reversible"},
+]
+
+
+def _defining_feature_group(variant_name: str, search_text: str) -> bool:
+    name_toks = set(re.findall(r"[a-z]+", (variant_name or "").lower()))
+    search_toks = set(re.findall(r"[a-z]+", (search_text or "").lower()))
+    for grp in _FEATURE_GROUPS:
+        if name_toks & grp and not (search_toks & grp):
+            return True
+    return False
+
+
 SPECIALIST_CATALOGUES: List[Tuple[List[str], Dict[str, Any]]] = [
     (
         ["nuptse", "north face puffer", "tnf 700"],
@@ -895,75 +915,86 @@ SPECIALIST_CATALOGUES: List[Tuple[List[str], Dict[str, Any]]] = [
     (
         ["superdry henley", "super dry henley"],
         {
-            "product_family": "Superdry Vintage & Y2K Henley Tops",
+            "product_family": "Superdry Henley & Grandad Tops",
             "domain": "fashion",
-            "research_notes": "Product-specific Superdry Henley lines: Vintage Y2K Grandad Button Henley, Fitted/Ruched Women's Y2K Cami Henley, and Hooded Henley.",
+            "research_notes": (
+                "Superdry henleys are overwhelmingly the core button-placket grandad/heritage henley (waffle, ribbed or "
+                "slub jersey, long or short sleeve). The Hooded Henley is a rarer, distinctive variant and is feature-gated: "
+                "a listing only lands there if it names the hood or the photo clearly shows one. Plain listings with no "
+                "evidence stay unclassified instead of being forced into a model."
+            ),
             "variants": [
                 {
                     "variant_slug": "superdry_y2k_grandad_henley",
-                    "variant_name": "Vintage Y2K Grandad Henley",
+                    "variant_name": "Classic Grandad / Heritage Henley",
                     "dimension": "Model",
                     "modality": "visual",
-                    "short_description": "Early-2000s heavyweight Superdry Japan button-placket grandad Henley top.",
-                    "resale_tier": "HIGH",
-                    "est_market_value_gbp": 24.0,
-                    "visual_cues": ["mens vintage Y2K ribbed or waffle knit button neck grandad henley top"],
-                    "ocr_signatures": ["SUPERDRY", "TOKYO"],
-                    "text_keywords": ["vintage", "y2k", "2000s", "grandad", "waffle", "striped", "long-sleeve", "long sleeve", "short sleeve"],
-                    "negative_keywords": ["hooded", "hoodie", "cami", "ruched"],
+                    "short_description": "Core Superdry button-placket grandad henley without a hood (waffle, ribbed or slub jersey).",
+                    "resale_tier": "STANDARD",
+                    "est_market_value_gbp": 16.0,
+                    "visual_cues": [
+                        "a mens henley top with a short button placket at the collarless neck and no hood",
+                        "a waffle or ribbed knit grandad top with buttons at the neck",
+                    ],
+                    "ocr_signatures": ["SUPERDRY", "ORANGE LABEL"],
+                    "text_keywords": ["grandad", "granddad", "heritage", "waffle", "ribbed", "orange label", "slub", "striped"],
+                    "negative_keywords": ["hooded", "hoodie", "hoody", "hood", "cami", "ruched", "tank", "polo shirt", "off shoulder"],
                     "sub_styles": [
                         {
                             "variant_slug": "superdry_henley_long_sleeve",
-                            "variant_name": "Long-Sleeve Waffle / Ribbed",
+                            "variant_name": "Long-Sleeve",
                             "modality": "label",
-                            "short_description": "Long-sleeve heavyweight waffle or ribbed button Henley.",
-                            "resale_tier": "HIGH",
-                            "est_market_value_gbp": 26.0,
+                            "short_description": "Long-sleeve grandad henley.",
+                            "resale_tier": "STANDARD",
+                            "est_market_value_gbp": 17.0,
                             "visual_cues": [],
                             "ocr_signatures": [],
-                            "text_keywords": ["long sleeve", "long-sleeve", "waffle", "ribbed", "striped"],
-                            "negative_keywords": ["short sleeve", "short-sleeve", "tshirt", "t-shirt"],
+                            "text_keywords": ["long sleeve", "long-sleeve", "longsleeve", "long sleeved"],
+                            "negative_keywords": ["short sleeve", "short-sleeve", "short sleeved"],
                         },
                         {
                             "variant_slug": "superdry_henley_short_sleeve",
-                            "variant_name": "Short-Sleeve Button Henley",
+                            "variant_name": "Short-Sleeve",
                             "modality": "label",
-                            "short_description": "Short-sleeve button-neck Y2K Henley tee.",
-                            "resale_tier": "STANDARD",
-                            "est_market_value_gbp": 19.0,
+                            "short_description": "Short-sleeve button-neck henley tee.",
+                            "resale_tier": "BUDGET",
+                            "est_market_value_gbp": 12.0,
                             "visual_cues": [],
                             "ocr_signatures": [],
-                            "text_keywords": ["short sleeve", "short-sleeve", "tshirt", "t-shirt", "tee"],
-                            "negative_keywords": ["long sleeve", "long-sleeve"],
+                            "text_keywords": ["short sleeve", "short-sleeve", "short sleeved", "tshirt", "t-shirt", "tee"],
+                            "negative_keywords": ["long sleeve", "long-sleeve", "long sleeved"],
                         },
                     ],
                 },
                 {
                     "variant_slug": "superdry_womens_y2k_ruched_henley",
-                    "variant_name": "Women's Y2K Fitted / Ruched Henley",
+                    "variant_name": "Women's Fitted / Ruched Henley",
                     "dimension": "Model",
                     "modality": "visual",
-                    "short_description": "2000s fitted, ruched, babydoll, or lace-trim cami Henley top.",
-                    "resale_tier": "HIGH",
-                    "est_market_value_gbp": 26.0,
-                    "visual_cues": ["womens fitted ruched 2000s Y2K button front cami or Henley top"],
+                    "short_description": "Women's fitted, ruched, babydoll or lace-trim button-front henley top.",
+                    "resale_tier": "STANDARD",
+                    "est_market_value_gbp": 15.0,
+                    "visual_cues": ["a womens fitted ruched button front henley top", "a womens lace trim cami henley top"],
                     "ocr_signatures": [],
-                    "text_keywords": ["ruched", "fitted", "cami", "babydoll", "lace", "womens", "size 8", "size 10", "size 12"],
-                    "negative_keywords": ["mens", "hooded"],
+                    "text_keywords": ["ruched", "fitted", "cami", "babydoll", "lace", "size 8", "size 10", "size 12"],
+                    "negative_keywords": ["hooded", "hood", "grandad", "tank", "polo shirt", "mens"],
                     "sub_styles": [],
                 },
                 {
                     "variant_slug": "superdry_hooded_henley",
-                    "variant_name": "Hooded Henley Pullover",
+                    "variant_name": "Hooded Henley",
                     "dimension": "Model",
-                    "modality": "visual",
-                    "short_description": "Button-placket Henley top with attached drawstring hood.",
-                    "resale_tier": "STANDARD",
-                    "est_market_value_gbp": 20.0,
-                    "visual_cues": ["long sleeve button neck henley pullover top with drawstring hood"],
+                    "modality": "feature",
+                    "short_description": "Rarer button-placket henley with an attached hood — only assigned when the hood is named or clearly visible.",
+                    "resale_tier": "HIGH",
+                    "est_market_value_gbp": 28.0,
+                    "visual_cues": [
+                        "a long sleeve henley top with an attached hood",
+                        "a button neck pullover top with a hood behind the neck",
+                    ],
                     "ocr_signatures": [],
-                    "text_keywords": ["hooded", "hood", "hoodie"],
-                    "negative_keywords": ["cami", "short sleeve"],
+                    "text_keywords": ["hooded", "hood", "hoodie", "hoody", "hooded henley", "hooded grandad"],
+                    "negative_keywords": ["cami", "ruched"],
                     "sub_styles": [],
                 },
             ],
@@ -1716,8 +1747,14 @@ class MultiLLMRouter:
             "   - Never put a cut or style onto a model that was not produced in that cut (e.g. 'Cropped / Nuptse Short' and '1996 Gilet / Vest' "
             "belong ONLY inside '1996 Retro Nuptse (700)', NEVER on 'Summit Series (800)').\n"
             "   - If a model has no meaningful sub-variants, set `\"sub_styles\": []`.\n"
+            "   - DO NOT FORCE CATEGORIES: a listing with no real evidence stays unclassified. Never invent a vague catch-all model "
+            "just so every listing lands somewhere, and never group ordinary items with a rare variant.\n"
             "3. SET `modality` ACCURATELY:\n"
             "   - `'visual'`: silhouette, knit geometry, baffle layout, collar/pocket hardware, or camera body/lens markings visible in photos.\n"
+            "   - `'feature'`: a RARER variant defined by ONE distinctive physical feature that ordinary listings lack "
+            "(e.g. 'Hooded Henley' vs a normal henley, 'Cropped' or 'Gilet / Vest' cuts, 'Reversible'). Feature variants are only "
+            "assigned when the listing explicitly names the feature or the photo clearly shows it — never as a best-guess bucket. "
+            "Give them precise `text_keywords` (e.g. 'hooded', 'hood') and `visual_cues` that describe the feature itself.\n"
             "   - `'label'`: luxury fibre composition or bundle kit verified strictly from listing text or neck-tag/care-label OCR "
             "(empty `visual_cues`: `[]`; never guessed from distant photos).\n"
             "4. DISCRIMINATIVE CUES ONLY:\n"
@@ -1727,7 +1764,7 @@ class MultiLLMRouter:
             "5. SCHEMA FOR EACH MODEL (and each item inside `sub_styles`):\n"
             "   - `variant_slug`: unique lowercase snake_case id\n"
             "   - `variant_name`: concise collector-grade name\n"
-            "   - `modality`: 'visual' or 'label'\n"
+            "   - `modality`: 'visual', 'feature', or 'label'\n"
             "   - `short_description`: concise physical & UK resale distinction\n"
             "   - `resale_tier`: 'PREMIUM' | 'HIGH' | 'STANDARD' | 'BUDGET'\n"
             "   - `est_market_value_gbp`: realistic UK secondhand sold price in GBP (number)\n"
@@ -1816,9 +1853,13 @@ class MultiLLMRouter:
 
             dim = "Style" if is_sub_style else "Model"
             modality = str(v.get("modality") or "").strip().lower()
-            if modality not in ("visual", "label"):
+            if modality not in ("visual", "label", "feature"):
                 raw_dim = str(v.get("dimension") or "").strip().lower()
                 modality = "label" if raw_dim in ("material", "fabric", "composition", "kit", "bundle") else "visual"
+            # Variants defined by one distinctive physical feature (hood, cropped hem, sleeveless, reversible)
+            # are feature-gated so ordinary listings are never forced into the rarer variant.
+            if modality == "visual" and _defining_feature_group(name, search_text):
+                modality = "feature"
 
             tier = str(v.get("resale_tier") or "STANDARD").upper()
             if tier not in ("PREMIUM", "HIGH", "STANDARD", "BUDGET"):
