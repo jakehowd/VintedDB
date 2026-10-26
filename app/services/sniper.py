@@ -31,6 +31,8 @@ from ..services.antirep import (
     get_item_uploaded_at,
 )
 from ..services.item_classifier import is_child_size, is_item_relevant, normalize_categories
+from ..services.resale_evaluator import resale_evaluator
+from ..services.sniper_executor import sniper_executor
 from ..services.variant_vision import variant_vision_service
 
 logger = logging.getLogger(__name__)
@@ -56,6 +58,9 @@ class DealSniperService:
         self.total_items_inspected: int = 0
         self.total_items_saved: int = 0
         self.total_snipes_found: int = 0
+        self.ai_resale_gate_enabled: bool = True
+        self.min_net_profit: float = 12.0
+        self.min_roi_pct: float = 30.0
 
         # Monotonic Vinted ID cutoff: any item with int(id) <= _oldest_expired_vinted_id
         # is guaranteed to have been uploaded before that item (> max_age_minutes ago)
@@ -105,6 +110,9 @@ class DealSniperService:
         max_age_minutes: int = 15,
         poll_delay_seconds: float = 6.0,
         item_max_prices: Optional[Dict[int, float]] = None,
+        ai_resale_gate_enabled: Optional[bool] = None,
+        min_net_profit: Optional[float] = None,
+        min_roi_pct: Optional[float] = None,
     ) -> dict:
         """Start the background sniper loop with specified parameters."""
         with self._lock:
@@ -112,6 +120,13 @@ class DealSniperService:
                 self.item_max_prices = {int(k): float(v) for k, v in item_max_prices.items()}
             else:
                 self.item_max_prices = {}
+
+            if ai_resale_gate_enabled is not None:
+                self.ai_resale_gate_enabled = bool(ai_resale_gate_enabled)
+            if min_net_profit is not None:
+                self.min_net_profit = float(min_net_profit)
+            if min_roi_pct is not None:
+                self.min_roi_pct = float(min_roi_pct)
 
             new_max_age = int(max_age_minutes)
             if new_max_age != self.max_age_minutes:
@@ -126,7 +141,7 @@ class DealSniperService:
                 custom_count = len(self.item_max_prices)
                 self._add_log(
                     "SYSTEM", 
-                    f"Sniper updated: {len(search_ids)} targets ({custom_count} custom prices), Default Max £{max_price:.2f}, Age <={max_age_minutes}m"
+                    f"Sniper updated: {len(search_ids)} targets ({custom_count} custom prices), Default Max £{max_price:.2f}, Age <={max_age_minutes}m, AI Gate {'ON' if self.ai_resale_gate_enabled else 'OFF'} (Min £{self.min_net_profit:.2f})"
                 )
                 self.revalidate_deals()
                 return self.get_status()
@@ -144,7 +159,7 @@ class DealSniperService:
             custom_count = len(self.item_max_prices)
             self._add_log(
                 "SYSTEM",
-                f"🚀 Deal Sniper launched on {len(search_ids)} products ({custom_count} custom price rules, default £{max_price:.2f}, Age <={max_age_minutes}m)",
+                f"🚀 Deal Sniper launched on {len(search_ids)} products ({custom_count} custom price rules, default £{max_price:.2f}, Age <={max_age_minutes}m, AI Gate {'ON' if self.ai_resale_gate_enabled else 'OFF'} Min £{self.min_net_profit:.2f})",
             )
 
             self._worker_thread = threading.Thread(
@@ -306,6 +321,31 @@ class DealSniperService:
                         if item_data.get("seller_id") and not db_item.seller_id:
                             db_item.seller_id = str(item_data["seller_id"])
                         db_dirty = True
+                    continue
+
+                # Refresh AI Resale Evaluation
+                resale_eval = resale_evaluator.evaluate_deal(db=db, tracked_search=search, deal=deal)
+                deal.update({
+                    "ai_score": resale_eval["ai_score"],
+                    "ai_verdict": resale_eval["verdict"],
+                    "is_recommended": resale_eval["is_recommended"],
+                    "projected_net_profit": resale_eval["projected_net_profit"],
+                    "projected_roi_pct": resale_eval["roi_pct"],
+                    "projected_resale_price": resale_eval["projected_resale_price"],
+                    "total_landed_cost": resale_eval["total_landed_cost"],
+                    "cost_breakdown": resale_eval["cost_breakdown"],
+                    "liquidity_rating": resale_eval["liquidity_rating"],
+                    "estimated_days_to_sell": resale_eval["estimated_days_to_sell"],
+                    "seller_risk_level": resale_eval["seller_risk_level"],
+                    "ai_reasoning": resale_eval["reasoning"],
+                })
+                if self.ai_resale_gate_enabled:
+                    if (
+                        resale_eval["projected_net_profit"] < self.min_net_profit
+                        or resale_eval["roi_pct"] < self.min_roi_pct
+                        or resale_eval["verdict"] == "PASS"
+                    ):
+                        removed_ids.add(vinted_id)
 
             if db_dirty:
                 db.commit()
@@ -414,6 +454,9 @@ class DealSniperService:
                 "item_max_prices": {int(k): float(v) for k, v in self.item_max_prices.items()},
                 "max_age_minutes": self.max_age_minutes,
                 "poll_delay_seconds": self.poll_delay_seconds,
+                "ai_resale_gate_enabled": self.ai_resale_gate_enabled,
+                "min_net_profit": self.min_net_profit,
+                "min_roi_pct": self.min_roi_pct,
                 "started_at": self.started_at.isoformat() if self.started_at else None,
                 "last_poll_at": self.last_poll_at.isoformat() if self.last_poll_at else None,
                 "total_polls_count": self.total_polls_count,
@@ -941,6 +984,53 @@ class DealSniperService:
                         "resale_tier": matched_v_obj.resale_tier if matched_v_obj else None,
                     }
 
+                    # Advanced AI Resale Profitability & Risk Evaluation
+                    resale_eval = resale_evaluator.evaluate_deal(
+                        db=db,
+                        tracked_search=search,
+                        deal=deal_card,
+                        custom_variant=matched_v_obj,
+                    )
+                    deal_card.update({
+                        "ai_score": resale_eval["ai_score"],
+                        "ai_verdict": resale_eval["verdict"],
+                        "is_recommended": resale_eval["is_recommended"],
+                        "projected_net_profit": resale_eval["projected_net_profit"],
+                        "projected_roi_pct": resale_eval["roi_pct"],
+                        "projected_resale_price": resale_eval["projected_resale_price"],
+                        "total_landed_cost": resale_eval["total_landed_cost"],
+                        "cost_breakdown": resale_eval["cost_breakdown"],
+                        "liquidity_rating": resale_eval["liquidity_rating"],
+                        "estimated_days_to_sell": resale_eval["estimated_days_to_sell"],
+                        "seller_risk_level": resale_eval["seller_risk_level"],
+                        "ai_reasoning": resale_eval["reasoning"],
+                    })
+
+                    # AI Resale Quality Gate: prevent low-margin or scam items from polluting stream
+                    if self.ai_resale_gate_enabled:
+                        if (
+                            resale_eval["projected_net_profit"] < self.min_net_profit
+                            or resale_eval["roi_pct"] < self.min_roi_pct
+                            or resale_eval["verdict"] == "PASS"
+                        ):
+                            self._add_log(
+                                "SHIELD",
+                                f"⚠️ Filtered by AI Profit Gate: '{item_title}' (£{item_price:.2f}) projected profit £{resale_eval['projected_net_profit']:+.2f} ({resale_eval['roi_pct']:.0f}% ROI, {resale_eval['verdict']}) below threshold (Min £{self.min_net_profit:.2f}, {self.min_roi_pct:.0f}% ROI).",
+                            )
+                            continue
+
+                    # Automated Checkout / Paper Trading Simulation Execution
+                    should_buy, buy_reason = sniper_executor.should_auto_execute(db, deal_card, resale_eval)
+                    if should_buy:
+                        order_res = sniper_executor.execute_deal(db, deal_card, resale_eval)
+                        deal_card["autobuy_order"] = order_res
+                        order_prefix = "🧪 SIMULATED" if order_res["is_simulation"] else "⚡ LIVE"
+                        self._add_log(
+                            "AUTO-BUY",
+                            f"{order_prefix} AUTO-BUY: Acquired '{item_title}' for £{item_price:.2f} (Landed: £{order_res['total_landed_cost']:.2f}). "
+                            f"Projected profit: +£{order_res['projected_net_profit']:.2f} ({order_res['projected_roi_pct']:.0f}% ROI). [Order #{order_res['order_id']}]",
+                        )
+
                     with self._lock:
                         self.sniped_deals.insert(0, deal_card)
                         if len(self.sniped_deals) > 100:
@@ -949,7 +1039,7 @@ class DealSniperService:
                     var_tag = f" [{matched_var_res['variant_name']}]" if matched_var_res and matched_var_res.get("variant_name") else ""
                     self._add_log(
                         "SNIPE",
-                        f"🔥 SNIPED{var_tag}: '{item_title}' for £{item_price:.2f} (Uploaded {real_age_minutes}m ago, {discount_pct}% below avg £{effective_market_avg:.2f})",
+                        f"🔥 SNIPED{var_tag}: '{item_title}' for £{item_price:.2f} (AI {resale_eval['verdict']} {resale_eval['ai_score']}/100, Net +£{resale_eval['projected_net_profit']:.2f}, {real_age_minutes}m ago)",
                     )
 
             if new_saved_count > 0 or updated_existing or len(db.new) > 0 or len(db.dirty) > 0:

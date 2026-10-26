@@ -99,7 +99,8 @@ class VintedApp {
       this.loadSniperTargetsInfo(),
       this.loadAntiBanStatus(),
       this.loadAIStatus(),
-      this.loadDatabaseSummaryBadges()
+      this.loadDatabaseSummaryBadges(),
+      this.loadAutoBuyProfile()
     ]);
     this.startSchedulerCountdownLoop();
     this.startTerminalPolling();
@@ -2259,6 +2260,10 @@ class VintedApp {
       }
     }
 
+    const aiGateOn = document.getElementById('sniper-ai-gate-toggle')?.checked ?? true;
+    const minNetProfit = parseFloat(document.getElementById('sniper-min-net-profit')?.value) || 12.0;
+    const minRoi = parseFloat(document.getElementById('sniper-min-roi')?.value) || 30.0;
+
     const toggleBtn = document.getElementById('btn-sniper-toggle');
     const toggleText = document.getElementById('sniper-toggle-text');
     const toggleIcon = document.getElementById('sniper-toggle-icon');
@@ -2274,7 +2279,10 @@ class VintedApp {
           max_price: maxPrice,
           item_max_prices: itemMaxPricesObj,
           max_age_minutes: maxAge,
-          poll_delay_seconds: 5.0
+          poll_delay_seconds: 5.0,
+          ai_resale_gate_enabled: aiGateOn,
+          min_net_profit: minNetProfit,
+          min_roi_pct: minRoi
         })
       });
 
@@ -2593,11 +2601,37 @@ class VintedApp {
 
       const askingPrice = Number(deal.price) || 0;
       const buyerFee = 0.70 + (askingPrice * 0.05);
-      const estShipping = 2.70;
-      const totalBuyCost = askingPrice + buyerFee + estShipping;
-      const estResaleVal = Number(deal.market_avg_price) || (askingPrice + Number(deal.savings || 15));
-      const netProfit = Math.max(0, estResaleVal - totalBuyCost);
-      const roiPct = totalBuyCost > 0 ? (netProfit / totalBuyCost) * 100 : 0;
+      const estShipping = 2.95;
+      const totalBuyCost = deal.total_landed_cost != null ? Number(deal.total_landed_cost) : (askingPrice + buyerFee + estShipping);
+      const estResaleVal = deal.projected_resale_price != null ? Number(deal.projected_resale_price) : (Number(deal.market_avg_price) || (askingPrice + Number(deal.savings || 15)));
+      const netProfit = deal.projected_net_profit != null ? Number(deal.projected_net_profit) : Math.max(0, estResaleVal - totalBuyCost);
+      const roiPct = deal.projected_roi_pct != null ? Number(deal.projected_roi_pct) : (totalBuyCost > 0 ? (netProfit / totalBuyCost) * 100 : 0);
+
+      const aiScore = deal.ai_score != null ? deal.ai_score : 75;
+      const aiVerdict = deal.ai_verdict || (netProfit >= 15 ? 'STRONG_BUY' : (netProfit >= 8 ? 'VIABLE_BUY' : 'MARGINAL'));
+      let verdictBadgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+      let verdictText = `🔥 STRONG BUY · Score ${aiScore}/100`;
+      if (aiVerdict === 'VIABLE_BUY') {
+        verdictBadgeClass = 'bg-teal-500/20 text-teal-300 border-teal-500/40';
+        verdictText = `✅ VIABLE BUY · Score ${aiScore}/100`;
+      } else if (aiVerdict === 'MARGINAL') {
+        verdictBadgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+        verdictText = `⚠️ MARGINAL · Score ${aiScore}/100`;
+      } else if (aiVerdict === 'PASS') {
+        verdictBadgeClass = 'bg-rose-500/20 text-rose-300 border-rose-500/40';
+        verdictText = `🛑 PASS / RISK · Score ${aiScore}/100`;
+      }
+
+      const liquidityPill = deal.liquidity_rating
+        ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-teal-300 border border-slate-700 font-mono">${this.escapeHtmlAttr(deal.liquidity_rating)}</span>`
+        : '';
+
+      const autobuyBadge = deal.autobuy_order
+        ? `<div class="px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center">
+             <i data-lucide="zap" class="w-3 h-3 mr-1 text-cyan-400"></i>
+             ${deal.autobuy_order.is_simulation ? '🧪 SIMULATED PICK' : '⚡ LIVE BUY'} · #${this.escapeHtmlAttr(deal.autobuy_order.order_id)}
+           </div>`
+        : '';
 
       return `
         <div class="deal-card deal-card-new p-4 rounded-2xl flex flex-col justify-between space-y-3 relative group" data-deal-id="${deal.id}" tabindex="0" onclick="app.setFocusedDealById('${deal.id}')">
@@ -2655,26 +2689,32 @@ class VintedApp {
             </div>
           </div>
 
-          <!-- Reseller Net Margin & Fee Breakdown (Persona 1 & 4 UX improvement) -->
-          <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-1 text-[11px]">
+          <!-- AI Resale Profitability & Fee Breakdown -->
+          <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-1.5 text-[11px]">
+            <div class="flex items-center justify-between pb-1 border-b border-slate-800/80">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${verdictBadgeClass} shadow-sm">
+                ${verdictText}
+              </span>
+              ${liquidityPill}
+            </div>
+
             <div class="flex items-center justify-between text-slate-400">
               <span class="flex items-center">
                 <i data-lucide="calculator" class="w-3 h-3 mr-1 text-teal-400"></i>
-                Vinted Fee + Shipping:
+                Total Landed Cost:
               </span>
-              <span class="font-mono text-slate-300 tabular-nums">+£${(buyerFee + estShipping).toFixed(2)}</span>
+              <span class="font-mono text-slate-200 tabular-nums font-semibold">£${totalBuyCost.toFixed(2)} <span class="text-[10px] text-slate-500 font-normal">(inc. fee & delivery)</span></span>
             </div>
-            <div class="flex items-center justify-between text-slate-400">
-              <span>Total Landed Cost:</span>
-              <span class="font-mono text-slate-200 tabular-nums font-semibold">£${totalBuyCost.toFixed(2)}</span>
-            </div>
-            <div class="flex items-center justify-between pt-1 border-t border-slate-800/80 font-bold">
-              <span class="text-emerald-400">Est. Resale Profit:</span>
+
+            <div class="flex items-center justify-between font-bold">
+              <span class="text-emerald-400">Projected Net Profit:</span>
               <span class="font-mono text-emerald-400 font-extrabold tabular-nums">+£${netProfit.toFixed(2)} <span class="text-[10px] text-emerald-400/80 font-normal">(${roiPct.toFixed(0)}% ROI)</span></span>
             </div>
+
+            ${autobuyBadge}
           </div>
 
-          <!-- Bottom bar: Size, Condition & Action Button -->
+          <!-- Bottom bar: Size, Condition & Action Buttons -->
           <div class="pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-2">
             <div class="flex items-center space-x-1.5 truncate text-[10px] text-slate-400">
               <span class="px-2 py-0.5 rounded-md font-mono font-semibold bg-slate-950/80 text-slate-300 border border-slate-800">
@@ -2683,12 +2723,22 @@ class VintedApp {
               ${deal.condition ? `<span class="hidden sm:inline-block text-slate-500">• ${deal.condition}</span>` : ''}
             </div>
 
-            ${vintedUrl ? `
-              <a href="${vintedUrl}" target="_blank" rel="noopener noreferrer" class="btn-primary-glow inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-bold text-white transition shadow-sm cursor-pointer shrink-0">
-                <span>Snipe Deal</span>
-                <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 ml-1"></i>
-              </a>
-            ` : '—'}
+            <div class="flex items-center space-x-1.5 shrink-0">
+              <button type="button" 
+                      onclick="event.stopPropagation(); app.simulateBuyDeal('${deal.id}')" 
+                      class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 transition cursor-pointer flex items-center" 
+                      title="Simulate paper trading automated purchase">
+                <i data-lucide="play" class="w-3 h-3 mr-1 fill-current"></i>
+                <span>Sim Pick</span>
+              </button>
+
+              ${vintedUrl ? `
+                <a href="${vintedUrl}" target="_blank" rel="noopener noreferrer" class="btn-primary-glow inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-bold text-white transition shadow-sm cursor-pointer shrink-0">
+                  <span>Snipe Deal</span>
+                  <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 ml-1"></i>
+                </a>
+              ` : '—'}
+            </div>
           </div>
         </div>
       `;
@@ -5532,6 +5582,8 @@ class VintedApp {
     this.closeDatabaseModal();
     this.closeAntiBanModal();
     this.closeAIModal();
+    this.closeArbitrageModal();
+    this.closeAutoBuyModal();
     this.closeShortcutsModal();
     this.closeScraperTerminal();
     const mobDrawer = document.getElementById('mobile-items-drawer');
@@ -6849,6 +6901,510 @@ class VintedApp {
   async assignItemVariant(itemId, variantVal) {
     const ids = (variantVal !== '' && variantVal != null) ? [Number(variantVal)] : [];
     await this.saveItemVariantTags(itemId, ids);
+  }
+
+  // ── Market Inefficiency & Arbitrage Radar ──────────────────────────────────
+
+  async openArbitrageModal() {
+    const modal = document.getElementById('arbitrage-modal');
+    if (modal) modal.classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+    await this.loadArbitrageRadar(false);
+  }
+
+  closeArbitrageModal() {
+    const modal = document.getElementById('arbitrage-modal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  async loadArbitrageRadar(forceRefresh = false) {
+    const btn = document.getElementById('btn-arbitrage-rescan');
+    const icon = document.getElementById('arbitrage-rescan-icon');
+    const container = document.getElementById('arbitrage-cards-container');
+
+    if (btn) btn.disabled = true;
+    if (icon) icon.classList.add('animate-spin');
+
+    if (forceRefresh && container) {
+      container.innerHTML = `
+        <div class="py-12 text-center text-slate-400 space-y-2">
+          <i data-lucide="radar" class="w-8 h-8 mx-auto animate-spin text-amber-400"></i>
+          <p class="text-xs font-semibold">Running deep market velocity & cheap inflow scan...</p>
+        </div>
+      `;
+      if (window.lucide) lucide.createIcons();
+    }
+
+    try {
+      const endpoint = forceRefresh ? '/api/arbitrage/scan' : '/api/arbitrage/radar';
+      const method = forceRefresh ? 'POST' : 'GET';
+      const body = forceRefresh ? JSON.stringify({ include_live_scan: false }) : null;
+
+      const res = await fetch(endpoint, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body
+      });
+      if (!res.ok) throw new Error('Failed to load market arbitrage radar');
+      const data = await res.json();
+
+      const opps = Array.isArray(data.opportunities) ? data.opportunities : [];
+
+      // Update stat counters
+      const elTotal = document.getElementById('arb-stat-total');
+      if (elTotal) elTotal.textContent = data.total_opportunities || opps.length;
+
+      const elMaxSpread = document.getElementById('arb-stat-max-spread');
+      if (elMaxSpread) {
+        const maxSpread = opps.reduce((acc, o) => Math.max(acc, Number(o.spread_gbp != null ? o.spread_gbp : (o.net_spread || 0))), 0);
+        elMaxSpread.textContent = `£${maxSpread.toFixed(2)}`;
+      }
+
+      const elRapid = document.getElementById('arb-stat-rapid');
+      if (elRapid) {
+        const rapidCount = opps.filter(o => (o.velocity_tag || '').includes('Rapid') || o.velocity_level === 'rapid' || o.velocity_level === 'fast').length;
+        elRapid.textContent = rapidCount;
+      }
+
+      const elAvgRoi = document.getElementById('arb-stat-avg-roi');
+      if (elAvgRoi) {
+        const avgRoi = opps.length > 0
+          ? (opps.reduce((acc, o) => acc + Number(o.projected_roi_pct != null ? o.projected_roi_pct : (o.roi_pct || 0)), 0) / opps.length)
+          : 0;
+        elAvgRoi.textContent = `${avgRoi.toFixed(0)}%`;
+      }
+
+      // Update sidebar badge if any opportunities exist
+      const sideBadge = document.getElementById('sidebar-arbitrage-badge');
+      if (sideBadge) {
+        sideBadge.textContent = opps.length > 0 ? `${opps.length} HOT` : '0';
+      }
+
+      this.renderArbitrageOpportunities(opps);
+    } catch (err) {
+      console.error('Arbitrage Radar Error:', err);
+      if (container) {
+        container.innerHTML = `
+          <div class="py-8 text-center text-rose-400 space-y-1">
+            <i data-lucide="alert-triangle" class="w-6 h-6 mx-auto"></i>
+            <p class="text-xs font-semibold">${this.escapeHtmlAttr(err.message)}</p>
+          </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+      if (icon) icon.classList.remove('animate-spin');
+    }
+  }
+
+  renderArbitrageOpportunities(opps) {
+    const container = document.getElementById('arbitrage-cards-container');
+    if (!container) return;
+
+    if (!opps || opps.length === 0) {
+      container.innerHTML = `
+        <div class="py-12 text-center text-slate-500 space-y-2">
+          <i data-lucide="check-circle-2" class="w-8 h-8 mx-auto text-slate-600"></i>
+          <p class="text-xs font-semibold text-slate-400">Market is currently in equilibrium.</p>
+          <p class="text-[11px] text-slate-500">Run a new live scrape or wait for new mispriced listings to be recorded.</p>
+        </div>
+      `;
+      if (window.lucide) lucide.createIcons();
+      return;
+    }
+
+    container.innerHTML = opps.map(opp => {
+      const keyword = opp.search_text || opp.target_name || opp.keyword || 'Opportunity';
+      const brand = opp.brand || opp.brand_name || '';
+      const cheapInflow = opp.cheap_listings_count != null ? opp.cheap_listings_count : (opp.cheap_listings_inflow || opp.cheap_inflow_count || 0);
+      const cheapEntryPrice = Number(opp.cheap_entry_price != null ? opp.cheap_entry_price : (opp.entry_price || 0));
+      const medianSold = Number(opp.market_sold_median != null ? opp.market_sold_median : (opp.median_sold_price || opp.market_sold_price || 0));
+      const netSpread = Number(opp.spread_gbp != null ? opp.spread_gbp : (opp.net_spread || (medianSold - cheapEntryPrice)));
+      const roiPct = Number(opp.projected_roi_pct != null ? opp.projected_roi_pct : (opp.roi_pct || 0));
+      const velocityText = opp.velocity_tag || opp.velocity_description || (opp.velocity_level === 'rapid' ? '⚡ Rapid (< 48 hrs)' : '🚀 Fast Turnover');
+      const searchId = opp.search_id || null;
+      const targetCap = opp.recommended_max_snipe_price || opp.recommended_max_buy || Math.round(cheapEntryPrice * 1.15) || 35;
+
+      const tagBadge = opp.variant_name
+        ? `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">↳ ${this.escapeHtmlAttr(opp.variant_name)}</span>`
+        : '';
+
+      return `
+        <div class="p-4 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-amber-500/40 transition flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="space-y-1.5 flex-1 min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                🔥 HIGH CHEAP INFLOW (${cheapInflow} items under £${cheapEntryPrice.toFixed(0)})
+              </span>
+              ${brand ? `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300">${this.escapeHtmlAttr(brand)}</span>` : ''}
+              ${tagBadge}
+            </div>
+
+            <h4 class="text-sm font-bold text-white truncate">
+              ${this.escapeHtmlAttr(keyword)}
+            </h4>
+
+            <p class="text-xs text-slate-400">
+              ${this.escapeHtmlAttr(opp.rationale || `Consistent buyer demand at £${medianSold.toFixed(0)} with frequent influx of bargain sellers at £${cheapEntryPrice.toFixed(0)}.`)}
+            </p>
+
+            <div class="flex flex-wrap items-center gap-3 text-[11px] pt-1">
+              <span class="text-slate-400">Entry: <strong class="text-white font-mono">£${cheapEntryPrice.toFixed(2)}</strong></span>
+              <span class="text-slate-600">•</span>
+              <span class="text-slate-400">Market Resale: <strong class="text-emerald-400 font-mono">£${medianSold.toFixed(2)}</strong></span>
+              <span class="text-slate-600">•</span>
+              <span class="text-slate-400">Pace: <strong class="text-cyan-300">${this.escapeHtmlAttr(velocityText)}</strong></span>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between md:justify-end gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-800/80">
+            <div class="text-left md:text-right">
+              <div class="text-base font-black font-mono text-emerald-400">
+                +£${netSpread.toFixed(2)}
+              </div>
+              <div class="text-[10px] font-mono text-teal-300 font-bold">
+                ${roiPct.toFixed(0)}% ROI
+              </div>
+            </div>
+
+            <button type="button" 
+                    onclick="app.addArbitrageToSniper(${searchId}, '${this.escapeHtmlAttr(keyword)}', '${this.escapeHtmlAttr(brand)}', ${targetCap})"
+                    class="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow-sm flex items-center cursor-pointer">
+              <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1.5"></i>
+              Track & Snipe
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    if (window.lucide) lucide.createIcons();
+  }
+
+  async addArbitrageToSniper(searchId, keyword, brand, targetCap) {
+    try {
+      this.closeArbitrageModal();
+
+      if (searchId) {
+        this.sniperTargetsInitialized = true;
+        this.sniperTargets.add(Number(searchId));
+        this.showToast(`Locked Deal Sniper onto '${keyword}' (Target cap: £${targetCap})!`, 'success');
+        this.showSniperView();
+        await this.loadSniperTargetsInfo();
+        return;
+      }
+
+      // If not yet in tracked searches, create/enable it via API
+      const res = await fetch('/api/arbitrage/add-to-sniper', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          keyword,
+          brand_name: brand,
+          target_max_price: targetCap
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to add target to sniper');
+
+      await this.loadSearches();
+      await this.loadSniperTargetsInfo();
+
+      if (data.search_id) {
+        this.sniperTargetsInitialized = true;
+        this.sniperTargets.add(Number(data.search_id));
+      }
+
+      this.showToast(`🎯 Added '${keyword}' to Deal Sniper with £${targetCap} cap!`, 'success');
+      this.showSniperView();
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    }
+  }
+
+  // ── Auto-Checkout & Paper Trading Simulation Profile ───────────────────────
+
+  async openAutoBuyModal() {
+    const modal = document.getElementById('autobuy-modal');
+    if (modal) modal.classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+    await this.loadAutoBuyProfile();
+    await this.loadAutoBuyLedger();
+  }
+
+  closeAutoBuyModal() {
+    const modal = document.getElementById('autobuy-modal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  switchAutoBuyTab(tabName) {
+    const tabProfile = document.getElementById('tab-autobuy-profile');
+    const tabLedger = document.getElementById('tab-autobuy-ledger');
+    const panelProfile = document.getElementById('autobuy-panel-profile');
+    const panelLedger = document.getElementById('autobuy-panel-ledger');
+
+    if (tabName === 'ledger') {
+      if (tabProfile) tabProfile.className = 'px-3 py-1.5 font-semibold rounded-lg text-slate-400 hover:text-white cursor-pointer';
+      if (tabLedger) tabLedger.className = 'px-3 py-1.5 font-bold rounded-lg bg-slate-800 text-cyan-300 border border-slate-700 cursor-pointer';
+      if (panelProfile) panelProfile.classList.add('hidden');
+      if (panelLedger) panelLedger.classList.remove('hidden');
+      this.loadAutoBuyLedger();
+    } else {
+      if (tabProfile) tabProfile.className = 'px-3 py-1.5 font-bold rounded-lg bg-slate-800 text-cyan-300 border border-slate-700 cursor-pointer';
+      if (tabLedger) tabLedger.className = 'px-3 py-1.5 font-semibold rounded-lg text-slate-400 hover:text-white cursor-pointer';
+      if (panelProfile) panelProfile.classList.remove('hidden');
+      if (panelLedger) panelLedger.classList.add('hidden');
+    }
+    if (window.lucide) lucide.createIcons();
+  }
+
+  async loadAutoBuyProfile() {
+    try {
+      const res = await fetch('/api/autobuy/profile');
+      if (!res.ok) throw new Error('Failed to load auto-buy profile');
+      const data = await res.json();
+
+      const simCb = document.getElementById('ab-simulation-mode');
+      if (simCb) simCb.checked = Boolean(data.simulation_mode ?? true);
+
+      const autoCb = document.getElementById('ab-autobuy-enabled');
+      if (autoCb) autoCb.checked = Boolean(data.auto_buy_enabled);
+
+      const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val != null ? val : '';
+      };
+
+      setVal('ab-ship-name', data.shipping_name || data.shipping_address?.full_name || '');
+      setVal('ab-ship-phone', data.phone || data.shipping_address?.phone || '');
+      setVal('ab-ship-addr1', data.address_line1 || data.shipping_address?.address_line1 || '');
+      setVal('ab-ship-city', data.city || data.shipping_address?.city || '');
+      setVal('ab-ship-postcode', data.postcode || data.shipping_address?.postcode || '');
+
+      setVal('ab-card-name', data.cardholder_name || data.payment_card?.cardholder_name || '');
+      setVal('ab-card-exp', data.card_expiry || data.payment_card?.expiry || '');
+
+      const cardNumEl = document.getElementById('ab-card-num');
+      if (cardNumEl) {
+        cardNumEl.value = '';
+        cardNumEl.placeholder = data.card_number_masked || data.payment_card?.masked_number || '•••• •••• •••• ••••';
+      }
+
+      const cvvEl = document.getElementById('ab-card-cvv');
+      if (cvvEl) cvvEl.value = '';
+
+      setVal('ab-max-price', data.max_price_per_item ?? 45);
+      setVal('ab-daily-cap', data.daily_spend_limit ?? 150);
+      setVal('ab-min-score', data.min_ai_resale_score ?? 65);
+      setVal('ab-min-profit', data.min_net_profit ?? 15);
+
+      // Update badge indicator
+      const pill = document.getElementById('autobuy-mode-pill');
+      if (pill) {
+        if (data.is_simulation_active) {
+          pill.textContent = 'SIMULATION MODE (PAPER TRADING)';
+          pill.className = 'ml-2 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30';
+        } else {
+          pill.textContent = 'LIVE AUTO-CHECKOUT ACTIVE';
+          pill.className = 'ml-2 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30';
+        }
+      }
+    } catch (err) {
+      console.warn('AutoBuy Profile load note:', err.message);
+    }
+  }
+
+  async saveAutoBuyProfile(event) {
+    if (event) event.preventDefault();
+
+    const simMode = document.getElementById('ab-simulation-mode')?.checked ?? true;
+    const autoEnabled = document.getElementById('ab-autobuy-enabled')?.checked ?? false;
+
+    const payload = {
+      simulation_mode: simMode,
+      auto_buy_enabled: autoEnabled,
+      shipping_name: document.getElementById('ab-ship-name')?.value || '',
+      phone: document.getElementById('ab-ship-phone')?.value || '',
+      address_line1: document.getElementById('ab-ship-addr1')?.value || '',
+      city: document.getElementById('ab-ship-city')?.value || '',
+      postcode: document.getElementById('ab-ship-postcode')?.value || '',
+      cardholder_name: document.getElementById('ab-card-name')?.value || '',
+      card_expiry: document.getElementById('ab-card-exp')?.value || '',
+      max_price_per_item: parseFloat(document.getElementById('ab-max-price')?.value || '45'),
+      daily_spend_limit: parseFloat(document.getElementById('ab-daily-cap')?.value || '150'),
+      min_ai_resale_score: parseInt(document.getElementById('ab-min-score')?.value || '65', 10),
+      min_net_profit: parseFloat(document.getElementById('ab-min-profit')?.value || '15')
+    };
+
+    const cardNum = (document.getElementById('ab-card-num')?.value || '').replace(/\s+/g, '');
+    if (cardNum) payload.card_number = cardNum;
+
+    const cvv = document.getElementById('ab-card-cvv')?.value || '';
+    if (cvv) payload.card_cvv = cvv;
+
+    try {
+      const res = await fetch('/api/autobuy/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to save auto-buy profile');
+
+      this.showToast(
+        data.is_simulation_active
+          ? 'Profile saved! Safe Paper Trading simulation mode is active.'
+          : 'Live auto-checkout credentials saved safely.',
+        'success'
+      );
+      await this.loadAutoBuyProfile();
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    }
+  }
+
+  async simulateBuyDeal(dealId) {
+    if (!dealId) return;
+
+    try {
+      this.showToast('Evaluating item & simulating sniper auto-pick...', 'info');
+      const res = await fetch(`/api/autobuy/simulate/${dealId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Simulation execution failed');
+
+      const ord = data.order || {};
+      const profit = Number(ord.projected_net_profit || 0);
+      const roi = Number(ord.projected_roi_pct || 0);
+
+      this.showToast(
+        `🧪 Simulated Pick Recorded! Order #${ord.order_id} · Profit: +£${profit.toFixed(2)} (${roi.toFixed(0)}% ROI)`,
+        'success'
+      );
+
+      // Refresh deal card state if item is in current deals list
+      if (Array.isArray(this.sniperDeals)) {
+        const found = this.sniperDeals.find(d => String(d.id) === String(dealId));
+        if (found) {
+          found.autobuy_order = ord;
+          this.renderSniperDeals(this.sniperDeals);
+        }
+      }
+
+      await this.loadAutoBuyLedger();
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    }
+  }
+
+  async loadAutoBuyLedger() {
+    try {
+      const res = await fetch('/api/autobuy/orders');
+      if (!res.ok) throw new Error('Failed to load simulated orders ledger');
+      const data = await res.json();
+
+      const metrics = data.metrics || {};
+      const orders = Array.isArray(data.orders) ? data.orders : [];
+
+      // Update Ledger badge
+      const badge = document.getElementById('autobuy-ledger-badge');
+      if (badge) badge.textContent = orders.length;
+
+      // Update metric cards
+      const elSpend = document.getElementById('ledger-stat-spend');
+      if (elSpend) elSpend.textContent = `£${Number(metrics.total_capital_deployed || 0).toFixed(2)}`;
+
+      const elResale = document.getElementById('ledger-stat-resale');
+      if (elResale) elResale.textContent = `£${Number(metrics.total_projected_resale || 0).toFixed(2)}`;
+
+      const elProfit = document.getElementById('ledger-stat-profit');
+      if (elProfit) {
+        const profit = Number(metrics.total_paper_profit || 0);
+        elProfit.textContent = `${profit >= 0 ? '+' : ''}£${profit.toFixed(2)}`;
+        elProfit.className = `text-lg font-black font-mono ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+      }
+
+      const elRoi = document.getElementById('ledger-stat-roi');
+      if (elRoi) elRoi.textContent = `${Number(metrics.overall_roi_pct || 0).toFixed(0)}%`;
+
+      // Render orders list
+      const container = document.getElementById('autobuy-orders-container');
+      if (!container) return;
+
+      if (orders.length === 0) {
+        container.innerHTML = `
+          <div class="py-12 text-center text-slate-500 text-xs space-y-1">
+            <i data-lucide="inbox" class="w-8 h-8 mx-auto text-slate-600 mb-2"></i>
+            <p class="font-semibold text-slate-400">No simulated orders recorded yet.</p>
+            <p>Click "Sim Pick" on any sniped deal to simulate paper purchases and track your projected ROI.</p>
+          </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+
+      container.innerHTML = orders.map(ord => {
+        const profit = Number(ord.projected_net_profit || 0);
+        const roi = Number(ord.projected_roi_pct || 0);
+        const createdDate = ord.created_at ? new Date(ord.created_at).toLocaleTimeString() : '';
+
+        return `
+          <div class="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-cyan-500/30 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div class="space-y-1 min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold ${ord.is_simulation ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}">
+                  ${ord.is_simulation ? 'SIMULATION' : 'LIVE'} #${this.escapeHtmlAttr(ord.order_id)}
+                </span>
+                <span class="text-[11px] font-mono text-slate-400">${createdDate}</span>
+                <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-slate-800 text-teal-300">Score ${ord.ai_score || 0}/100</span>
+              </div>
+              <h5 class="font-bold text-white truncate" title="${this.escapeHtmlAttr(ord.title || ord.item_title || '')}">
+                ${this.escapeHtmlAttr(ord.title || ord.item_title || `Item #${ord.vinted_item_id || ord.deal_id}`)}
+              </h5>
+              <div class="flex flex-wrap items-center gap-2.5 text-[11px] text-slate-400">
+                <span>Bought: <strong class="text-white font-mono">£${Number(ord.item_price != null ? ord.item_price : (ord.buy_price || 0)).toFixed(2)}</strong></span>
+                <span>Landed Cost: <strong class="text-slate-300 font-mono">£${Number(ord.total_landed_cost || 0).toFixed(2)}</strong></span>
+                <span>Projected Resale: <strong class="text-white font-mono">£${Number(ord.projected_resale_price || 0).toFixed(2)}</strong></span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/80">
+              <div class="text-left sm:text-right">
+                <div class="text-sm font-black font-mono ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}">
+                  ${profit >= 0 ? '+' : ''}£${profit.toFixed(2)}
+                </div>
+                <div class="text-[10px] font-mono text-cyan-300 font-bold">
+                  ${roi.toFixed(0)}% ROI
+                </div>
+              </div>
+              <a href="${ord.item_url || ('https://www.vinted.co.uk/items/' + (ord.vinted_item_id || ord.deal_id))}" target="_blank" rel="noopener noreferrer" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="View original listing on Vinted">
+                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+              </a>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      if (window.lucide) lucide.createIcons();
+    } catch (err) {
+      console.warn('Ledger load error:', err.message);
+    }
+  }
+
+  async clearAutoBuyLedger() {
+    if (!confirm('Clear all simulated orders and reset paper trading metrics?')) return;
+
+    try {
+      const res = await fetch('/api/autobuy/orders/clear', { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to clear ledger');
+      this.showToast('Paper trading ledger history cleared.', 'info');
+      await this.loadAutoBuyLedger();
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    }
   }
 }
 

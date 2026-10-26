@@ -37,7 +37,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <!-- Custom Styles -->
-  <link rel="stylesheet" href="/static/style.css?v=3.1">
+  <link rel="stylesheet" href="/static/style.css?v=3.2">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-vinted selection:text-white">
 
@@ -131,6 +131,28 @@
             <span>Deal Sniper</span>
           </div>
           <span id="sniper-deals-badge" class="px-2 py-0.5 text-[11px] font-mono font-bold rounded-full bg-slate-800 text-emerald-400 border border-slate-700">0</span>
+        </button>
+
+        <!-- Fast-Flip Arbitrage & Market Inefficiency Radar Button -->
+        <button id="nav-arbitrage-btn" onclick="app.openArbitrageModal()" class="sidebar-item w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition group">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform">
+              <i data-lucide="flame" class="w-4 h-4 text-amber-400"></i>
+            </div>
+            <span>Arbitrage Radar</span>
+          </div>
+          <span id="sidebar-arbitrage-badge" class="px-2 py-0.5 text-[10px] font-mono font-bold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">HOT</span>
+        </button>
+
+        <!-- Auto-Checkout & Paper Trading Simulation Profile Button -->
+        <button id="nav-autobuy-btn" onclick="app.openAutoBuyModal()" class="sidebar-item w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition group">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-7 h-7 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-105 transition-transform">
+              <i data-lucide="zap" class="w-4 h-4 text-cyan-400"></i>
+            </div>
+            <span>Auto-Buy & Sim</span>
+          </div>
+          <span id="sidebar-autobuy-badge" class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">TEST-SIM</span>
         </button>
 
         <!-- Advanced Database Explorer Page Button -->
@@ -500,7 +522,17 @@
             </p>
           </div>
 
-          <div class="flex items-center space-x-3 shrink-0">
+          <div class="flex items-center space-x-2.5 shrink-0">
+            <button id="btn-sniper-arbitrage" onclick="app.openArbitrageModal()" class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition cursor-pointer" title="Scan for high-spread fast-turnover market inefficiencies">
+              <i data-lucide="flame" class="w-3.5 h-3.5 mr-1.5 text-amber-400"></i>
+              Arbitrage Radar
+            </button>
+
+            <button id="btn-sniper-autobuy" onclick="app.openAutoBuyModal()" class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition cursor-pointer" title="Configure Card/Shipping or Paper Trading Simulation">
+              <i data-lucide="zap" class="w-3.5 h-3.5 mr-1.5 text-cyan-400"></i>
+              Auto-Buy & Sim
+            </button>
+
             <button id="btn-sniper-clear" onclick="app.clearSniperDeals()" class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer">
               <i data-lucide="trash-2" class="w-3.5 h-3.5 mr-1.5 text-slate-400"></i>
               Clear Stream
@@ -569,6 +601,54 @@
                 <button type="button" onclick="app.setQuickMaxAge(15)" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">15m</button>
                 <button type="button" onclick="app.setQuickMaxAge(30)" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">30m</button>
                 <button type="button" onclick="app.setQuickMaxAge(60)" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">1h</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI Resale Quality Gate & Auto-Execution Strip -->
+          <div class="p-3.5 rounded-xl bg-gradient-to-r from-emerald-950/30 via-slate-950/80 to-cyan-950/30 border border-emerald-500/25 space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div class="flex items-center space-x-2">
+                <div class="w-6 h-6 rounded-md bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                  <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>
+                </div>
+                <div>
+                  <h4 class="text-xs font-bold text-white flex items-center">
+                    AI Resale Quality Gate & Profitability Checker
+                    <span class="ml-2 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">ACTIVE</span>
+                  </h4>
+                  <p class="text-[10px] text-slate-400">Automatically models landed buy fees, condition, size liquidity & rejects unprofitable / scam bait items</p>
+                </div>
+              </div>
+              <div class="flex items-center space-x-3 text-xs">
+                <label class="flex items-center space-x-1.5 cursor-pointer text-slate-300 hover:text-white">
+                  <input type="checkbox" id="sniper-ai-gate-toggle" checked class="custom-checkbox">
+                  <span class="text-[11px] font-semibold">Enable AI Profit Filter</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-800/80 text-xs">
+              <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between">
+                <span class="text-[11px] text-slate-400">Min Net Profit:</span>
+                <div class="flex items-center space-x-1 font-mono">
+                  <span class="text-emerald-400 font-bold">£</span>
+                  <input type="number" id="sniper-min-net-profit" value="12" min="1" max="500" step="1" class="w-14 bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-emerald-400 font-bold focus:outline-none">
+                </div>
+              </div>
+              <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between">
+                <span class="text-[11px] text-slate-400">Min Projected ROI:</span>
+                <div class="flex items-center space-x-1 font-mono">
+                  <input type="number" id="sniper-min-roi" value="30" min="5" max="500" step="5" class="w-14 bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-teal-300 font-bold focus:outline-none">
+                  <span class="text-teal-400 font-bold">%</span>
+                </div>
+              </div>
+              <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between">
+                <span class="text-[11px] text-slate-400">Auto-Buy State:</span>
+                <button type="button" onclick="app.openAutoBuyModal()" id="sniper-autobuy-state-btn" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/20 transition cursor-pointer flex items-center">
+                  <i data-lucide="zap" class="w-3 h-3 mr-1 text-cyan-400"></i>
+                  <span id="sniper-autobuy-state-text">SIMULATION (Paper Trading)</span>
+                </button>
               </div>
             </div>
           </div>
@@ -2200,8 +2280,277 @@
     </div>
   </div>
 
+  <!-- Fast-Flip Arbitrage & Market Inefficiency Radar Modal -->
+  <div id="arbitrage-modal" onclick="if(event.target === this) app.closeArbitrageModal()" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 hidden">
+    <div class="glass-modal rounded-2xl max-w-4xl w-full p-5 sm:p-6 space-y-4 animate-fade-in shadow-2xl max-h-[90vh] flex flex-col">
+      <!-- Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800 shrink-0">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+            <i data-lucide="flame" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center">
+              Market Inefficiency & Arbitrage Radar
+              <span class="ml-2 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">VINTED UK SCANNER</span>
+            </h3>
+            <p class="text-xs text-slate-400">Identifies items with high volume of new cheap listings selling rapidly despite commanding much higher market resale values.</p>
+          </div>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button type="button" onclick="app.loadArbitrageRadar(true)" id="btn-arbitrage-rescan" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition cursor-pointer">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1.5" id="arbitrage-rescan-icon"></i>
+            Scan Live Inefficiencies
+          </button>
+          <button type="button" onclick="app.closeArbitrageModal()" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 cursor-pointer">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Opportunity Metric Highlights -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
+        <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+          <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Inefficiencies Found</span>
+          <span id="arb-stat-total" class="text-xl font-black font-mono text-white">0</span>
+        </div>
+        <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+          <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Max Net Spread</span>
+          <span id="arb-stat-max-spread" class="text-xl font-black font-mono text-emerald-400">£0.00</span>
+        </div>
+        <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+          <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Rapid Flip Items</span>
+          <span id="arb-stat-rapid" class="text-xl font-black font-mono text-amber-300">0</span>
+        </div>
+        <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+          <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Avg Flipping ROI</span>
+          <span id="arb-stat-avg-roi" class="text-xl font-black font-mono text-cyan-300">0%</span>
+        </div>
+      </div>
+
+      <!-- Arbitrage Opportunities Stream -->
+      <div id="arbitrage-cards-container" class="flex-1 overflow-y-auto space-y-3.5 pr-1">
+        <div class="py-12 text-center text-slate-500 space-y-2">
+          <i data-lucide="radar" class="w-8 h-8 mx-auto animate-spin text-amber-400"></i>
+          <p class="text-xs">Analyzing market sales velocity & cheap inflow spreads...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auto-Checkout & Paper Trading Simulation Modal -->
+  <div id="autobuy-modal" onclick="if(event.target === this) app.closeAutoBuyModal()" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 hidden">
+    <div class="glass-modal rounded-2xl max-w-3xl w-full p-5 sm:p-6 space-y-4 animate-fade-in shadow-2xl max-h-[92vh] flex flex-col">
+      <!-- Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800 shrink-0">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+            <i data-lucide="zap" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center">
+              Sniper Auto-Checkout & Paper Trading Profile
+              <span id="autobuy-mode-pill" class="ml-2 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">SIMULATION MODE</span>
+            </h3>
+            <p class="text-xs text-slate-400">Configure auto-buy card & shipping credentials, or keep them blank to safely simulate sniped purchases.</p>
+          </div>
+        </div>
+        <button type="button" onclick="app.closeAutoBuyModal()" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Navigation Tabs inside Modal -->
+      <div class="flex items-center space-x-2 border-b border-slate-800 shrink-0 pb-1 text-xs">
+        <button type="button" id="tab-autobuy-profile" onclick="app.switchAutoBuyTab('profile')" class="px-3 py-1.5 font-bold rounded-lg bg-slate-800 text-cyan-300 border border-slate-700 cursor-pointer">
+          <i data-lucide="credit-card" class="w-3.5 h-3.5 inline mr-1"></i>
+          Execution & Credentials
+        </button>
+        <button type="button" id="tab-autobuy-ledger" onclick="app.switchAutoBuyTab('ledger')" class="px-3 py-1.5 font-semibold rounded-lg text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="list-ordered" class="w-3.5 h-3.5 inline mr-1"></i>
+          Simulated Orders Ledger
+          <span id="autobuy-ledger-badge" class="ml-1 px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-800 text-slate-300">0</span>
+        </button>
+      </div>
+
+      <!-- Tab 1: Profile & Settings -->
+      <div id="autobuy-panel-profile" class="flex-1 overflow-y-auto space-y-4 pr-1">
+        <!-- Safety Banner -->
+        <div class="p-3.5 rounded-xl bg-cyan-950/30 border border-cyan-500/30 flex items-start space-x-3 text-xs">
+          <i data-lucide="info" class="w-5 h-5 text-cyan-400 shrink-0 mt-0.5"></i>
+          <div class="space-y-1">
+            <h4 class="font-bold text-cyan-200">Test & Simulation Guarantee</h4>
+            <p class="text-slate-300 text-[11px] leading-relaxed">
+              Whenever <strong>Simulation Mode</strong> is enabled OR if your card/address details are left blank, all sniped purchases are run as <strong>zero-risk paper trading simulations</strong>. 
+              The engine models exact landed costs, reserves stock in memory, logs simulated order IDs, and calculates your projected ROI without charging any money.
+            </p>
+          </div>
+        </div>
+
+        <form id="autobuy-profile-form" onsubmit="app.saveAutoBuyProfile(event)" class="space-y-4 text-xs">
+          <!-- Simulation Mode & Master Toggle -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-950/80 border border-slate-800">
+            <label class="flex items-center space-x-2.5 cursor-pointer">
+              <input type="checkbox" id="ab-simulation-mode" checked class="custom-checkbox">
+              <div>
+                <span class="font-bold text-white block">Simulation Mode (Paper Trading)</span>
+                <span class="text-[10px] text-slate-400">Zero money charged; test what gets sniped & picked</span>
+              </div>
+            </label>
+            <label class="flex items-center space-x-2.5 cursor-pointer">
+              <input type="checkbox" id="ab-autobuy-enabled" class="custom-checkbox">
+              <div>
+                <span class="font-bold text-white block">Auto-Buy on Sniper Hits</span>
+                <span class="text-[10px] text-slate-400">Automatically trigger purchase when deal passes AI gate</span>
+              </div>
+            </label>
+          </div>
+
+          <!-- Shipping Details Section -->
+          <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+            <h4 class="text-xs font-bold text-white flex items-center pb-2 border-b border-slate-800/80">
+              <i data-lucide="map-pin" class="w-3.5 h-3.5 mr-1.5 text-teal-400"></i>
+              Shipping Address Profile <span class="text-[10px] text-slate-500 font-normal ml-2">(Keep blank to test simulation)</span>
+            </h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Full Recipient Name</label>
+                <input type="text" id="ab-ship-name" placeholder="Leave blank for test mode" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-vinted">
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Phone Number (SMS updates)</label>
+                <input type="text" id="ab-ship-phone" placeholder="e.g. 07123456789" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-vinted">
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Address Line 1</label>
+                <input type="text" id="ab-ship-addr1" placeholder="e.g. 10 High Street" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-vinted">
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-300 mb-1">City / Town</label>
+                <input type="text" id="ab-ship-city" placeholder="e.g. Manchester" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-vinted">
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-300 mb-1">UK Postcode</label>
+                <input type="text" id="ab-ship-postcode" placeholder="e.g. M1 1AA" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-vinted">
+              </div>
+            </div>
+          </div>
+
+          <!-- Payment Details Section -->
+          <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+            <h4 class="text-xs font-bold text-white flex items-center pb-2 border-b border-slate-800/80">
+              <i data-lucide="credit-card" class="w-3.5 h-3.5 mr-1.5 text-cyan-400"></i>
+              Payment Card Profile <span class="text-[10px] text-slate-500 font-normal ml-2">(Keep blank to test simulation · card numbers are masked)</span>
+            </h4>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div class="sm:col-span-2">
+                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Cardholder Name</label>
+                <input type="text" id="ab-card-name" placeholder="Name on card" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-vinted">
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Expiry (MM/YY)</label>
+                <input type="text" id="ab-card-exp" placeholder="MM/YY" maxlength="5" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-vinted">
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Card Number (Stored locally only)</label>
+                <input type="text" id="ab-card-num" placeholder="•••• •••• •••• ••••" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-vinted">
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Security Code (CVV)</label>
+                <input type="password" id="ab-card-cvv" placeholder="•••" maxlength="4" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-vinted">
+              </div>
+            </div>
+          </div>
+
+          <!-- Execution Safety Safeguards -->
+          <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+            <h4 class="text-xs font-bold text-white flex items-center pb-2 border-b border-slate-800/80">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5 mr-1.5 text-emerald-400"></i>
+              Execution Safety Safeguards & Spending Caps
+            </h4>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div>
+                <label class="block text-[10px] font-semibold text-slate-400 mb-1">Max Price / Item</label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center text-slate-400 text-xs font-bold">£</span>
+                  <input type="number" id="ab-max-price" value="45" min="1" max="1000" class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-6 pr-2 py-1.5 text-xs text-emerald-400 font-mono font-bold focus:outline-none">
+                </div>
+              </div>
+              <div>
+                <label class="block text-[10px] font-semibold text-slate-400 mb-1">Daily Spend Cap</label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center text-slate-400 text-xs font-bold">£</span>
+                  <input type="number" id="ab-daily-cap" value="150" min="1" max="10000" class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-6 pr-2 py-1.5 text-xs text-cyan-300 font-mono font-bold focus:outline-none">
+                </div>
+              </div>
+              <div>
+                <label class="block text-[10px] font-semibold text-slate-400 mb-1">Min AI Score (0-100)</label>
+                <input type="number" id="ab-min-score" value="65" min="10" max="100" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono font-bold focus:outline-none">
+              </div>
+              <div>
+                <label class="block text-[10px] font-semibold text-slate-400 mb-1">Min Net Profit (£)</label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center text-slate-400 text-xs font-bold">£</span>
+                  <input type="number" id="ab-min-profit" value="15" min="1" max="500" class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-6 pr-2 py-1.5 text-xs text-emerald-400 font-mono font-bold focus:outline-none">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-2 border-t border-slate-800 flex items-center justify-end gap-2">
+            <button type="button" onclick="app.closeAutoBuyModal()" class="px-3 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer">
+              Cancel
+            </button>
+            <button type="submit" class="btn-primary-glow px-5 py-2 rounded-xl text-xs font-bold text-white transition cursor-pointer">
+              Save Execution Profile
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Tab 2: Orders Ledger -->
+      <div id="autobuy-panel-ledger" class="flex-1 overflow-y-auto space-y-3.5 pr-1 hidden">
+        <!-- Performance summary strip -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Capital Deployed</span>
+            <span id="ledger-stat-spend" class="text-lg font-black font-mono text-cyan-300">£0.00</span>
+          </div>
+          <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Projected Resale</span>
+            <span id="ledger-stat-resale" class="text-lg font-black font-mono text-white">£0.00</span>
+          </div>
+          <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Total Paper Profit</span>
+            <span id="ledger-stat-profit" class="text-lg font-black font-mono text-emerald-400">+£0.00</span>
+          </div>
+          <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Simulated ROI</span>
+            <span id="ledger-stat-roi" class="text-lg font-black font-mono text-teal-300">0%</span>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between text-xs pt-1">
+          <span class="text-slate-400 font-semibold flex items-center">
+            <i data-lucide="history" class="w-3.5 h-3.5 mr-1 text-slate-400"></i>
+            Historical Executed Snipes & Paper Trades
+          </span>
+          <button type="button" onclick="app.clearAutoBuyLedger()" class="text-rose-400 hover:text-rose-300 text-[11px] font-semibold hover:underline cursor-pointer">
+            Clear Ledger History
+          </button>
+        </div>
+
+        <div id="autobuy-orders-container" class="space-y-2.5">
+          <div class="py-12 text-center text-slate-500 text-xs">
+            No simulated orders recorded yet. As bargains appear in Deal Sniper or when you click "Simulate Pick", they will be logged here.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Application Logic -->
-  <script src="/static/app.js?v=3.1"></script>
+  <script src="/static/app.js?v=3.2"></script>
 </body>
 </html>
 

@@ -239,3 +239,39 @@ class ScrapedPhotoRecord(Base):
     )
     created_at = Column(DateTime, default=_utcnow)
 
+
+class AutoBuyOrder(Base):
+    """Ledger of simulated (paper trading) and live automated snipe purchases."""
+
+    __tablename__ = "autobuy_orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(String, unique=True, index=True, nullable=False)
+    deal_id = Column(String, index=True, nullable=False)
+    vinted_item_id = Column(String, index=True, nullable=False)
+    tracked_search_id = Column(
+        Integer, ForeignKey("tracked_searches.id", ondelete="SET NULL"), nullable=True
+    )
+    title = Column(String, nullable=False)
+    brand = Column(String, nullable=True)
+    variant_name = Column(String, nullable=True)
+    item_price = Column(Float, nullable=False)
+    buyer_fee = Column(Float, nullable=False)
+    shipping_cost = Column(Float, nullable=False)
+    total_landed_cost = Column(Float, nullable=False)
+    projected_resale_price = Column(Float, nullable=False)
+    projected_net_profit = Column(Float, nullable=False)
+    projected_roi_pct = Column(Float, nullable=False)
+    ai_score = Column(Integer, nullable=True)
+    ai_verdict = Column(String, nullable=True)
+    is_simulation = Column(Boolean, default=True, nullable=False)
+    status = Column(String, default="SIMULATED_SUCCESS", nullable=False)
+    execution_notes = Column(Text, nullable=True)
+    shipping_name = Column(String, nullable=True)
+    shipping_postcode = Column(String, nullable=True)
+    card_last4 = Column(String, nullable=True)
+    photo_url = Column(String, nullable=True)
+    item_url = Column(String, nullable=True)
+    created_at = Column(DateTime, default=_utcnow, index=True)
+
+

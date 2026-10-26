@@ -136,6 +136,40 @@ def ensure_db_schema(target_engine=engine):
             cursor.execute("CREATE INDEX IF NOT EXISTS ix_sold_items_sold ON sold_items (is_sold);")
             cursor.execute("CREATE INDEX IF NOT EXISTS ix_sold_items_child ON sold_items (is_child_size);")
             cursor.execute("CREATE INDEX IF NOT EXISTS ix_sold_items_variant ON sold_items (variant_id);")
+
+        # 4. autobuy_orders table for simulated paper trading and automated snipes
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS autobuy_orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id TEXT NOT NULL UNIQUE,
+                deal_id TEXT NOT NULL,
+                vinted_item_id TEXT NOT NULL,
+                tracked_search_id INTEGER REFERENCES tracked_searches(id) ON DELETE SET NULL,
+                title TEXT NOT NULL,
+                brand TEXT,
+                variant_name TEXT,
+                item_price REAL NOT NULL,
+                buyer_fee REAL NOT NULL,
+                shipping_cost REAL NOT NULL,
+                total_landed_cost REAL NOT NULL,
+                projected_resale_price REAL NOT NULL,
+                projected_net_profit REAL NOT NULL,
+                projected_roi_pct REAL NOT NULL,
+                ai_score INTEGER,
+                ai_verdict TEXT,
+                is_simulation BOOLEAN DEFAULT 1 NOT NULL,
+                status TEXT DEFAULT 'SIMULATED_SUCCESS' NOT NULL,
+                execution_notes TEXT,
+                shipping_name TEXT,
+                shipping_postcode TEXT,
+                card_last4 TEXT,
+                photo_url TEXT,
+                item_url TEXT,
+                created_at DATETIME
+            );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS ix_autobuy_orders_deal ON autobuy_orders (deal_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS ix_autobuy_orders_created ON autobuy_orders (created_at DESC);")
                 
         conn.connection.commit()
 

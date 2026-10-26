@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import DEFAULT_SEARCHES
 from .database import Base, SessionLocal, engine, ensure_db_schema
 from .models import TrackedSearch
-from .routers import analytics, antiban, database_ops, scraper_ops, searches, sniper, variants
+from .routers import analytics, antiban, arbitrage, database_ops, scraper_ops, searches, sniper, sniper_executor, variants
 from .scheduler import start_scheduler, stop_scheduler
 
 logging.basicConfig(
@@ -79,6 +79,8 @@ app.include_router(scraper_ops.router)
 app.include_router(database_ops.router)
 app.include_router(antiban.router)
 app.include_router(variants.router)
+app.include_router(arbitrage.router)
+app.include_router(sniper_executor.router)
 
 # Static files (CSS, JS)
 app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
