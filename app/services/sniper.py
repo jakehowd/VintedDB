@@ -232,17 +232,17 @@ class DealSniperService:
                     removed_ids.add(vinted_id)
                     continue
 
-                # Variant selection & per-variant max price revalidation
+                # Multi-category variant selection & max price revalidation
                 s_variants = variants_by_search.get(search.id, []) if getattr(search, "variants_enabled", False) else []
                 eff_max_price = self.item_max_prices.get(search.id, self.max_price)
                 if s_variants:
-                    v_map = {v.id: v for v in s_variants}
-                    enabled_v_ids = {v.id for v in s_variants if v.is_sniping_enabled}
-                    all_v_enabled = len(enabled_v_ids) == len(s_variants)
+                    from ..routers.variants import evaluate_sniper_variant_match
 
-                    d_vid = deal.get("variant_id") or (db_item.variant_id if db_item else None)
-                    matched_v = v_map.get(d_vid) if d_vid else None
-                    if not matched_v:
+                    d_vids = deal.get("variant_ids") or (db_item.parsed_variant_ids() if db_item else [])
+                    if not d_vids and deal.get("variant_id"):
+                        d_vids = [int(deal["variant_id"])]
+
+                    if not d_vids:
                         v_res = variant_vision_service.classify_item_variant(
                             db=db,
                             tracked_search=search,
@@ -254,28 +254,24 @@ class DealSniperService:
                             allow_vision=True,
                         )
                         if v_res:
-                            matched_v = v_map.get(v_res["variant_id"])
+                            d_vids = list(v_res.get("variant_ids") or ([v_res["variant_id"]] if v_res.get("variant_id") else []))
                             deal["variant_id"] = v_res["variant_id"]
+                            deal["variant_ids"] = d_vids
                             deal["variant_name"] = v_res["variant_name"]
+                            deal["variant_names"] = v_res.get("variant_names", [])
                             deal["variant_confidence"] = v_res["confidence"]
                             deal["variant_method"] = v_res["method"]
                             deal["variant_evidence"] = v_res["evidence"]
-                            if db_item:
-                                db_item.variant_id = v_res["variant_id"]
-                                db_item.variant_name = v_res["variant_name"]
-                                db_item.variant_confidence = v_res["confidence"]
-                                db_item.variant_method = v_res["method"]
-                                db_item.variant_evidence = v_res["evidence"]
+                            if db_item and db_item.variant_method != "manual":
+                                db_item.apply_variant_result(v_res)
                                 db_dirty = True
 
-                    if len(enabled_v_ids) == 0:
+                    allowed_var, var_price_cap = evaluate_sniper_variant_match(d_vids, s_variants)
+                    if not allowed_var:
                         removed_ids.add(vinted_id)
                         continue
-                    if not all_v_enabled and (not matched_v or matched_v.id not in enabled_v_ids):
-                        removed_ids.add(vinted_id)
-                        continue
-                    if matched_v and matched_v.target_max_price is not None and float(matched_v.target_max_price) > 0:
-                        eff_max_price = float(matched_v.target_max_price)
+                    if var_price_cap is not None and var_price_cap > 0:
+                        eff_max_price = var_price_cap
 
                 if float(deal.get("price") or 0.0) > eff_max_price:
                     removed_ids.add(vinted_id)
@@ -552,40 +548,41 @@ class DealSniperService:
                     .all()
                 )
             variants_map: Dict[int, ProductVariant] = {v.id: v for v in active_variants}
-            enabled_variant_ids = {v.id for v in active_variants if v.is_sniping_enabled}
-            all_variants_enabled = len(enabled_variant_ids) == len(active_variants)
             variant_market_avgs: Dict[int, float] = {}
-            for v in active_variants:
-                v_sold_avg = (
-                    db.query(func.avg(SoldItem.price))
-                    .filter(
-                        SoldItem.tracked_search_id == search.id,
-                        SoldItem.variant_id == v.id,
-                        SoldItem.price > 0,
-                        SoldItem.is_sold == True,
-                        SoldItem.is_replica.isnot(True),
-                    )
-                    .scalar()
-                )
-                if v_sold_avg and float(v_sold_avg) > 0:
-                    variant_market_avgs[v.id] = float(v_sold_avg)
-                else:
-                    v_all_avg = (
+            if active_variants:
+                from ..routers.variants import item_has_variant_clause
+                for v in active_variants:
+                    has_v = item_has_variant_clause(v.id)
+                    v_sold_avg = (
                         db.query(func.avg(SoldItem.price))
                         .filter(
                             SoldItem.tracked_search_id == search.id,
-                            SoldItem.variant_id == v.id,
+                            has_v,
                             SoldItem.price > 0,
+                            SoldItem.is_sold == True,
                             SoldItem.is_replica.isnot(True),
                         )
                         .scalar()
                     )
-                    if v_all_avg and float(v_all_avg) > 0:
-                        variant_market_avgs[v.id] = float(v_all_avg)
-                    elif v.est_market_value_gbp and float(v.est_market_value_gbp) > 0:
-                        variant_market_avgs[v.id] = float(v.est_market_value_gbp)
+                    if v_sold_avg and float(v_sold_avg) > 0:
+                        variant_market_avgs[v.id] = float(v_sold_avg)
                     else:
-                        variant_market_avgs[v.id] = market_avg
+                        v_all_avg = (
+                            db.query(func.avg(SoldItem.price))
+                            .filter(
+                                SoldItem.tracked_search_id == search.id,
+                                has_v,
+                                SoldItem.price > 0,
+                                SoldItem.is_replica.isnot(True),
+                            )
+                            .scalar()
+                        )
+                        if v_all_avg and float(v_all_avg) > 0:
+                            variant_market_avgs[v.id] = float(v_all_avg)
+                        elif v.est_market_value_gbp and float(v.est_market_value_gbp) > 0:
+                            variant_market_avgs[v.id] = float(v.est_market_value_gbp)
+                        else:
+                            variant_market_avgs[v.id] = market_avg
 
             new_saved_count = 0
             new_snipes_count = 0
@@ -683,23 +680,32 @@ class DealSniperService:
                 base_search_max_price = self.item_max_prices.get(search.id, self.max_price)
                 target_max_price = base_search_max_price
 
-                # 3. Local AI Variant Classification & Variant-Aware Sniper Filtering
+                # 3. Local Multi-Category Variant Classification & Faceted Sniper Filtering
                 matched_var_res: Optional[Dict[str, Any]] = None
+                matched_v_ids: List[int] = []
                 matched_v_obj: Optional[ProductVariant] = None
                 variant_allowed_for_snipe = True
 
                 if active_variants:
-                    if existing_item and existing_item.variant_id and existing_item.variant_id in variants_map:
-                        matched_v_obj = variants_map[existing_item.variant_id]
+                    from ..routers.variants import evaluate_sniper_variant_match
+
+                    cached_ids = [
+                        vid for vid in (existing_item.parsed_variant_ids() if existing_item else [])
+                        if vid in variants_map
+                    ]
+                    if existing_item and cached_ids:
+                        matched_v_ids = cached_ids
+                        matched_v_obj = variants_map.get(cached_ids[0])
                         matched_var_res = {
-                            "variant_id": existing_item.variant_id,
-                            "variant_name": existing_item.variant_name or matched_v_obj.variant_name,
-                            "confidence": float(existing_item.variant_confidence or 0.75),
+                            "variant_id": cached_ids[0],
+                            "variant_ids": cached_ids,
+                            "variant_name": existing_item.variant_name or " · ".join(variants_map[i].variant_name for i in cached_ids),
+                            "variant_names": [variants_map[i].variant_name for i in cached_ids],
+                            "confidence": float(existing_item.variant_confidence or 0.78),
                             "method": existing_item.variant_method or "cached",
                             "evidence": existing_item.variant_evidence or "",
                         }
                     else:
-                        # Only download & run ONNX CLIP/OCR if new item or price could potentially snipe any variant
                         max_possible_price = max(
                             [base_search_max_price]
                             + [float(v.target_max_price) for v in active_variants if v.target_max_price and v.target_max_price > 0]
@@ -713,22 +719,15 @@ class DealSniperService:
                             allow_vision=should_use_vision,
                         )
                         if matched_var_res:
-                            matched_v_obj = variants_map.get(matched_var_res["variant_id"])
-                            if existing_item:
-                                existing_item.variant_id = matched_var_res["variant_id"]
-                                existing_item.variant_name = matched_var_res["variant_name"]
-                                existing_item.variant_confidence = matched_var_res["confidence"]
-                                existing_item.variant_method = matched_var_res["method"]
-                                existing_item.variant_evidence = matched_var_res["evidence"]
+                            matched_v_ids = list(matched_var_res.get("variant_ids") or ([matched_var_res["variant_id"]] if matched_var_res.get("variant_id") else []))
+                            matched_v_obj = variants_map.get(matched_v_ids[0]) if matched_v_ids else None
+                            if existing_item and existing_item.variant_method != "manual":
+                                existing_item.apply_variant_result(matched_var_res)
                                 updated_existing = True
 
-                    if len(enabled_variant_ids) == 0:
-                        variant_allowed_for_snipe = False
-                    elif not all_variants_enabled:
-                        variant_allowed_for_snipe = bool(matched_v_obj and matched_v_obj.id in enabled_variant_ids)
-
-                    if matched_v_obj and matched_v_obj.target_max_price is not None and float(matched_v_obj.target_max_price) > 0:
-                        target_max_price = float(matched_v_obj.target_max_price)
+                    variant_allowed_for_snipe, var_price_cap = evaluate_sniper_variant_match(matched_v_ids, active_variants)
+                    if var_price_cap is not None and var_price_cap > 0:
+                        target_max_price = var_price_cap
 
                 is_sniper_candidate = (
                     clean
@@ -782,8 +781,8 @@ class DealSniperService:
                             self._seen_deal_ids.add(vinted_id)
                             logger.info("Candidate deal '%s' rejected by description filter: %s", item_title, leak_reason)
                             continue
-                        # Re-evaluate variant classification now that full Vinted description is available
-                        if active_variants and (not matched_var_res or matched_var_res.get("confidence", 0.0) < 0.85):
+                        # Re-evaluate multi-category classification now that full Vinted description is available
+                        if active_variants:
                             refined_var = variant_vision_service.classify_item_variant(
                                 db=db,
                                 tracked_search=search,
@@ -793,11 +792,13 @@ class DealSniperService:
                             )
                             if refined_var:
                                 matched_var_res = refined_var
-                                matched_v_obj = variants_map.get(refined_var["variant_id"])
-                                if not all_variants_enabled and (not matched_v_obj or matched_v_obj.id not in enabled_variant_ids):
+                                matched_v_ids = list(refined_var.get("variant_ids") or ([refined_var["variant_id"]] if refined_var.get("variant_id") else []))
+                                matched_v_obj = variants_map.get(matched_v_ids[0]) if matched_v_ids else None
+                                allowed_after_desc, cap_after_desc = evaluate_sniper_variant_match(matched_v_ids, active_variants)
+                                if not allowed_after_desc:
                                     is_sniper_candidate = False
-                                elif matched_v_obj and matched_v_obj.target_max_price is not None and float(matched_v_obj.target_max_price) > 0:
-                                    target_max_price = float(matched_v_obj.target_max_price)
+                                elif cap_after_desc is not None and cap_after_desc > 0:
+                                    target_max_price = cap_after_desc
                                     if item_price > target_max_price:
                                         is_sniper_candidate = False
 
@@ -831,7 +832,9 @@ class DealSniperService:
                         is_child_size=is_child,
                         child_size_reason=child_reason if is_child else None,
                         variant_id=matched_var_res["variant_id"] if matched_var_res else None,
+                        variant_ids_json=json.dumps(matched_v_ids, separators=(",", ":")) if matched_v_ids else None,
                         variant_name=matched_var_res["variant_name"] if matched_var_res else None,
+                        variant_names_json=json.dumps(matched_var_res["variant_names"]) if (matched_var_res and matched_var_res.get("variant_names")) else None,
                         variant_confidence=matched_var_res["confidence"] if matched_var_res else 0.0,
                         variant_method=matched_var_res["method"] if matched_var_res else None,
                         variant_evidence=matched_var_res["evidence"] if matched_var_res else None,
@@ -869,11 +872,7 @@ class DealSniperService:
                         existing_item.replica_reason = rep_reason
                         updated_existing = True
                     if matched_var_res and existing_item.variant_method != "manual":
-                        existing_item.variant_id = matched_var_res["variant_id"]
-                        existing_item.variant_name = matched_var_res["variant_name"]
-                        existing_item.variant_confidence = matched_var_res["confidence"]
-                        existing_item.variant_method = matched_var_res["method"]
-                        existing_item.variant_evidence = matched_var_res["evidence"]
+                        existing_item.apply_variant_result(matched_var_res)
                         updated_existing = True
 
                 # If item failed anti-rep or seller review check, never trigger deal sniper alerts
@@ -894,11 +893,8 @@ class DealSniperService:
                     new_snipes_count += 1
                     self.total_snipes_found += 1
 
-                    effective_market_avg = (
-                        variant_market_avgs.get(matched_v_obj.id, market_avg)
-                        if matched_v_obj
-                        else market_avg
-                    )
+                    matched_avgs = [variant_market_avgs[vid] for vid in matched_v_ids if vid in variant_market_avgs]
+                    effective_market_avg = max(matched_avgs) if matched_avgs else market_avg
 
                     discount_pct = 0.0
                     if effective_market_avg > item_price:
@@ -936,7 +932,9 @@ class DealSniperService:
                         "savings": savings,
                         "threshold_price": target_max_price,
                         "variant_id": matched_var_res["variant_id"] if matched_var_res else None,
+                        "variant_ids": matched_v_ids,
                         "variant_name": matched_var_res["variant_name"] if matched_var_res else None,
+                        "variant_names": matched_var_res.get("variant_names", []) if matched_var_res else [],
                         "variant_confidence": matched_var_res["confidence"] if matched_var_res else None,
                         "variant_method": matched_var_res["method"] if matched_var_res else None,
                         "variant_evidence": matched_var_res["evidence"] if matched_var_res else None,

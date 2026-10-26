@@ -56,79 +56,100 @@ SPECIALIST_CATALOGUES: List[Tuple[List[str], Dict[str, Any]]] = [
     (
         ["nuptse", "north face puffer", "tnf 700"],
         {
-            "product_family": "The North Face Nuptse Down Outerwear",
+            "product_family": "The North Face Nuptse Outerwear",
             "domain": "fashion",
-            "research_notes": "Distinguished by fill-power cuff embroidery (700 vs 800), shoulder yoke contrast panels, baffle geometry, sleeve presence (jacket vs gilet), and fleece reversibility.",
+            "research_notes": "Multi-category facets: Edition (1996 Retro 700 vs Summit Series 800 vs Reversible/Sherpa) combined with Cut (Jacket vs Cropped vs Gilet).",
             "variants": [
                 {
                     "variant_slug": "1996_retro_nuptse",
-                    "variant_name": "1996 Retro Nuptse (700 Fill)",
-                    "short_description": "Iconic boxy oversized down puffer with shiny ripstop nylon, contrasting black shoulder yoke, stowable collar hood, and '700' embroidered on sleeve cuff.",
+                    "variant_name": "1996 Retro (700)",
+                    "dimension": "Edition",
+                    "modality": "visual",
+                    "short_description": "Boxy shiny ripstop nylon puffer with contrasting black shoulder yoke and '700' cuff embroidery.",
                     "resale_tier": "HIGH",
                     "est_market_value_gbp": 115.0,
                     "visual_cues": [
-                        "boxy puffer jacket with wide horizontal down baffles and contrasting black shoulder yoke",
-                        "shiny ripstop nylon North Face puffer jacket with stand collar and long sleeves",
-                        "700 embroidered text on jacket sleeve cuff",
+                        "boxy puffer with wide horizontal down baffles and contrasting black shoulder yoke",
+                        "shiny ripstop nylon down puffer with 700 embroidered on sleeve cuff",
                     ],
                     "ocr_signatures": ["700", "NF0A3C8D", "NF0A3XEO", "STOW POCKET"],
-                    "text_keywords": ["1996", "retro nuptse", "1996 retro", "700", "boxy", "nf0a3c8d"],
-                    "negative_keywords": ["gilet", "vest", "bodywarmer", "sleeveless", "summit", "800", "reversible", "sherpa", "cropped", "short"],
+                    "text_keywords": ["1996", "retro nuptse", "1996 retro", "700 fill", "nf0a3c8d"],
+                    "negative_keywords": ["summit", "summit series", "800", "850", "reversible", "sherpa", "borg"],
                 },
                 {
                     "variant_slug": "summit_series_nuptse",
-                    "variant_name": "Summit Series Nuptse (800 / Pertex)",
-                    "short_description": "Technical alpine edition featuring Summit Series sleeve crest, higher 800/850 loft down, Pertex or Gore Windstopper shell, and articulated baffling.",
+                    "variant_name": "Summit Series (800)",
+                    "dimension": "Edition",
+                    "modality": "visual",
+                    "short_description": "Alpine edition with Summit Series sleeve crest, 800/850 fill down, and Pertex/Windstopper shell.",
                     "resale_tier": "PREMIUM",
                     "est_market_value_gbp": 165.0,
                     "visual_cues": [
-                        "technical alpine expedition down puffer jacket with Summit Series emblem on sleeve",
-                        "high loft mountaineering down jacket with chest zip pocket and matte Pertex shell",
-                        "800 fill embroidery on cuff and curved alpine shoulder panels",
+                        "technical alpine expedition down jacket with Summit Series crest on sleeve and chest zip pocket",
+                        "matte Pertex mountaineering down jacket with 800 fill embroidery",
                     ],
                     "ocr_signatures": ["SUMMIT", "SUMMIT SERIES", "800", "850", "PERTEX", "WINDSTOPPER"],
                     "text_keywords": ["summit", "summit series", "800", "850", "pertex", "windstopper", "baltoro"],
-                    "negative_keywords": ["gilet", "vest", "sleeveless", "sherpa", "reversible", "cropped"],
+                    "negative_keywords": ["1996 retro", "sherpa", "reversible"],
                 },
                 {
                     "variant_slug": "reversible_sherpa_nuptse",
-                    "variant_name": "Reversible / Sherpa Nuptse",
-                    "short_description": "Dual-wear Nuptse or high-pile Sherpa fleece exterior Nuptse combining teddy borg fleece texture with baffled down insulation.",
+                    "variant_name": "Reversible / Sherpa",
+                    "dimension": "Edition",
+                    "modality": "visual",
+                    "short_description": "High-pile teddy/Sherpa fleece Nuptse or reversible nylon-to-fleece construction.",
                     "resale_tier": "HIGH",
-                    "est_market_value_gbp": 105.0,
+                    "est_market_value_gbp": 120.0,
                     "visual_cues": [
-                        "fluffy textured sherpa borg teddy fleece puffer jacket with North Face logo",
+                        "fluffy textured sherpa borg teddy fleece puffer jacket",
                         "reversible fleece and nylon quilted down puffer coat",
                     ],
-                    "ocr_signatures": ["600", "HEATSEEKER"],
-                    "text_keywords": ["reversible", "sherpa", "borg", "teddy", "fleece nuptse", "high pile"],
-                    "negative_keywords": ["gilet", "vest", "sleeveless", "summit series"],
+                    "ocr_signatures": ["HEATSEEKER"],
+                    "text_keywords": ["reversible", "sherpa", "borg", "teddy", "high pile"],
+                    "negative_keywords": ["summit series", "800"],
+                },
+                {
+                    "variant_slug": "nuptse_full_jacket",
+                    "variant_name": "Standard Jacket",
+                    "dimension": "Cut",
+                    "modality": "visual",
+                    "short_description": "Full waist/hip-length long-sleeve puffer jacket.",
+                    "resale_tier": "HIGH",
+                    "est_market_value_gbp": 110.0,
+                    "visual_cues": [
+                        "mens regular hip-length long sleeve down puffer coat with 4 or 5 horizontal baffles",
+                    ],
+                    "ocr_signatures": ["NF0A3C8D"],
+                    "text_keywords": ["puffer jacket", "down jacket"],
+                    "negative_keywords": ["gilet", "vest", "bodywarmer", "body warmer", "sleeveless", "cropped", "nuptse short", "crop"],
                 },
                 {
                     "variant_slug": "cropped_short_nuptse",
-                    "variant_name": "Nuptse Short / Cropped Jacket",
-                    "short_description": "Women's high-waisted 2-to-3 baffle cropped Nuptse silhouette sitting above the hip.",
+                    "variant_name": "Cropped / Short",
+                    "dimension": "Cut",
+                    "modality": "visual",
+                    "short_description": "Women's high-waisted 2-to-3 baffle cropped Nuptse silhouette.",
                     "resale_tier": "STANDARD",
                     "est_market_value_gbp": 85.0,
                     "visual_cues": [
-                        "short cropped waist-length puffer jacket with only three horizontal down baffles",
-                        "womens boxy cropped down puffer jacket with tall collar",
+                        "short cropped waist-length womens puffer jacket with only two or three horizontal baffles",
                     ],
-                    "ocr_signatures": ["NF0A5GGE", "700"],
-                    "text_keywords": ["nuptse short", "cropped nuptse", "cropped", "short jacket", "crop"],
-                    "negative_keywords": ["gilet", "vest", "sleeveless", "summit"],
+                    "ocr_signatures": ["NF0A5GGE"],
+                    "text_keywords": ["nuptse short", "cropped nuptse", "cropped", "crop"],
+                    "negative_keywords": ["gilet", "vest", "bodywarmer", "sleeveless"],
                 },
                 {
                     "variant_slug": "nuptse_gilet_vest",
-                    "variant_name": "Nuptse 700 Gilet / Vest",
-                    "short_description": "Sleeveless 1996 Retro or vintage 700-fill Nuptse down bodywarmer vest.",
+                    "variant_name": "Gilet / Vest",
+                    "dimension": "Cut",
+                    "modality": "visual",
+                    "short_description": "Sleeveless down puffer bodywarmer gilet.",
                     "resale_tier": "STANDARD",
-                    "est_market_value_gbp": 75.0,
+                    "est_market_value_gbp": 70.0,
                     "visual_cues": [
                         "sleeveless down puffer gilet vest bodywarmer with black shoulder yoke and no sleeves",
-                        "quilted padded sleeveless vest on hanger",
                     ],
-                    "ocr_signatures": ["700", "NF0A3JQQ"],
+                    "ocr_signatures": ["NF0A3JQQ"],
                     "text_keywords": ["gilet", "vest", "bodywarmer", "body warmer", "sleeveless"],
                     "negative_keywords": ["long sleeve"],
                 },
@@ -138,59 +159,62 @@ SPECIALIST_CATALOGUES: List[Tuple[List[str], Dict[str, Any]]] = [
     (
         ["ixus", "cannon ixus", "canon ixus", "powershot elph"],
         {
-            "product_family": "Canon IXUS / PowerShot ELPH Compact Digital Cameras",
+            "product_family": "Canon IXUS / PowerShot ELPH Cameras",
             "domain": "tech",
-            "research_notes": "Canon IXUS models look similar at a glance but are precisely separated by optical zoom multiplier on the lens ring (3x, 8x, 10x, 12x), focal length (e.g. 25-300mm vs 28-224mm), optical viewfinder window (vintage CCD models), and Wi-Fi HS badging.",
+            "research_notes": "Multi-category facets: Model Series (vintage CCD IXUS 70/75/80 vs 12x Wi-Fi 285 HS vs 20MP 185/190) + Bundle completeness.",
             "variants": [
                 {
                     "variant_slug": "ixus_70_75_80_ccd",
-                    "variant_name": "Vintage CCD Series (IXUS 70 / 75 / 80 IS / 85 IS)",
-                    "short_description": "Highly coveted 2007–2008 ultra-compact metal CCD digicams featuring an optical viewfinder window on the front (IXUS 70/80), 3x optical zoom (5.8-17.4mm / 6.2-18.6mm), and 7.1MP–10MP CCD sensor.",
+                    "variant_name": "IXUS 70 / 75 / 80 (CCD)",
+                    "dimension": "Series",
+                    "modality": "visual",
+                    "short_description": "2007–2008 metal CCD digicams with optical viewfinder window and 3x zoom (5.8-17.4mm).",
                     "resale_tier": "PREMIUM",
                     "est_market_value_gbp": 135.0,
                     "visual_cues": [
-                        "boxy flat rectangular vintage silver metallic Canon IXUS compact camera with small optical viewfinder window above lens",
-                        "retro minimalist brushed aluminum pocket camera with black ring around lens and 3x zoom",
+                        "boxy flat rectangular vintage silver metallic compact camera with small optical viewfinder window above 3x lens",
                     ],
                     "ocr_signatures": [
                         "IXUS 70", "IXUS 75", "IXUS 80", "IXUS 85", "SD1000", "SD750", "SD1100",
-                        "7.1 MEGA PIXELS", "8.0 MEGA PIXELS", "10.0 MEGA PIXELS", "5.8-17.4", "6.2-18.6", "3x",
+                        "7.1 MEGA PIXELS", "8.0 MEGA PIXELS", "5.8-17.4", "6.2-18.6", "3x",
                     ],
                     "text_keywords": [
                         "ixus 70", "ixus 75", "ixus 80", "ixus 85", "sd1000", "sd750", "sd1100",
-                        "7.1mp", "ccd", "viewfinder", "ixus 60", "ixus 65",
+                        "7.1mp", "ixus 60", "ixus 65",
                     ],
-                    "negative_keywords": ["185", "190", "285", "175", "160", "12x", "10x", "8x", "wifi", "wi-fi"],
+                    "negative_keywords": ["185", "190", "285", "275", "265", "175", "160", "12x", "10x", "8x", "wifi", "wi-fi"],
                 },
                 {
                     "variant_slug": "ixus_285_hs_wifi",
-                    "variant_name": "Flagship Zoom CMOS (IXUS 285 HS / 275 HS / 265 HS)",
-                    "short_description": "Modern flagship pocket travel zoom with 12x Optical Zoom (4.5-54.0mm / 25-300mm), 20.2MP HS CMOS sensor, Full HD video, and Wi-Fi / NFC connectivity.",
+                    "variant_name": "IXUS 285 / 275 / 265 HS",
+                    "dimension": "Series",
+                    "modality": "visual",
+                    "short_description": "Flagship pocket travel zoom with 12x Optical Zoom (25-300mm), 20.2MP HS CMOS, and Wi-Fi.",
                     "resale_tier": "PREMIUM",
                     "est_market_value_gbp": 175.0,
                     "visual_cues": [
-                        "modern sleek matte black silver or purple Canon IXUS camera with thick protruding 12x zoom lens barrel and Wi-Fi icon",
-                        "Canon IXUS HS compact digital camera with 12x Optical Zoom printed on lens ring",
+                        "modern sleek matte black silver or purple compact camera with thick 12x zoom lens barrel and Wi-Fi badge",
                     ],
                     "ocr_signatures": [
-                        "285 HS", "275 HS", "265 HS", "ELPH 360", "12x", "4.5-54.0", "25-300", "Wi-Fi", "FULL HD", "HS",
+                        "285 HS", "275 HS", "265 HS", "ELPH 360", "12x", "4.5-54.0", "25-300", "Wi-Fi", "FULL HD",
                     ],
                     "text_keywords": ["ixus 285", "285 hs", "285hs", "ixus 275", "ixus 265", "elph 360", "12x zoom", "wifi", "wi-fi"],
                     "negative_keywords": ["ixus 70", "ixus 75", "ixus 80", "ixus 185", "8x"],
                 },
                 {
                     "variant_slug": "ixus_185_190_175",
-                    "variant_name": "Modern 20MP Series (IXUS 175 / 180 / 185 / 190)",
-                    "short_description": "Late-generation 20.0MP CCD compact cameras with 8x or 10x Optical Zoom (5.0-40.0mm / 4.3-43.0mm), Eco button, and rounded slim body.",
+                    "variant_name": "IXUS 175 / 185 / 190 (20MP)",
+                    "dimension": "Series",
+                    "modality": "visual",
+                    "short_description": "Late-gen 20.0MP compact cameras with 8x or 10x Optical Zoom and slim rounded shell.",
                     "resale_tier": "HIGH",
                     "est_market_value_gbp": 110.0,
                     "visual_cues": [
-                        "slim rounded silver red or black Canon IXUS camera with 8x or 10x Optical Zoom printed on front lens faceplate",
-                        "modern compact point and shoot Canon camera without optical viewfinder window",
+                        "slim rounded silver red or black compact camera with 8x or 10x Optical Zoom printed on lens ring and no viewfinder",
                     ],
                     "ocr_signatures": [
                         "IXUS 185", "IXUS 190", "IXUS 180", "IXUS 175", "IXUS 160", "IXUS 165", "IXUS 170",
-                        "8x", "10x", "5.0-40.0", "4.3-43.0", "20.0", "HD",
+                        "8x", "10x", "5.0-40.0", "4.3-43.0", "20.0",
                     ],
                     "text_keywords": [
                         "ixus 185", "ixus 190", "ixus 180", "ixus 175", "ixus 170", "ixus 165", "ixus 160",
@@ -200,17 +224,18 @@ SPECIALIST_CATALOGUES: List[Tuple[List[str], Dict[str, Any]]] = [
                 },
                 {
                     "variant_slug": "ixus_105_115_130_mid",
-                    "variant_name": "2010–2013 Colour Compact Series (IXUS 105 / 115 HS / 130 / 132 / 145)",
-                    "short_description": "Slim anodised colourful mid-era 12MP–16MP IXUS models (pink, aqua, silver, black) with 4x–8x IS zoom lenses and curved ergonomic corners.",
+                    "variant_name": "IXUS 105–155 Mid-Era",
+                    "dimension": "Series",
+                    "modality": "visual",
+                    "short_description": "Slim anodised colourful 12MP–16MP models (pink, aqua, silver, black) with 4x–5x IS zoom.",
                     "resale_tier": "HIGH",
                     "est_market_value_gbp": 88.0,
                     "visual_cues": [
-                        "curved anodized pink blue silver or black slim Canon IXUS camera with 4x or 5x zoom ring",
-                        "compact metallic Canon camera with IMAGE STABILIZER text on lens",
+                        "curved anodized pink blue silver or black slim compact camera with 4x or 5x zoom ring",
                     ],
                     "ocr_signatures": [
                         "IXUS 105", "IXUS 115", "IXUS 125", "IXUS 130", "IXUS 132", "IXUS 135", "IXUS 140", "IXUS 145", "IXUS 155",
-                        "12.1", "14.1", "16.0", "4x", "5x", "IMAGE STABILIZER",
+                        "12.1", "14.1", "16.0", "4x", "5x",
                     ],
                     "text_keywords": [
                         "ixus 105", "ixus 115", "ixus 125", "ixus 130", "ixus 132", "ixus 135",
@@ -220,23 +245,35 @@ SPECIALIST_CATALOGUES: List[Tuple[List[str], Dict[str, Any]]] = [
                 },
                 {
                     "variant_slug": "ixus_early_classic_40_50",
-                    "variant_name": "Early Y2K CCD Classics (IXUS 30 / 40 / 50 / 55 / v2 / 400 / 500)",
-                    "short_description": "Early-2000s stainless-steel Y2K CCD digicams (3.2MP–5.0MP) prized for warm filmic lo-fi sensor rendering and chunky steel chassis.",
+                    "variant_name": "Early Y2K IXUS 30–55 / 400",
+                    "dimension": "Series",
+                    "modality": "visual",
+                    "short_description": "Early-2000s stainless-steel Y2K CCD digicams (3.2MP–5.0MP) with optical viewfinder.",
                     "resale_tier": "STANDARD",
                     "est_market_value_gbp": 65.0,
                     "visual_cues": [
-                        "chunky early 2000s stainless steel pocket digital camera with optical viewfinder and small rear LCD",
-                        "retro Y2K Canon Digital IXUS metal camera with AiAF badge",
+                        "chunky early 2000s stainless steel pocket digital camera with optical viewfinder and AiAF badge",
                     ],
                     "ocr_signatures": [
-                        "IXUS 30", "IXUS 40", "IXUS 50", "IXUS 55", "IXUS 400", "IXUS 500", "IXUS II",
-                        "AiAF", "3.2", "4.0", "5.0 MEGA PIXELS", "DIGITAL IXUS",
+                        "IXUS 30", "IXUS 40", "IXUS 50", "IXUS 55", "IXUS 400", "IXUS 500", "AiAF", "3.2", "4.0", "5.0 MEGA PIXELS",
                     ],
                     "text_keywords": [
-                        "ixus 30", "ixus 40", "ixus 50", "ixus 55", "ixus 400", "ixus 430", "ixus 500",
-                        "ixus ii", "ixus v", "ixus v2", "ixus v3", "ixus i",
+                        "ixus 30", "ixus 40", "ixus 50", "ixus 55", "ixus 400", "ixus 430", "ixus 500", "ixus ii", "ixus v2", "ixus v3",
                     ],
                     "negative_keywords": ["285", "185", "190", "12x", "wifi"],
+                },
+                {
+                    "variant_slug": "ixus_boxed_bundle",
+                    "variant_name": "Boxed / Charger Kit",
+                    "dimension": "Kit",
+                    "modality": "label",
+                    "short_description": "Includes original charger, battery, SD card, or retail box.",
+                    "resale_tier": "HIGH",
+                    "est_market_value_gbp": 125.0,
+                    "visual_cues": [],
+                    "ocr_signatures": ["CHARGER", "CB-2L"],
+                    "text_keywords": ["boxed", "with box", "charger", "with charger", "sd card", "complete"],
+                    "negative_keywords": ["no charger", "untested", "spares", "faulty"],
                 },
             ],
         },
@@ -244,50 +281,58 @@ SPECIALIST_CATALOGUES: List[Tuple[List[str], Dict[str, Any]]] = [
     (
         ["cyber-shot", "cybershot", "sony dsc"],
         {
-            "product_family": "Sony Cyber-shot Compact Digital Cameras",
+            "product_family": "Sony Cyber-shot Compact Cameras",
             "domain": "tech",
-            "research_notes": "Sony Cyber-shot models split into sliding-cover T-series, Carl Zeiss W-series pocket compacts, and high-end RX100 / HX travel zoom cameras.",
+            "research_notes": "Multi-category facets: Cyber-shot Series (RX100 Pro vs T-Series Sliding vs W-Series vs WX/HX Superzoom) + Kit.",
             "variants": [
                 {
                     "variant_slug": "cybershot_rx100_series",
-                    "variant_name": "Cyber-shot RX100 Pro 1-Inch Series",
-                    "short_description": "Enthusiast 1-inch sensor compact (RX100 I–VII) with matte black anodized aluminum body and Zeiss Vario-Sonnar T* f/1.8 lens.",
+                    "variant_name": "RX100 Pro 1-Inch",
+                    "dimension": "Series",
+                    "modality": "visual",
+                    "short_description": "Enthusiast 1-inch sensor compact with matte black body and Zeiss Vario-Sonnar T* f/1.8 lens.",
                     "resale_tier": "PREMIUM",
                     "est_market_value_gbp": 260.0,
-                    "visual_cues": ["matte black pro compact Sony camera with large Zeiss T* lens control ring"],
+                    "visual_cues": ["matte black pro compact camera with large Zeiss T* lens control ring"],
                     "ocr_signatures": ["RX100", "Vario-Sonnar", "ZEISS", "1.8-4.9", "1.8-2.8"],
                     "text_keywords": ["rx100", "dsc-rx100", "rx100m2", "rx100m3", "rx100m4", "rx100m5"],
                     "negative_keywords": ["dsc-w", "dsc-t", "dsc-s"],
                 },
                 {
                     "variant_slug": "cybershot_t_sliding_series",
-                    "variant_name": "Cyber-shot DSC-T Sliding Cover Series (T10 / T70 / T90 / T200)",
-                    "short_description": "Ultra-thin Y2K fashion digicam with vertical sliding front lens shield and internal folded Carl Zeiss periscope zoom.",
+                    "variant_name": "DSC-T Sliding Cover",
+                    "dimension": "Series",
+                    "modality": "visual",
+                    "short_description": "Ultra-thin Y2K digicam with vertical sliding front lens shield and internal folded periscope zoom.",
                     "resale_tier": "HIGH",
                     "est_market_value_gbp": 115.0,
-                    "visual_cues": ["ultra flat rectangular metallic Sony Cyber-shot camera with sliding front faceplate cover and non-protruding corner lens"],
-                    "ocr_signatures": ["DSC-T", "Carl Zeiss", "Vario-Tessar", "Cyber-shot"],
+                    "visual_cues": ["ultra flat rectangular metallic camera with sliding front faceplate cover and corner lens"],
+                    "ocr_signatures": ["DSC-T", "Vario-Tessar"],
                     "text_keywords": ["dsc-t", "t10", "t20", "t70", "t77", "t90", "t99", "t100", "t200", "t300", "sliding"],
                     "negative_keywords": ["rx100", "dsc-w830", "dsc-hx"],
                 },
                 {
                     "variant_slug": "cybershot_w_pocket_series",
-                    "variant_name": "Cyber-shot DSC-W Series (W80 / W120 / W350 / W810 / W830)",
-                    "short_description": "Classic extending-barrel pocket Cyber-shot cameras with Zeiss or Sony Lens G optics (4x–8x optical zoom).",
+                    "variant_name": "DSC-W Pocket Series",
+                    "dimension": "Series",
+                    "modality": "visual",
+                    "short_description": "Classic extending-barrel pocket Cyber-shot cameras (W80 / W350 / W810 / W830).",
                     "resale_tier": "STANDARD",
                     "est_market_value_gbp": 80.0,
-                    "visual_cues": ["compact silver black or pink Sony Cyber-shot camera with circular telescoping center zoom lens"],
-                    "ocr_signatures": ["DSC-W", "W830", "W810", "W800", "W350", "W530", "W570", "SteadyShot", "Optical SteadyShot"],
+                    "visual_cues": ["compact silver black or pink pocket camera with circular telescoping center zoom lens"],
+                    "ocr_signatures": ["DSC-W", "W830", "W810", "W800", "W350", "W530", "W570", "SteadyShot"],
                     "text_keywords": ["dsc-w", "w830", "w810", "w800", "w570", "w530", "w350", "w320", "w120", "w80", "w55"],
                     "negative_keywords": ["rx100", "dsc-t", "dsc-hx"],
                 },
                 {
                     "variant_slug": "cybershot_hx_wx_superzoom",
-                    "variant_name": "Cyber-shot WX / HX High-Zoom HS Series (WX220 / WX350 / HX60 / HX90)",
-                    "short_description": "Modern CMOS Exmor R travel superzoom Cyber-shot models (10x–30x Sony G / Zeiss zoom, Wi-Fi/NFC).",
+                    "variant_name": "WX / HX High-Zoom",
+                    "dimension": "Series",
+                    "modality": "visual",
+                    "short_description": "Modern CMOS Exmor R travel superzoom models (10x–30x Sony G / Zeiss zoom, Wi-Fi).",
                     "resale_tier": "HIGH",
                     "est_market_value_gbp": 145.0,
-                    "visual_cues": ["modern travel zoom Sony camera with mode dial, grip, and 10x 20x or 30x G lens"],
+                    "visual_cues": ["modern travel zoom camera with mode dial, grip, and 10x 20x or 30x G lens"],
                     "ocr_signatures": ["WX220", "WX350", "WX500", "HX50", "HX60", "HX80", "HX90", "Sony Lens G", "20x", "30x"],
                     "text_keywords": ["wx220", "wx350", "wx500", "hx50", "hx60", "hx80", "hx90", "dsc-wx", "dsc-hx"],
                     "negative_keywords": ["dsc-t", "dsc-w800"],
@@ -296,98 +341,159 @@ SPECIALIST_CATALOGUES: List[Tuple[List[str], Dict[str, Any]]] = [
         },
     ),
     (
-        ["synchilla", "patagonia fleece"],
+        ["synchilla", "patagonia fleece", "patagonia gilet"],
         {
-            "product_family": "Patagonia Fleece Outerwear",
+            "product_family": "Patagonia Fleece",
             "domain": "fashion",
-            "research_notes": "Separated by Snap-T 4-button placket vs Classic Retro-X windproof deep-pile chest pocket vs Better Sweater knit-face fleece.",
+            "research_notes": "Multi-category facets: Model (Snap-T vs Retro-X Sherpa vs Better Sweater) + Pattern (Patterned/Aztec vs Solid).",
             "variants": [
                 {
-                    "variant_slug": "synchilla_snap_t_patterned",
-                    "variant_name": "Lightweight / Heavyweight Patterned Synchilla Snap-T",
-                    "short_description": "Signature 4-snap nylon placket pullover with contrasting nylon chest flap pocket in Aztec, geometric, or wildlife all-over prints.",
+                    "variant_slug": "patagonia_snap_t",
+                    "variant_name": "Synchilla Snap-T",
+                    "dimension": "Model",
+                    "modality": "visual",
+                    "short_description": "4-snap nylon placket fleece pullover with contrasting chest flap pocket.",
+                    "resale_tier": "HIGH",
+                    "est_market_value_gbp": 60.0,
+                    "visual_cues": ["polar fleece pullover jumper with four snap buttons at neck and nylon chest flap pocket"],
+                    "ocr_signatures": [],
+                    "text_keywords": ["snap-t", "snap t", "4 button", "button neck", "oatmeal"],
+                    "negative_keywords": ["better sweater", "retro-x", "retro x", "full zip"],
+                },
+                {
+                    "variant_slug": "classic_retro_x",
+                    "variant_name": "Retro-X / Deep-Pile Sherpa",
+                    "dimension": "Model",
+                    "modality": "visual",
+                    "short_description": "Shaggy sherpa deep-pile fleece with contrasting vertical zippered nylon chest patch pocket.",
+                    "resale_tier": "PREMIUM",
+                    "est_market_value_gbp": 88.0,
+                    "visual_cues": ["shaggy teddy sherpa pile zip fleece with contrasting vertical zippered nylon patch pocket on chest"],
+                    "ocr_signatures": [],
+                    "text_keywords": ["retro-x", "retro x", "retro pile", "sherpa", "deep pile"],
+                    "negative_keywords": ["snap-t", "better sweater"],
+                },
+                {
+                    "variant_slug": "better_sweater",
+                    "variant_name": "Better Sweater Knit-Face",
+                    "dimension": "Model",
+                    "modality": "visual",
+                    "short_description": "Heathered marl sweater-knit exterior fleece with zip stand collar.",
+                    "resale_tier": "STANDARD",
+                    "est_market_value_gbp": 42.0,
+                    "visual_cues": ["heathered marl knitted texture zip fleece sweater"],
+                    "ocr_signatures": [],
+                    "text_keywords": ["better sweater", "marl", "knit fleece"],
+                    "negative_keywords": ["snap-t", "retro-x"],
+                },
+                {
+                    "variant_slug": "patterned_aztec_print",
+                    "variant_name": "Patterned / Aztec Print",
+                    "dimension": "Pattern",
+                    "modality": "visual",
+                    "short_description": "Collectible geometric, Aztec, floral, or wildlife all-over print.",
                     "resale_tier": "PREMIUM",
                     "est_market_value_gbp": 78.0,
-                    "visual_cues": ["patterned colorful geometric tribal print Patagonia fleece pullover with 4 snap button collar and chest flap pocket"],
-                    "ocr_signatures": ["SYNCHILLA", "PATAGONIA"],
-                    "text_keywords": ["patterned", "aztec", "geometric", "printed", "rare print", "oatmeal", "snap-t", "snap t"],
-                    "negative_keywords": ["better sweater", "retro-x", "full zip", "vest", "gilet"],
-                },
-                {
-                    "variant_slug": "synchilla_snap_t_solid",
-                    "variant_name": "Solid Block-Colour Synchilla Snap-T Pullover",
-                    "short_description": "Classic solid colourway (navy, grey, black, forest green) Snap-T fleece pullover with contrast trim and chest snap pocket.",
-                    "resale_tier": "HIGH",
-                    "est_market_value_gbp": 55.0,
-                    "visual_cues": ["solid single color polar fleece pullover jumper with four snap buttons at neck and contrast nylon chest pocket flap"],
-                    "ocr_signatures": ["SYNCHILLA", "PATAGONIA"],
-                    "text_keywords": ["synchilla", "snap-t", "snap t", "pullover", "button fleece"],
-                    "negative_keywords": ["better sweater", "retro-x", "vest", "gilet", "aztec"],
-                },
-                {
-                    "variant_slug": "classic_retro_x_jacket",
-                    "variant_name": "Classic Retro-X Deep-Pile Zip Jacket",
-                    "short_description": "Shaggy sherpa deep-pile full-zip windproof fleece jacket with vertical contrasting nylon zippered chest patch pocket.",
-                    "resale_tier": "PREMIUM",
-                    "est_market_value_gbp": 92.0,
-                    "visual_cues": ["shaggy teddy sherpa pile full zip fleece jacket with contrasting vertical zippered nylon patch pocket on left chest"],
-                    "ocr_signatures": ["PATAGONIA"],
-                    "text_keywords": ["retro-x", "retro x", "retro pile", "sherpa", "deep pile"],
-                    "negative_keywords": ["snap-t", "better sweater", "vest", "gilet"],
-                },
-                {
-                    "variant_slug": "better_sweater_quarter_full",
-                    "variant_name": "Better Sweater Knit-Face Fleece (1/4 Zip or Full Zip)",
-                    "short_description": "Heathered sweater-knit exterior fleece with zip-through stand collar and vertical welt pocket.",
-                    "resale_tier": "STANDARD",
-                    "est_market_value_gbp": 45.0,
-                    "visual_cues": ["heathered marl knitted texture quarter zip or full zip Patagonia sweater"],
-                    "ocr_signatures": ["PATAGONIA"],
-                    "text_keywords": ["better sweater", "quarter zip", "1/4 zip", "marl", "knit fleece"],
-                    "negative_keywords": ["snap-t", "retro-x"],
+                    "visual_cues": ["colorful patterned geometric tribal aztec or floral all-over print fleece"],
+                    "ocr_signatures": [],
+                    "text_keywords": ["patterned", "aztec", "geometric", "printed", "rare print", "abstract", "tribal"],
+                    "negative_keywords": ["solid", "plain"],
                 },
             ],
         },
     ),
     (
-        ["ralph lauren quarter zip", "polo quarter zip", "ralph lauren half zip"],
+        ["ralph lauren quarter zip", "polo quarter zip", "ralph lauren half zip", "ralph lauren jumper", "ralph lauren knit"],
         {
-            "product_family": "Polo Ralph Lauren Quarter-Zip Sweaters",
+            "product_family": "Polo Ralph Lauren Quarter-Zip Knitwear",
             "domain": "fashion",
-            "research_notes": "Separated by fabric construction: chunky Cable-Knit cotton/wool vs Estate-Rib smooth jersey cotton vs Pima/Merino fine knit vs Pony size.",
+            "research_notes": "Multi-category combinable facets: Knit/Style (Cable-Knit vs Smooth/Estate-Rib vs Waffle/Fleece) + Material (Wool/Merino/Lambswool vs Cashmere vs Cotton/Pima). Items like Cable-Knit Wool receive BOTH tags.",
             "variants": [
                 {
-                    "variant_slug": "cable_knit_quarter_zip",
-                    "variant_name": "Cable-Knit Quarter-Zip Jumper",
-                    "short_description": "Textured braided vertical cable-knit weave cotton or wool quarter-zip with embroidered chest pony and suede/metal zip pull.",
+                    "variant_slug": "cable_knit",
+                    "variant_name": "Cable-Knit",
+                    "dimension": "Style",
+                    "modality": "visual",
+                    "short_description": "Raised braided vertical rope cable-knit weave (available in cotton, wool, or cashmere).",
                     "resale_tier": "PREMIUM",
                     "est_market_value_gbp": 58.0,
-                    "visual_cues": ["braided vertical rope cable knit textured jumper with quarter zip collar and small polo horse logo"],
-                    "ocr_signatures": ["POLO RALPH LAUREN"],
-                    "text_keywords": ["cable knit", "cable-knit", "cable", "chunky knit", "knitted"],
-                    "negative_keywords": ["sweatshirt", "fleece", "big pony"],
+                    "visual_cues": [
+                        "a close-up photo of a chunky braided cable-knit sweater jumper with raised twisted rope vertical cable stitches",
+                        "textured vertical cable knit weave jumper with raised rope braids across torso and sleeves",
+                    ],
+                    "ocr_signatures": [],
+                    "text_keywords": ["cable knit", "cable-knit", "cable", "braided", "rope knit", "chunky cable"],
+                    "negative_keywords": ["estate rib", "estate-rib", "sweatshirt", "fleece", "polar fleece", "waffle", "interlock", "ribbed", "fair isle", "argyle"],
                 },
                 {
-                    "variant_slug": "estate_rib_sweatshirt_qzip",
-                    "variant_name": "Estate-Rib / Smooth Jersey Sweatshirt Quarter-Zip",
-                    "short_description": "Smooth brushed cotton-blend sweatshirt/jersey quarter-zip pullover with ribbed mock-neck collar and suede zipper tab.",
+                    "variant_slug": "smooth_estate_rib",
+                    "variant_name": "Smooth / Estate-Rib",
+                    "dimension": "Style",
+                    "modality": "visual",
+                    "short_description": "Flat smooth jersey / Estate-Rib / ribbed pullover without braided cable ridges.",
                     "resale_tier": "STANDARD",
-                    "est_market_value_gbp": 36.0,
-                    "visual_cues": ["smooth flat cotton jersey sweatshirt quarter zip pullover with small embroidered chest pony"],
-                    "ocr_signatures": ["POLO", "ESTATE RIB"],
-                    "text_keywords": ["estate rib", "estate-rib", "sweatshirt", "jersey", "cotton quarter zip", "pullover"],
-                    "negative_keywords": ["cable knit", "cable-knit", "merino", "cashmere", "wool"],
+                    "est_market_value_gbp": 34.0,
+                    "visual_cues": [
+                        "a photo of a smooth flat cotton jersey quarter-zip sweatshirt pullover with plain smooth fabric and no cable texture",
+                        "flat plain smooth or vertical ribbed knit pullover sweater without any twisted rope cable braids",
+                    ],
+                    "ocr_signatures": ["ESTATE RIB", "ESTATE-RIB"],
+                    "text_keywords": ["estate rib", "estate-rib", "sweatshirt", "jersey", "interlock", "fine knit", "smooth", "ribbed"],
+                    "negative_keywords": ["cable", "cable-knit", "cable knit", "waffle", "polar fleece", "sherpa", "corduroy"],
                 },
                 {
-                    "variant_slug": "merino_pima_fine_knit_qzip",
-                    "variant_name": "Merino / Pima / Lambswool Fine-Knit Quarter-Zip",
-                    "short_description": "Lightweight luxury fine-gauge Merino wool, Pima cotton, or Lambswool dress quarter-zip jumper.",
+                    "variant_slug": "waffle_fleece_bear",
+                    "variant_name": "Waffle / Fleece / Graphic",
+                    "dimension": "Style",
+                    "modality": "label",
+                    "short_description": "Textured waffle thermal, polar fleece, Fair Isle, or Polo Bear / Crest graphic edition.",
                     "resale_tier": "HIGH",
                     "est_market_value_gbp": 48.0,
-                    "visual_cues": ["fine gauge smooth luxury wool knit quarter zip sweater with rib cuffs"],
-                    "ocr_signatures": ["MERINO", "PIMA", "LAMBSWOOL", "100% WOOL"],
-                    "text_keywords": ["merino", "pima", "lambswool", "wool", "cashmere", "fine knit"],
-                    "negative_keywords": ["sweatshirt", "fleece", "cable"],
+                    "visual_cues": [
+                        "plush polar fleece or waffle thermal grid pullover or sweater with large Polo Bear graphic",
+                    ],
+                    "ocr_signatures": ["POLO SPORT", "HI TECH"],
+                    "text_keywords": ["waffle", "fleece", "polar fleece", "polo bear", "aztec", "corduroy", "velour", "big pony", "crest", "fair isle", "argyle", "jacquard"],
+                    "negative_keywords": ["cable", "cable-knit", "estate rib"],
+                },
+                {
+                    "variant_slug": "wool_merino_lambswool",
+                    "variant_name": "Wool / Merino / Lambswool",
+                    "dimension": "Material",
+                    "modality": "label",
+                    "short_description": "100% Wool, Italian Merino, or Lambswool yarn (combines with Cable-Knit or Smooth).",
+                    "resale_tier": "HIGH",
+                    "est_market_value_gbp": 48.0,
+                    "visual_cues": [],
+                    "ocr_signatures": ["100% WOOL", "MERINO", "LAMBSWOOL", "PURE NEW WOOL", "ITALIAN YARN"],
+                    "text_keywords": ["wool", "merino", "lambswool", "lambs wool", "pure new wool"],
+                    "negative_keywords": ["100% cotton"],
+                },
+                {
+                    "variant_slug": "cashmere_blend",
+                    "variant_name": "Cashmere",
+                    "dimension": "Material",
+                    "modality": "label",
+                    "short_description": "Pure cashmere or luxury wool/cotton-cashmere blend.",
+                    "resale_tier": "PREMIUM",
+                    "est_market_value_gbp": 65.0,
+                    "visual_cues": [],
+                    "ocr_signatures": ["CASHMERE"],
+                    "text_keywords": ["cashmere"],
+                    "negative_keywords": [],
+                },
+                {
+                    "variant_slug": "cotton_pima",
+                    "variant_name": "Cotton / Pima",
+                    "dimension": "Material",
+                    "modality": "label",
+                    "short_description": "100% Cotton or luxury soft Pima cotton construction.",
+                    "resale_tier": "STANDARD",
+                    "est_market_value_gbp": 36.0,
+                    "visual_cues": [],
+                    "ocr_signatures": ["PIMA COTTON", "100% COTTON", "SUPIMA"],
+                    "text_keywords": ["pima", "cotton", "supima"],
+                    "negative_keywords": ["100% wool", "100% merino", "pure wool"],
                 },
             ],
         },
@@ -803,22 +909,30 @@ class MultiLLMRouter:
 
         system_prompt = (
             "You are an elite secondary-market product taxonomist, computer-vision prompt engineer, and UK Vinted reseller analyst. "
-            "Given a broad fashion or tech product search query, research and break it down into 3 to 6 distinct, commercially important, "
-            "visually distinguishable product variants / exact sub-models traded on Vinted UK.\n\n"
+            "Given a broad fashion or tech product search query, break it down into 4 to 8 orthogonal, combinable product variants "
+            "grouped across 1 or 2 clean facets (`dimension`s) so items can carry MULTIPLE tags when appropriate (e.g. Style='Cable-Knit' + Material='Wool / Merino').\n\n"
             "CRITICAL REQUIREMENTS:\n"
-            "1. Work equally well for FASHION (e.g. 'North Face Nuptse' -> 1996 Retro 700, Summit Series 800, Reversible/Sherpa, Cropped/Short, Nuptse Gilet) "
-            "and TECH / CAMERAS / CONSOLES (e.g. 'Canon IXUS' -> Vintage CCD IXUS 70/75/80 IS, Flagship Wi-Fi 12x IXUS 285 HS, Modern 20MP 8x/10x IXUS 185/190, Mid-era IXUS 105/115/130, Early Y2K IXUS 40/50).\n"
-            "2. For every variant, provide:\n"
+            "1. Use clean `dimension` names so orthogonal attributes combine naturally:\n"
+            "   - FASHION examples: `dimension`: 'Style' (e.g. Cable-Knit vs Smooth / Estate-Rib, or 1996 Retro 700 vs Summit 800) + `dimension`: 'Material' (e.g. Wool / Merino, Cashmere, Cotton / Pima) or `dimension`: 'Cut' (e.g. Cropped / Short, Gilet / Vest).\n"
+            "   - TECH / CAMERAS examples: `dimension`: 'Series' (e.g. Vintage CCD IXUS 70/75/80, Flagship Wi-Fi IXUS 285 HS, Modern 20MP IXUS 185/190) + `dimension`: 'Kit' (e.g. Boxed / Complete Charger Kit).\n"
+            "2. Set `modality` for each variant:\n"
+            "   - `'visual'`: silhouette, knit texture, baffle geometry, sleeve cut, or camera body/lens markings visible from product photos (mutually exclusive within its `dimension`).\n"
+            "   - `'label'`: fabric composition or bundle accessories verified strictly from listing text or neck/care tag OCR (e.g. Material or Kit; never guessed from distant garment photos, and blends like Wool + Cashmere can co-occur).\n"
+            "3. NEVER include the parent brand name or generic words from the search query itself (e.g. 'polo', 'ralph lauren', 'quarter zip', 'jumper', 'knitted', 'camera') in `text_keywords` or `ocr_signatures`. Every cue MUST uniquely distinguish that specific variant from sibling variants.\n"
+            "4. NEVER put terms belonging to a DIFFERENT `dimension` inside `negative_keywords` (e.g. do NOT put 'cable' in Wool's `negative_keywords`, because 'Cable-Knit' + 'Wool' co-occur!). Only put mutually exclusive sibling terms from the SAME `dimension`.\n"
+            "5. For every variant, provide:\n"
             "   - `variant_slug`: lowercase snake_case identifier\n"
-            "   - `variant_name`: clear human-readable title\n"
+            "   - `variant_name`: concise, clean human-readable chip label (e.g. 'Cable-Knit', 'Wool / Merino', '1996 Retro (700)')\n"
+            "   - `dimension`: facet group name ('Style', 'Material', 'Edition', 'Cut', 'Series', 'Kit')\n"
+            "   - `modality`: 'visual' or 'label'\n"
             "   - `short_description`: concise physical & resale distinction\n"
             "   - `resale_tier`: one of 'PREMIUM', 'HIGH', 'STANDARD', 'BUDGET'\n"
             "   - `est_market_value_gbp`: realistic UK secondhand sold price in GBP (number)\n"
-            "   - `visual_cues`: 3 to 5 descriptive visual phrases optimized for CLIP vision-language image matching (describe silhouette, baffles, collar, texture, lens zoom ring, viewfinder window, body finish, sleeve length)\n"
-            "   - `ocr_signatures`: exact uppercase/numeric text strings printed or embroidered on the physical product visible in photos (e.g. cuff fill '700', '800', 'SUMMIT', style code 'NF0A3C8D', or camera faceplate/lens text '285 HS', '12x', '25-300', '7.1 MEGA PIXELS', 'Wi-Fi')\n"
-            "   - `text_keywords`: lowercase title/description substrings, model numbers, nicknames\n"
-            "   - `negative_keywords`: lowercase terms indicating the item belongs to a DIFFERENT variant (e.g. 'gilet' excluded from jacket variant)\n"
-            "3. Respond ONLY with a valid JSON object matching schema: "
+            "   - `visual_cues`: 2 to 5 specific visual phrases for CLIP image matching (empty list [] if `modality` is 'label')\n"
+            "   - `ocr_signatures`: exact discriminative text printed on tags/faceplates (e.g. '100% WOOL', 'CASHMERE', '700', 'SUMMIT', '285 HS', '7.1 MEGA PIXELS') — NEVER brand names!\n"
+            "   - `text_keywords`: lowercase discriminative title/description substrings\n"
+            "   - `negative_keywords`: lowercase mutually exclusive terms within the SAME `dimension`\n"
+            "6. Respond ONLY with a valid JSON object matching schema: "
             "{\"product_family\": str, \"domain\": \"fashion\"|\"tech\"|\"footwear\"|\"other\", \"research_notes\": str, \"variants\": [...]}"
         )
 
@@ -832,7 +946,7 @@ class MultiLLMRouter:
 
         llm_result, provider_used = self.generate_json(system_prompt, user_prompt, allow_grounding=True)
         if llm_result and isinstance(llm_result.get("variants"), list) and len(llm_result["variants"]) >= 2:
-            normalized = self._normalize_catalogue(llm_result, search_text, median_price)
+            normalized = self._normalize_catalogue(llm_result, search_text, median_price, brand=brand)
             normalized["provider_used"] = provider_used
             normalized["researched_at"] = datetime.now(timezone.utc).isoformat()
             return normalized
@@ -842,7 +956,37 @@ class MultiLLMRouter:
         local_cat["researched_at"] = datetime.now(timezone.utc).isoformat()
         return local_cat
 
-    def _normalize_catalogue(self, raw: Dict[str, Any], search_text: str, median_price: float) -> Dict[str, Any]:
+    def _normalize_catalogue(
+        self,
+        raw: Dict[str, Any],
+        search_text: str,
+        median_price: float,
+        brand: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        domain = str(raw.get("domain") or "other").lower()
+        default_dim = "Series" if domain == "tech" else "Style"
+
+        # Build generic stop-token set so parent brand/query words never pollute variant cues
+        stop_tokens = {
+            t for t in re.findall(r"[a-z0-9]+", (search_text or "").lower())
+            if not any(ch.isdigit() for ch in t)
+        }
+        if brand:
+            stop_tokens.update(re.findall(r"[a-z0-9]+", brand.lower()))
+        stop_tokens.update({
+            "the", "and", "with", "for", "mens", "womens", "unisex", "size",
+            "polo", "knitted", "jumper", "sweater", "pullover", "top",
+            "camera", "digital", "compact",
+        })
+
+        def _is_generic_cue(phrase: str) -> bool:
+            toks = re.findall(r"[a-z0-9]+", phrase.lower())
+            if not toks:
+                return True
+            if any(any(ch.isdigit() for ch in tok) for tok in toks):
+                return False
+            return all(tok in stop_tokens for tok in toks)
+
         variants_out = []
         seen_slugs = set()
         for idx, v in enumerate(raw.get("variants") or []):
@@ -854,6 +998,11 @@ class MultiLLMRouter:
                 slug = f"{slug}_{idx + 1}"
             seen_slugs.add(slug)
 
+            dim = str(v.get("dimension") or default_dim).strip().title() or default_dim
+            modality = str(v.get("modality") or "").strip().lower()
+            if modality not in ("visual", "label"):
+                modality = "label" if dim.lower() in ("material", "fabric", "composition", "kit", "bundle") else "visual"
+
             tier = str(v.get("resale_tier") or "STANDARD").upper()
             if tier not in ("PREMIUM", "HIGH", "STANDARD", "BUDGET"):
                 tier = "STANDARD"
@@ -864,16 +1013,38 @@ class MultiLLMRouter:
             except Exception:
                 est_float = round(median_price, 2)
 
+            clean_ocr = [
+                str(x).strip()
+                for x in (v.get("ocr_signatures") or [])
+                if str(x).strip() and not _is_generic_cue(str(x))
+            ][:14]
+            clean_kws = [
+                str(x).strip().lower()
+                for x in (v.get("text_keywords") or [])
+                if str(x).strip() and not _is_generic_cue(str(x))
+            ][:18]
+            clean_negs = [
+                str(x).strip().lower()
+                for x in (v.get("negative_keywords") or [])
+                if str(x).strip() and not _is_generic_cue(str(x))
+            ][:14]
+            clean_vcues = (
+                [] if modality == "label"
+                else [str(x).strip() for x in (v.get("visual_cues") or []) if str(x).strip()][:6]
+            )
+
             variants_out.append({
                 "variant_slug": slug,
                 "variant_name": name,
+                "dimension": dim,
+                "modality": modality,
                 "short_description": str(v.get("short_description") or v.get("description") or "").strip(),
                 "resale_tier": tier,
                 "est_market_value_gbp": max(5.0, est_float),
-                "visual_cues": [str(x).strip() for x in (v.get("visual_cues") or []) if str(x).strip()][:6],
-                "ocr_signatures": [str(x).strip() for x in (v.get("ocr_signatures") or []) if str(x).strip()][:14],
-                "text_keywords": [str(x).strip().lower() for x in (v.get("text_keywords") or []) if str(x).strip()][:18],
-                "negative_keywords": [str(x).strip().lower() for x in (v.get("negative_keywords") or []) if str(x).strip()][:14],
+                "visual_cues": clean_vcues,
+                "ocr_signatures": clean_ocr,
+                "text_keywords": clean_kws,
+                "negative_keywords": clean_negs,
             })
 
         return {
@@ -897,10 +1068,11 @@ class MultiLLMRouter:
             if any(t in q_lower for t in triggers):
                 cloned = json.loads(json.dumps(template))
                 cloned["provider_used"] = "Specialist Knowledge Base + Vinted UK Corpus"
-                return self._normalize_catalogue(cloned, search_text, median_price)
+                return self._normalize_catalogue(cloned, search_text, median_price, brand=brand) | {
+                    "provider_used": "Specialist Knowledge Base + Vinted UK Corpus"
+                }
 
         # 2. Dynamic Live Vinted Corpus Model-Code & Sub-Variant Miner
-        # Mines alphanumeric model codes (e.g. 'G7X Mark II', 'XT-6', '990v5', '501', '3DS XL') or style modifiers!
         is_tech = any(w in q_lower for w in (
             "camera", "canon", "cannon", "sony", "nikon", "fuji", "fujifilm", "olympus", "lumix",
             "coolpix", "finepix", "powershot", "3ds", "2ds", "ds", "gameboy", "switch", "airpods",
@@ -916,16 +1088,20 @@ class MultiLLMRouter:
 
         model_regex = re.compile(r"\b([a-z]{0,4}\d{2,4}[a-z]{0,3}(?:\s+(?:hs|is|mark\s*ii|mark\s*iii|xl|pro|max|oled|lite|v\d))?)\b", re.IGNORECASE)
         fashion_modifiers = [
-            ("gore-tex", "GORE-TEX / Waterproof Edition", "PREMIUM", ["waterproof hardshell membrane jacket with GORE-TEX logo embroidery"], ["GORE-TEX", "GORETEX"]),
-            ("vintage", "Vintage / OG Archive Issue", "HIGH", ["vintage worn-in classic archive garment with retro woven neck tag"], ["MADE IN USA"]),
-            ("hoodie", "Hooded Pullover / Zip Hoodie", "STANDARD", ["hooded fleece sweatshirt with drawstring hood"], []),
-            ("crewneck", "Crewneck Sweatshirt", "STANDARD", ["collarless ribbed crew neck pullover sweatshirt without hood"], []),
-            ("quarter zip", "Quarter-Zip / Half-Zip Pullover", "HIGH", ["stand collar pullover jumper with short metal quarter zipper at neck"], []),
-            ("full zip", "Full-Zip Jacket", "HIGH", ["full length front zipper jacket"], []),
-            ("gilet", "Sleeveless Gilet / Bodywarmer", "STANDARD", ["sleeveless padded vest gilet bodywarmer"], []),
-            ("sherpa", "Sherpa / High-Pile Fleece", "HIGH", ["fluffy textured high pile teddy sherpa fleece"], []),
-            ("leather", "Full-Grain Leather Edition", "PREMIUM", ["smooth grained leather construction"], ["LEATHER"]),
-            ("suede", "Suede Edition", "HIGH", ["brushed matte nap suede upper construction"], []),
+            ("cable", "Cable-Knit", "Style", "visual", "HIGH", ["chunky braided twisted rope cable-knit pattern across chest and sleeves"], []),
+            ("gore-tex", "GORE-TEX Waterproof", "Style", "visual", "PREMIUM", ["waterproof technical shell jacket with GORE-TEX embroidery"], ["GORE-TEX", "GORETEX"]),
+            ("hoodie", "Hooded", "Style", "visual", "STANDARD", ["hooded pullover or zip hoodie with drawstring hood"], []),
+            ("crewneck", "Crewneck", "Style", "visual", "STANDARD", ["collarless ribbed crew neck pullover without hood"], []),
+            ("quarter zip", "Quarter-Zip", "Style", "visual", "HIGH", ["stand collar pullover with short quarter zipper at neck"], []),
+            ("full zip", "Full-Zip", "Style", "visual", "HIGH", ["full length front zipper jacket"], []),
+            ("gilet", "Gilet / Vest", "Cut", "visual", "STANDARD", ["sleeveless padded gilet vest bodywarmer"], []),
+            ("cropped", "Cropped", "Cut", "visual", "HIGH", ["short waist-length boxy cropped silhouette"], []),
+            ("sherpa", "Sherpa / Pile", "Style", "visual", "HIGH", ["fluffy textured high-pile teddy sherpa fleece"], []),
+            ("cashmere", "Cashmere", "Material", "label", "PREMIUM", [], ["100% CASHMERE", "CASHMERE"]),
+            ("wool", "Wool / Merino", "Material", "label", "HIGH", [], ["100% WOOL", "MERINO", "LAMBSWOOL"]),
+            ("cotton", "Cotton", "Material", "label", "STANDARD", [], ["100% COTTON", "PIMA COTTON"]),
+            ("leather", "Leather", "Material", "label", "PREMIUM", [], ["100% LEATHER", "GENUINE LEATHER"]),
+            ("suede", "Suede", "Material", "label", "HIGH", [], ["SUEDE"]),
         ]
 
         for s in samples:
@@ -949,27 +1125,46 @@ class MultiLLMRouter:
                 tier = "PREMIUM" if avg_p >= median_price * 1.25 else ("HIGH" if avg_p >= median_price else "STANDARD")
                 mined_variants.append({
                     "variant_slug": re.sub(r"[^a-z0-9]+", "_", code.lower()).strip("_"),
-                    "variant_name": f"{brand or search_text.title()} {code}".strip(),
-                    "short_description": f"Identified {code} sub-model discovered from live UK Vinted marketplace listings.",
+                    "variant_name": code,
+                    "dimension": "Series" if is_tech else "Edition",
+                    "modality": "visual",
+                    "short_description": f"Identified {code} sub-model discovered from live UK Vinted listings.",
                     "resale_tier": tier,
                     "est_market_value_gbp": max(8.0, avg_p),
                     "visual_cues": [
-                        f"{search_text} {code} product photo showing {code} body design and faceplate markings",
+                        f"{search_text} {code} product photo showing {code} design and markings",
                     ],
                     "ocr_signatures": [code, code.replace(" ", "")],
                     "text_keywords": [code.lower(), code.lower().replace(" ", "")],
                     "negative_keywords": other_codes,
                 })
+            if is_tech:
+                mined_variants.append({
+                    "variant_slug": "boxed_charger_kit",
+                    "variant_name": "Boxed / Charger Kit",
+                    "dimension": "Kit",
+                    "modality": "label",
+                    "short_description": "Complete bundle including charger, battery, or original box.",
+                    "resale_tier": "HIGH",
+                    "est_market_value_gbp": round(median_price * 1.2, 2),
+                    "visual_cues": [],
+                    "ocr_signatures": [],
+                    "text_keywords": ["boxed", "with box", "with charger", "charger included", "complete"],
+                    "negative_keywords": ["no charger", "untested", "spares", "faulty"],
+                })
         else:
-            # Check fashion modifier hits across samples or build sensible archetype variants
-            for kw, title_label, tier, vcues, ocrs in fashion_modifiers:
+            for kw, title_label, dim, mod, tier, vcues, ocrs in fashion_modifiers:
+                if kw in q_lower:
+                    continue
                 matches = [s for s in samples if kw in str(s.get("title") or "").lower()]
                 if len(matches) >= 2:
                     p_list = [float(x["price"]) for x in matches if float(x.get("price") or 0) > 0] or [median_price]
                     mined_variants.append({
                         "variant_slug": re.sub(r"[^a-z0-9]+", "_", kw),
-                        "variant_name": f"{search_text.title()} — {title_label}",
-                        "short_description": f"{title_label} variant of {search_text}.",
+                        "variant_name": title_label,
+                        "dimension": dim,
+                        "modality": mod,
+                        "short_description": f"{title_label} {search_text}.",
                         "resale_tier": tier,
                         "est_market_value_gbp": round(sum(p_list) / len(p_list), 2),
                         "visual_cues": [f"{search_text} {c}" for c in vcues],
@@ -983,8 +1178,10 @@ class MultiLLMRouter:
                 mined_variants = [
                     {
                         "variant_slug": "pro_flagship_edition",
-                        "variant_name": f"{search_text.title()} — Pro / High-Spec Wi-Fi / Zoom Edition",
-                        "short_description": "Higher-tier specification featuring superior optical zoom, Wi-Fi/HS sensor, or XL/OLED hardware.",
+                        "variant_name": "Pro / Wi-Fi / High-Zoom",
+                        "dimension": "Series",
+                        "modality": "visual",
+                        "short_description": "Higher-tier specification with Wi-Fi, HS sensor, XL/OLED, or long optical zoom.",
                         "resale_tier": "PREMIUM",
                         "est_market_value_gbp": round(median_price * 1.4, 2),
                         "visual_cues": [f"high-end black or silver {search_text} with large zoom lens barrel and Wi-Fi HD markings"],
@@ -994,50 +1191,71 @@ class MultiLLMRouter:
                     },
                     {
                         "variant_slug": "vintage_classic_edition",
-                        "variant_name": f"{search_text.title()} — Classic / Vintage CCD Edition",
+                        "variant_name": "Classic / Vintage CCD",
+                        "dimension": "Series",
+                        "modality": "visual",
                         "short_description": "Classic compact metallic or original release model.",
                         "resale_tier": "HIGH",
                         "est_market_value_gbp": round(median_price * 1.05, 2),
                         "visual_cues": [f"compact metallic retro {search_text} in clean working condition"],
-                        "ocr_signatures": ["CCD", "MEGA PIXELS", "OPTICAL"],
-                        "text_keywords": ["ccd", "vintage", "retro", "classic", "silver"],
-                        "negative_keywords": ["faulty", "spares"],
+                        "ocr_signatures": ["CCD", "MEGA PIXELS"],
+                        "text_keywords": ["ccd", "vintage", "retro"],
+                        "negative_keywords": ["faulty", "spares", "wifi", "wi-fi"],
                     },
                     {
                         "variant_slug": "boxed_complete_bundle",
-                        "variant_name": f"{search_text.title()} — Complete Boxed / Charger Bundle",
-                        "short_description": "Complete retail bundle with original box, battery, charger, and pouch.",
+                        "variant_name": "Boxed / Charger Kit",
+                        "dimension": "Kit",
+                        "modality": "label",
+                        "short_description": "Complete bundle with original box, battery, and charger.",
                         "resale_tier": "HIGH",
                         "est_market_value_gbp": round(median_price * 1.25, 2),
-                        "visual_cues": [f"{search_text} photographed next to original retail box, battery charger, and cables"],
+                        "visual_cues": [],
                         "ocr_signatures": [],
-                        "text_keywords": ["boxed", "with box", "charger included", "complete", "bundle"],
+                        "text_keywords": ["boxed", "with box", "charger included", "with charger", "complete"],
                         "negative_keywords": ["no charger", "untested"],
                     },
                 ]
             else:
                 mined_variants = [
                     {
-                        "variant_slug": "premium_edition",
-                        "variant_name": f"{search_text.title()} — Archive / Technical / Collaboration Edition",
-                        "short_description": "High-demand colourway, heavyweight archive cut, GORE-TEX/technical shell, or special edition.",
+                        "variant_slug": "archive_special_edition",
+                        "variant_name": "Archive / Special Edition",
+                        "dimension": "Style",
+                        "modality": "visual",
+                        "short_description": "Vintage archive issue, GORE-TEX technical shell, or special edition.",
                         "resale_tier": "PREMIUM",
                         "est_market_value_gbp": round(median_price * 1.35, 2),
-                        "visual_cues": [f"premium technical or vintage archive {search_text} with distinct logo detailing"],
-                        "ocr_signatures": ["GORE-TEX", "LIMITED", "ARCHIVE"],
+                        "visual_cues": [f"vintage archive or technical {search_text} with distinct woven badge detailing"],
+                        "ocr_signatures": ["GORE-TEX", "LIMITED", "MADE IN USA"],
                         "text_keywords": ["archive", "vintage", "retro", "gore-tex", "collab", "limited", "rare"],
                         "negative_keywords": ["kids", "junior"],
                     },
                     {
-                        "variant_slug": "core_classic_edition",
-                        "variant_name": f"{search_text.title()} — Classic Core Edition",
-                        "short_description": "Standard mainline retail release in core colourways.",
+                        "variant_slug": "wool_cashmere_blend",
+                        "variant_name": "Wool / Cashmere",
+                        "dimension": "Material",
+                        "modality": "label",
+                        "short_description": "Premium natural wool, merino, lambswool, or cashmere composition.",
+                        "resale_tier": "HIGH",
+                        "est_market_value_gbp": round(median_price * 1.2, 2),
+                        "visual_cues": [],
+                        "ocr_signatures": ["100% WOOL", "MERINO", "LAMBSWOOL", "CASHMERE"],
+                        "text_keywords": ["wool", "merino", "lambswool", "cashmere"],
+                        "negative_keywords": ["acrylic", "100% cotton"],
+                    },
+                    {
+                        "variant_slug": "cotton_core",
+                        "variant_name": "Cotton",
+                        "dimension": "Material",
+                        "modality": "label",
+                        "short_description": "Breathable 100% cotton or Pima cotton weave.",
                         "resale_tier": "STANDARD",
-                        "est_market_value_gbp": round(median_price, 2),
-                        "visual_cues": [f"classic standard {search_text} garment laid flat"],
-                        "ocr_signatures": [],
-                        "text_keywords": [w for w in re.findall(r"[a-z0-9]+", q_lower) if len(w) > 2][:4],
-                        "negative_keywords": ["gilet", "vest"],
+                        "est_market_value_gbp": round(median_price * 0.95, 2),
+                        "visual_cues": [],
+                        "ocr_signatures": ["100% COTTON", "PIMA COTTON"],
+                        "text_keywords": ["cotton", "pima"],
+                        "negative_keywords": ["100% wool", "100% cashmere"],
                     },
                 ]
 
@@ -1047,13 +1265,13 @@ class MultiLLMRouter:
                 "domain": "tech" if is_tech else "fashion",
                 "research_notes": (
                     "Generated via Live Vinted UK Corpus Mining. Add a free Gemini, Groq, or OpenRouter API key in "
-                    "'AI Engine' settings to unlock live web-grounded Deep Research for arbitrary products!"
+                    "'AI Models & Keys' to enable live web-grounded Deep Research for arbitrary products."
                 ),
                 "variants": mined_variants,
-                "provider_used": "Live Vinted Corpus Miner (Zero-Key Local Mode)",
             },
             search_text,
             median_price,
+            brand=brand,
         ) | {"provider_used": "Live Vinted Corpus Miner (Zero-Key Local Mode)"}
 
 

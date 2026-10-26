@@ -216,7 +216,12 @@ def get_database_analytics(db: Session = Depends(get_db)):
             "clean": t_cnt - r_cnt,
             "variants_enabled": bool(getattr(s, "variants_enabled", False)),
             "variants": [
-                {"id": v.id, "variant_name": v.variant_name, "resale_tier": v.resale_tier or "STANDARD"}
+                {
+                    "id": v.id,
+                    "variant_name": v.variant_name,
+                    "dimension": (v.dimension or "Style").strip() or "Style",
+                    "resale_tier": v.resale_tier or "STANDARD",
+                }
                 for v in s_vars
             ],
         })
@@ -304,15 +309,14 @@ def get_database_items(
             )
         )
 
-    # 2. Tracked Search & Variant Filter
+    # 2. Tracked Search & Multi-Category Variant Filter
     if search_id:
         query = query.filter(SoldItem.tracked_search_id == search_id)
     if variant_id and str(variant_id).strip().lower() not in ("", "all"):
-        v_str = str(variant_id).strip().lower()
-        if v_str == "unclassified":
-            query = query.filter(SoldItem.variant_id.is_(None))
-        elif v_str.isdigit():
-            query = query.filter(SoldItem.variant_id == int(v_str))
+        from .variants import build_variant_filter_clauses
+        v_clauses = build_variant_filter_clauses(db, variant_id)
+        for vc in v_clauses:
+            query = query.filter(vc)
 
     # 3. Sold Status Filter
     if status_filter == "sold":
@@ -452,7 +456,9 @@ def get_database_items(
             "is_child_size": bool(item.is_child_size),
             "child_size_reason": item.child_size_reason,
             "variant_id": getattr(item, "variant_id", None),
+            "variant_ids": item.parsed_variant_ids(),
             "variant_name": getattr(item, "variant_name", None),
+            "variant_names": item.parsed_variant_names(),
             "variant_confidence": round(float(getattr(item, "variant_confidence", 0.0) or 0.0), 3),
             "variant_method": getattr(item, "variant_method", None),
             "variant_evidence": getattr(item, "variant_evidence", None),

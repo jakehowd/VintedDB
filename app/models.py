@@ -2,6 +2,7 @@
 
 import json
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import (
     Boolean,
@@ -108,6 +109,8 @@ class SoldItem(Base):
         Integer, ForeignKey("product_variants.id", ondelete="SET NULL"), nullable=True, index=True
     )
     variant_name = Column(String, nullable=True, index=True)
+    variant_ids_json = Column(Text, nullable=True)     # Compact JSON list e.g. "[6,8]" for multi-category facets
+    variant_names_json = Column(Text, nullable=True)   # JSON list e.g. '["Cable-Knit","Wool / Merino"]'
     variant_confidence = Column(Float, default=0.0)
     variant_method = Column(String, nullable=True)
     variant_evidence = Column(Text, nullable=True)
@@ -118,9 +121,56 @@ class SoldItem(Base):
     tracked_search = relationship("TrackedSearch", back_populates="items")
     variant = relationship("ProductVariant", back_populates="items")
 
+    def parsed_variant_ids(self) -> List[int]:
+        if self.variant_ids_json:
+            try:
+                arr = json.loads(self.variant_ids_json)
+                if isinstance(arr, list):
+                    return [int(x) for x in arr if x is not None]
+            except Exception:
+                pass
+        return [int(self.variant_id)] if self.variant_id is not None else []
+
+    def parsed_variant_names(self) -> List[str]:
+        if self.variant_names_json:
+            try:
+                arr = json.loads(self.variant_names_json)
+                if isinstance(arr, list):
+                    return [str(x) for x in arr if x]
+            except Exception:
+                pass
+        return [self.variant_name] if self.variant_name else []
+
+    def apply_variant_result(self, res: Optional[Dict[str, Any]]) -> None:
+        """Synchronize both multi-category JSON arrays and primary variant fields on SoldItem."""
+        if not res:
+            self.variant_id = None
+            self.variant_name = None
+            self.variant_ids_json = None
+            self.variant_names_json = None
+            self.variant_confidence = 0.0
+            self.variant_method = None
+            self.variant_evidence = None
+            return
+
+        v_ids = [int(x) for x in (res.get("variant_ids") or []) if x is not None]
+        if not v_ids and res.get("variant_id") is not None:
+            v_ids = [int(res["variant_id"])]
+        v_names = [str(x) for x in (res.get("variant_names") or []) if x]
+        if not v_names and res.get("variant_name"):
+            v_names = [str(res["variant_name"])]
+
+        self.variant_id = v_ids[0] if v_ids else None
+        self.variant_name = " · ".join(v_names) if v_names else None
+        self.variant_ids_json = json.dumps(v_ids, separators=(",", ":")) if v_ids else None
+        self.variant_names_json = json.dumps(v_names, ensure_ascii=False) if v_names else None
+        self.variant_confidence = float(res.get("confidence") or 0.0)
+        self.variant_method = res.get("method")
+        self.variant_evidence = res.get("evidence")
+
 
 class ProductVariant(Base):
-    """Specific product variant / sub-model generated via Deep Research & learned by Local Vision AI."""
+    """Specific product variant / facet tag generated via Deep Research & learned by Local Vision AI."""
 
     __tablename__ = "product_variants"
 
@@ -130,6 +180,8 @@ class ProductVariant(Base):
     )
     variant_slug = Column(String, nullable=False, index=True)
     variant_name = Column(String, nullable=False)
+    dimension = Column(String, default="Style", nullable=False)  # Facet group e.g. 'Style', 'Material', 'Cut', 'Series'
+    modality = Column(String, default="visual", nullable=False)  # 'visual' (CLIP+OCR+Text) or 'label' (Text+OCR only)
     short_description = Column(Text, nullable=True)
     resale_tier = Column(String, default="STANDARD")  # PREMIUM, HIGH, STANDARD, BUDGET
     est_market_value_gbp = Column(Float, nullable=True)

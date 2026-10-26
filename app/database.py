@@ -51,6 +51,8 @@ def ensure_db_schema(target_engine=engine):
                 tracked_search_id INTEGER NOT NULL REFERENCES tracked_searches(id) ON DELETE CASCADE,
                 variant_slug TEXT NOT NULL,
                 variant_name TEXT NOT NULL,
+                dimension TEXT DEFAULT 'Style',
+                modality TEXT DEFAULT 'visual',
                 short_description TEXT,
                 resale_tier TEXT DEFAULT 'STANDARD',
                 est_market_value_gbp REAL,
@@ -67,6 +69,12 @@ def ensure_db_schema(target_engine=engine):
             );
         """)
         cursor.execute("CREATE INDEX IF NOT EXISTS ix_product_variants_search ON product_variants (tracked_search_id);")
+        pv_cols = [c[1] for c in cursor.execute("PRAGMA table_info(product_variants)").fetchall()]
+        if pv_cols:
+            if "dimension" not in pv_cols:
+                cursor.execute("ALTER TABLE product_variants ADD COLUMN dimension TEXT DEFAULT 'Style';")
+            if "modality" not in pv_cols:
+                cursor.execute("ALTER TABLE product_variants ADD COLUMN modality TEXT DEFAULT 'visual';")
 
         # 1. tracked_searches columns
         ts_cols = [c[1] for c in cursor.execute("PRAGMA table_info(tracked_searches)").fetchall()]
@@ -107,6 +115,10 @@ def ensure_db_schema(target_engine=engine):
                 cursor.execute("ALTER TABLE sold_items ADD COLUMN variant_id INTEGER REFERENCES product_variants(id) ON DELETE SET NULL;")
             if "variant_name" not in si_cols:
                 cursor.execute("ALTER TABLE sold_items ADD COLUMN variant_name TEXT;")
+            if "variant_ids_json" not in si_cols:
+                cursor.execute("ALTER TABLE sold_items ADD COLUMN variant_ids_json TEXT;")
+            if "variant_names_json" not in si_cols:
+                cursor.execute("ALTER TABLE sold_items ADD COLUMN variant_names_json TEXT;")
             if "variant_confidence" not in si_cols:
                 cursor.execute("ALTER TABLE sold_items ADD COLUMN variant_confidence REAL DEFAULT 0.0;")
             if "variant_method" not in si_cols:

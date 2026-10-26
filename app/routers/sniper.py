@@ -102,6 +102,7 @@ def get_sniper_targets_info():
                 "recommended_profitable_price": rec_price,
                 "target_margin_pct": 35.0,
                 "variants_enabled": bool(getattr(s, "variants_enabled", False)),
+                "dimensions": variant_data.get("dimensions", []),
                 "variants": variants_list,
                 "variants_count": len(variants_list),
                 "enabled_variants_count": enabled_variants_count,

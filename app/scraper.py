@@ -381,7 +381,7 @@ def scrape_and_store(
             if not existing_item.seller_username and item_data.get("seller_username"):
                 existing_item.seller_username = str(item_data.get("seller_username"))
                 updated_existing = True
-            if active_variants and existing_item.variant_id is None:
+            if active_variants and not existing_item.parsed_variant_ids():
                 v_match = variant_vision_service.classify_item_variant(
                     db=db,
                     tracked_search=tracked_search,
@@ -390,11 +390,7 @@ def scrape_and_store(
                     allow_vision=True,
                 )
                 if v_match:
-                    existing_item.variant_id = v_match["variant_id"]
-                    existing_item.variant_name = v_match["variant_name"]
-                    existing_item.variant_confidence = v_match["confidence"]
-                    existing_item.variant_method = v_match["method"]
-                    existing_item.variant_evidence = v_match["evidence"]
+                    existing_item.apply_variant_result(v_match)
                     updated_existing = True
             continue
 
@@ -504,7 +500,9 @@ def scrape_and_store(
             is_child_size=is_child,
             child_size_reason=child_reason if is_child else None,
             variant_id=variant_match["variant_id"] if variant_match else None,
+            variant_ids_json=json.dumps(variant_match["variant_ids"], separators=(",", ":")) if (variant_match and variant_match.get("variant_ids")) else None,
             variant_name=variant_match["variant_name"] if variant_match else None,
+            variant_names_json=json.dumps(variant_match["variant_names"]) if (variant_match and variant_match.get("variant_names")) else None,
             variant_confidence=variant_match["confidence"] if variant_match else 0.0,
             variant_method=variant_match["method"] if variant_match else None,
             variant_evidence=variant_match["evidence"] if variant_match else None,

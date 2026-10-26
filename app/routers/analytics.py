@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import SoldItem, TrackedSearch
+from .variants import build_variant_filter_clauses
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
@@ -19,16 +20,10 @@ _PERIOD_FMT = {
 }
 
 
-def _apply_variant_filter(filters: list, variant_id: Optional[str]) -> None:
-    if not variant_id:
-        return
-    v_str = str(variant_id).strip().lower()
-    if v_str in ("", "all"):
-        return
-    if v_str == "unclassified":
-        filters.append(SoldItem.variant_id.is_(None))
-    elif v_str.isdigit():
-        filters.append(SoldItem.variant_id == int(v_str))
+def _apply_variant_filter(db: Session, filters: list, variant_id: Optional[str]) -> None:
+    clauses = build_variant_filter_clauses(db, variant_id)
+    if clauses:
+        filters.extend(clauses)
 
 
 @router.get("/{search_id}/sales-over-time")
@@ -49,7 +44,7 @@ def sales_over_time(
     filters = [SoldItem.tracked_search_id == search_id, SoldItem.is_replica.isnot(True)]
     if getattr(search, "exclude_child_sizes", False):
         filters.append(SoldItem.is_child_size.isnot(True))
-    _apply_variant_filter(filters, variant_id)
+    _apply_variant_filter(db, filters, variant_id)
 
     rows = (
         db.query(
@@ -98,7 +93,7 @@ def get_summary(
     filters = [SoldItem.tracked_search_id == search_id, SoldItem.is_replica.isnot(True)]
     if getattr(search, "exclude_child_sizes", False):
         filters.append(SoldItem.is_child_size.isnot(True))
-    _apply_variant_filter(filters, variant_id)
+    _apply_variant_filter(db, filters, variant_id)
 
     stats = (
         db.query(
@@ -180,7 +175,7 @@ def recent_sales(
     filters = [SoldItem.tracked_search_id == search_id]
     if getattr(search, "exclude_child_sizes", False):
         filters.append(SoldItem.is_child_size.isnot(True))
-    _apply_variant_filter(filters, variant_id)
+    _apply_variant_filter(db, filters, variant_id)
 
     items = (
         db.query(SoldItem)
@@ -236,7 +231,9 @@ def recent_sales(
                 "is_child_size": bool(getattr(item, "is_child_size", False)),
                 "child_size_reason": getattr(item, "child_size_reason", None),
                 "variant_id": getattr(item, "variant_id", None),
+                "variant_ids": item.parsed_variant_ids(),
                 "variant_name": getattr(item, "variant_name", None),
+                "variant_names": item.parsed_variant_names(),
                 "variant_confidence": round(float(getattr(item, "variant_confidence", 0.0) or 0.0), 3),
                 "variant_method": getattr(item, "variant_method", None),
                 "variant_evidence": getattr(item, "variant_evidence", None),
