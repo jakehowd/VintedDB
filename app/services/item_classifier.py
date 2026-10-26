@@ -990,6 +990,99 @@ VINTED_CATEGORIES: Dict[str, Dict[str, Any]] = {
             "hat", "cap", "beanie", "scarf", "belt", "sunglasses",
         ],
     },
+
+    # =========================================================================
+    # 10. ELECTRONICS & TECH -> CAMERAS, AUDIO, CONSOLES & SMART TECH
+    # =========================================================================
+    "tech_all": {
+        "id": "tech_all",
+        "name": "All Tech, Cameras, Audio & Consoles",
+        "short_name": "All Tech & Electronics",
+        "parent": "Electronics & Tech",
+        "group_id": "tech_group",
+        "department": "Electronics",
+        "vinted_path": "Electronics › All Tech & Cameras",
+        "vinted_catalog_ids": [2994, 3002, 3013],
+        "is_group_all": True,
+        "keywords": [
+            "camera", "digicam", "ixus", "powershot", "elph", "cyber-shot", "cybershot",
+            "coolpix", "lumix", "finepix", "exilim", "mju", "stylus", "eos", "dslr",
+            "mirrorless", "camcorder", "handycam", "g7x", "rx100", "x100", "zv-1",
+            "console", "3ds", "2ds", "dsi", "gameboy", "game boy", "psp", "ps vita",
+            "switch", "steam deck", "playstation", "xbox", "headphones", "airpods",
+            "earbuds", "walkman", "ipod", "garmin", "apple watch", "dyson", "airwrap",
+        ],
+        "contradicting_words": _SHOE_WORDS + _OUTERWEAR_WORDS + _TOPS_SWEATERS_WORDS + _BOTTOMS_WORDS + _DRESSES_WORDS + [
+            "case only", "pouch only", "strap only", "battery only", "charger only",
+            "cable only", "manual only", "box only", "empty box", "screen protector",
+        ],
+    },
+    "tech_cameras": {
+        "id": "tech_cameras",
+        "name": "Digital Cameras, CCD Compacts, Mirrorless & Film",
+        "short_name": "Cameras & Photography",
+        "parent": "Electronics & Tech",
+        "group_id": "tech_group",
+        "department": "Electronics",
+        "vinted_path": "Electronics › Cameras & Photography",
+        "vinted_catalog_ids": [3002, 3003, 3004],
+        "is_group_all": False,
+        "keywords": [
+            "camera", "cameras", "digital camera", "compact camera", "digicam", "ccd",
+            "point and shoot", "ixus", "powershot", "elph", "cyber-shot", "cybershot",
+            "dsc", "coolpix", "lumix", "finepix", "exilim", "optio", "mju", "stylus",
+            "eos", "dslr", "mirrorless", "35mm", "film camera", "camcorder", "handycam",
+            "g7x", "sx740", "sx720", "sx730", "rx100", "zv-1", "x100v", "x100f", "ricoh gr",
+            "canon", "nikon", "fujifilm", "olympus", "leica", "kodak", "pixpro",
+        ],
+        "contradicting_words": _SHOE_WORDS + _OUTERWEAR_WORDS + _TOPS_SWEATERS_WORDS + _BOTTOMS_WORDS + _DRESSES_WORDS + [
+            "case only", "camera bag only", "pouch only", "strap only", "battery only",
+            "charger only", "cable only", "manual only", "lens cap only", "sd card only",
+            "memory card only", "tripod only",
+        ],
+    },
+    "tech_consoles_gaming": {
+        "id": "tech_consoles_gaming",
+        "name": "Handheld Consoles & Video Gaming Hardware",
+        "short_name": "Consoles & Handhelds",
+        "parent": "Electronics & Tech",
+        "group_id": "tech_group",
+        "department": "Electronics",
+        "vinted_path": "Electronics › Video Games & Consoles › Consoles",
+        "vinted_catalog_ids": [3013, 3014],
+        "is_group_all": False,
+        "keywords": [
+            "console", "3ds", "new 3ds", "3ds xl", "2ds", "2ds xl", "dsi", "ds lite",
+            "nintendo ds", "gameboy", "game boy", "gba", "gbc", "psp", "ps vita", "vita",
+            "switch", "switch lite", "switch oled", "steam deck", "rog ally", "ps5", "ps4",
+            "ps2", "ps3", "xbox", "wii", "gamecube", "n64",
+        ],
+        "contradicting_words": _SHOE_WORDS + _OUTERWEAR_WORDS + _TOPS_SWEATERS_WORDS + _BOTTOMS_WORDS + _DRESSES_WORDS + [
+            "case only", "box only", "empty box", "manual only", "stylus only", "charger only",
+            "shell only", "skin only", "screen protector",
+        ],
+    },
+    "tech_audio_headphones": {
+        "id": "tech_audio_headphones",
+        "name": "Headphones, Earbuds, Speakers & Portable Audio",
+        "short_name": "Audio & Headphones",
+        "parent": "Electronics & Tech",
+        "group_id": "tech_group",
+        "department": "Electronics",
+        "vinted_path": "Electronics › Audio, Headphones & Hi-Fi",
+        "vinted_catalog_ids": [2995, 2996],
+        "is_group_all": False,
+        "keywords": [
+            "headphones", "earbuds", "earphones", "airpods", "airpods max", "airpods pro",
+            "wh-1000xm4", "wh-1000xm5", "wf-1000xm4", "wf-1000xm5", "quietcomfort", "qc45",
+            "qc35", "bose", "sennheiser", "marshall", "sonos", "beats", "studio pro",
+            "walkman", "ipod", "ipod classic", "ipod nano", "ipod mini", "speaker",
+        ],
+        "contradicting_words": _SHOE_WORDS + _OUTERWEAR_WORDS + _TOPS_SWEATERS_WORDS + _BOTTOMS_WORDS + _DRESSES_WORDS + [
+            "case only", "charging case only", "silicone case", "cover only", "left ear only",
+            "right ear only", "replacement earpads", "ear pads only", "cushion only", "box only",
+        ],
+    },
 }
 
 # Universal spam & non-product exclusions (items that are never the genuine clothing/shoe)
@@ -1052,6 +1145,23 @@ KNOWN_BRANDS = [
     ("Timberland", ["timberland"]),
     ("Clarks Originals", ["clarks", "clarks originals", "wallabee", "wallabees"]),
     ("Levi's", ["levis", "levi's"]),
+    ("Canon", ["canon", "cannon", "ixus", "powershot", "eos"]),
+    ("Sony", ["sony", "cyber-shot", "cybershot", "handycam", "walkman", "playstation"]),
+    ("Nikon", ["nikon", "coolpix"]),
+    ("Fujifilm", ["fujifilm", "fuji", "finepix", "instax"]),
+    ("Olympus", ["olympus", "mju", "om system"]),
+    ("Panasonic", ["panasonic", "lumix"]),
+    ("Casio", ["casio", "exilim", "g-shock"]),
+    ("Kodak", ["kodak", "pixpro", "easyshare"]),
+    ("Leica", ["leica"]),
+    ("Ricoh", ["ricoh"]),
+    ("Pentax", ["pentax", "optio"]),
+    ("Nintendo", ["nintendo", "gameboy", "game boy"]),
+    ("Apple", ["apple", "airpods", "ipod", "ipad"]),
+    ("Bose", ["bose", "quietcomfort"]),
+    ("Dyson", ["dyson", "airwrap"]),
+    ("Garmin", ["garmin", "forerunner", "fenix"]),
+    ("Marshall", ["marshall"]),
 ]
 
 
@@ -1127,8 +1237,14 @@ def suggest_brand_and_category(query: str) -> Dict[str, Any]:
             matched_categories = ["jumpers_quarter_zip", "sweaters_knitwear"]
         elif any(w in q for w in ["knit", "sweater", "jumper", "cardigan"]):
             matched_categories = ["sweaters_knitwear"]
+        elif any(w in q for w in ["camera", "ixus", "cannon", "canon", "powershot", "cybershot", "cyber-shot", "coolpix", "lumix", "finepix", "digicam"]):
+            matched_categories = ["tech_cameras"]
+        elif any(w in q for w in ["3ds", "2ds", "gameboy", "psp", "vita", "switch", "console"]):
+            matched_categories = ["tech_consoles_gaming"]
+        elif any(w in q for w in ["airpods", "headphones", "bose", "walkman", "ipod"]):
+            matched_categories = ["tech_audio_headphones"]
         else:
-            matched_categories = ["coats_jackets"]
+            matched_categories = []
 
     category_labels = [
         VINTED_CATEGORIES[cid].get("vinted_path") or VINTED_CATEGORIES[cid]["name"]

@@ -16,6 +16,8 @@ class SearchCreate(BaseModel):
     must_exclude: Optional[str] = None
     exclude_child_sizes: Optional[bool] = False
     antirep_settings: Optional[Dict[str, Any]] = None
+    variants_enabled: Optional[bool] = False
+    auto_research_variants: Optional[bool] = False
 
 
 class SearchUpdate(BaseModel):
@@ -26,6 +28,7 @@ class SearchUpdate(BaseModel):
     must_exclude: Optional[str] = None
     exclude_child_sizes: Optional[bool] = None
     antirep_settings: Optional[Dict[str, Any]] = None
+    variants_enabled: Optional[bool] = None
     is_active: Optional[bool] = None
 
 

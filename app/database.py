@@ -44,6 +44,30 @@ def ensure_db_schema(target_engine=engine):
     with target_engine.connect() as conn:
         cursor = conn.connection.cursor()
         
+        # 0. Ensure product_variants table exists
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS product_variants (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tracked_search_id INTEGER NOT NULL REFERENCES tracked_searches(id) ON DELETE CASCADE,
+                variant_slug TEXT NOT NULL,
+                variant_name TEXT NOT NULL,
+                short_description TEXT,
+                resale_tier TEXT DEFAULT 'STANDARD',
+                est_market_value_gbp REAL,
+                visual_cues TEXT,
+                ocr_signatures TEXT,
+                text_keywords TEXT,
+                negative_keywords TEXT,
+                prototype_embedding TEXT,
+                training_sample_count INTEGER DEFAULT 0,
+                target_max_price REAL,
+                is_sniping_enabled BOOLEAN DEFAULT 1,
+                created_at DATETIME,
+                updated_at DATETIME
+            );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS ix_product_variants_search ON product_variants (tracked_search_id);")
+
         # 1. tracked_searches columns
         ts_cols = [c[1] for c in cursor.execute("PRAGMA table_info(tracked_searches)").fetchall()]
         if ts_cols:
@@ -51,6 +75,10 @@ def ensure_db_schema(target_engine=engine):
                 cursor.execute("ALTER TABLE tracked_searches ADD COLUMN antirep_settings TEXT;")
             if "exclude_child_sizes" not in ts_cols:
                 cursor.execute("ALTER TABLE tracked_searches ADD COLUMN exclude_child_sizes BOOLEAN DEFAULT 0;")
+            if "variants_enabled" not in ts_cols:
+                cursor.execute("ALTER TABLE tracked_searches ADD COLUMN variants_enabled BOOLEAN DEFAULT 0;")
+            if "catalogue_summary" not in ts_cols:
+                cursor.execute("ALTER TABLE tracked_searches ADD COLUMN catalogue_summary TEXT;")
         
         # 2. sold_items columns
         si_cols = [c[1] for c in cursor.execute("PRAGMA table_info(sold_items)").fetchall()]
@@ -75,12 +103,23 @@ def ensure_db_schema(target_engine=engine):
                 cursor.execute("ALTER TABLE sold_items ADD COLUMN child_size_reason TEXT;")
             if "item_created_at" not in si_cols:
                 cursor.execute("ALTER TABLE sold_items ADD COLUMN item_created_at DATETIME;")
+            if "variant_id" not in si_cols:
+                cursor.execute("ALTER TABLE sold_items ADD COLUMN variant_id INTEGER REFERENCES product_variants(id) ON DELETE SET NULL;")
+            if "variant_name" not in si_cols:
+                cursor.execute("ALTER TABLE sold_items ADD COLUMN variant_name TEXT;")
+            if "variant_confidence" not in si_cols:
+                cursor.execute("ALTER TABLE sold_items ADD COLUMN variant_confidence REAL DEFAULT 0.0;")
+            if "variant_method" not in si_cols:
+                cursor.execute("ALTER TABLE sold_items ADD COLUMN variant_method TEXT;")
+            if "variant_evidence" not in si_cols:
+                cursor.execute("ALTER TABLE sold_items ADD COLUMN variant_evidence TEXT;")
 
-            # 3. High-performance indexes for search, status, replica and child size lookups
+            # 3. High-performance indexes for search, status, replica, child size, and variant lookups
             cursor.execute("CREATE INDEX IF NOT EXISTS ix_sold_items_search_captured ON sold_items (tracked_search_id, captured_at DESC);")
             cursor.execute("CREATE INDEX IF NOT EXISTS ix_sold_items_replica ON sold_items (is_replica);")
             cursor.execute("CREATE INDEX IF NOT EXISTS ix_sold_items_sold ON sold_items (is_sold);")
             cursor.execute("CREATE INDEX IF NOT EXISTS ix_sold_items_child ON sold_items (is_child_size);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS ix_sold_items_variant ON sold_items (variant_id);")
                 
         conn.connection.commit()
 

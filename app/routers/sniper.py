@@ -33,6 +33,7 @@ def get_sniper_targets_info():
     """Return tracked items with sold item counts, average sold price, and recommended profitable buy price."""
     from ..database import get_db
     from ..models import TrackedSearch, SoldItem
+    from .variants import serialize_search_variants
     from sqlalchemy import func
 
     db_gen = get_db()
@@ -86,6 +87,10 @@ def get_sniper_targets_info():
             else:
                 rec_price = 40.0
 
+            variant_data = serialize_search_variants(db, s)
+            variants_list = variant_data.get("variants", [])
+            enabled_variants_count = sum(1 for v in variants_list if v.get("is_sniping_enabled"))
+
             results.append({
                 "id": s.id,
                 "search_text": s.search_text,
@@ -96,6 +101,10 @@ def get_sniper_targets_info():
                 "max_sold_price": round(max_sold_price, 2),
                 "recommended_profitable_price": rec_price,
                 "target_margin_pct": 35.0,
+                "variants_enabled": bool(getattr(s, "variants_enabled", False)),
+                "variants": variants_list,
+                "variants_count": len(variants_list),
+                "enabled_variants_count": enabled_variants_count,
             })
         return results
     finally:

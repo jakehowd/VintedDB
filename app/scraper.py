@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from .config import VINTED_BASE_URL
-from .models import SoldItem, TrackedSearch
+from .models import ProductVariant, SoldItem, TrackedSearch
 
 from .services.item_classifier import is_child_size, is_item_relevant, normalize_categories
 
@@ -334,6 +334,16 @@ def scrape_and_store(
     scraper = _get_vinted_scraper()
     seller_batch_counts: dict[str, int] = {}
 
+    active_variants: list[ProductVariant] = []
+    if getattr(tracked_search, "variants_enabled", False):
+        active_variants = (
+            db.query(ProductVariant)
+            .filter(ProductVariant.tracked_search_id == tracked_search.id)
+            .order_by(ProductVariant.id)
+            .all()
+        )
+    from .services.variant_vision import variant_vision_service
+
     updated_existing = False
     for item_data in items:
         vinted_id = item_data.get("id")
@@ -371,6 +381,21 @@ def scrape_and_store(
             if not existing_item.seller_username and item_data.get("seller_username"):
                 existing_item.seller_username = str(item_data.get("seller_username"))
                 updated_existing = True
+            if active_variants and existing_item.variant_id is None:
+                v_match = variant_vision_service.classify_item_variant(
+                    db=db,
+                    tracked_search=tracked_search,
+                    item_data=item_data,
+                    variants=active_variants,
+                    allow_vision=True,
+                )
+                if v_match:
+                    existing_item.variant_id = v_match["variant_id"]
+                    existing_item.variant_name = v_match["variant_name"]
+                    existing_item.variant_confidence = v_match["confidence"]
+                    existing_item.variant_method = v_match["method"]
+                    existing_item.variant_evidence = v_match["evidence"]
+                    updated_existing = True
             continue
 
         item_title = str(item_data.get("title", "") or "")
@@ -448,6 +473,17 @@ def scrape_and_store(
         serializable_data.pop("raw_item", None)
         serializable_data.pop("raw_photo", None)
 
+        # 3. Local AI Variant Classification (CLIP Vision + Apple Neural OCR, $0 cloud cost)
+        variant_match = None
+        if active_variants:
+            variant_match = variant_vision_service.classify_item_variant(
+                db=db,
+                tracked_search=tracked_search,
+                item_data=item_data,
+                variants=active_variants,
+                allow_vision=True,
+            )
+
         sold_item = SoldItem(
             tracked_search_id=tracked_search.id,
             vinted_item_id=vinted_id,
@@ -467,6 +503,11 @@ def scrape_and_store(
             replica_reason=rep_reason if not is_rep_clean else None,
             is_child_size=is_child,
             child_size_reason=child_reason if is_child else None,
+            variant_id=variant_match["variant_id"] if variant_match else None,
+            variant_name=variant_match["variant_name"] if variant_match else None,
+            variant_confidence=variant_match["confidence"] if variant_match else 0.0,
+            variant_method=variant_match["method"] if variant_match else None,
+            variant_evidence=variant_match["evidence"] if variant_match else None,
             raw_data=json.dumps(serializable_data),
         )
         db.add(sold_item)
@@ -483,6 +524,7 @@ def scrape_and_store(
                 "seller_username": item_data.get("seller_username") or "",
                 "photo_url": item_data.get("photo_url"),
                 "url": url,
+                "variant_name": variant_match["variant_name"] if variant_match else "",
             },
             search_text=tracked_search.search_text,
             source="scraper",

@@ -593,3 +593,45 @@ input[type="number"]::-webkit-inner-spin-button {
   }
 }
 
+/* ── AI Variant Pills & Multimodal Badges ────────────────────────────────── */
+.variant-pill-card {
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.variant-pill-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(168, 85, 247, 0.45);
+}
+
+.variant-pill-card.active {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.24) 0%, rgba(9, 177, 186, 0.18) 100%) !important;
+  border-color: rgba(168, 85, 247, 0.75) !important;
+  box-shadow: 0 0 18px rgba(139, 92, 246, 0.28);
+}
+
+.tier-badge-grail {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.tier-badge-high {
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.tier-badge-standard {
+  background: rgba(56, 189, 248, 0.14);
+  color: #7dd3fc;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.tier-badge-budget {
+  background: rgba(148, 163, 184, 0.14);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+

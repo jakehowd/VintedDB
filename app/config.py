@@ -23,6 +23,10 @@ DEFAULT_SEARCHES = [
 ANTIBAN_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "antiban_config.json")
 CLEARED_DEALS_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "cleared_deals.json")
 SCHEDULER_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "scheduler_config.json")
+AI_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "ai_config.json")
+VISION_CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "vision_cache")
+VISION_MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "vision_models")
+MAC_OCR_BIN_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "bin", "mac_vision_ocr")
 DEFAULT_PROXIES = os.environ.get("VINTED_PROXIES", os.environ.get("VINTED_PROXY", ""))
 DEFAULT_COOKIE = os.environ.get("VINTED_COOKIE", "")
 

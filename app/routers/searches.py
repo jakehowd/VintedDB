@@ -7,7 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import SoldItem, TrackedSearch
+from ..models import ProductVariant, SoldItem, TrackedSearch
 from ..schemas import (
     SearchCreate,
     SearchUpdate,
@@ -63,6 +63,17 @@ def list_searches(db: Session = Depends(get_db)):
             .filter(SoldItem.tracked_search_id == s.id)
             .scalar()
         )
+        v_count = (
+            db.query(func.count(ProductVariant.id))
+            .filter(ProductVariant.tracked_search_id == s.id)
+            .scalar()
+        ) or 0
+        cat_summary = {}
+        if getattr(s, "catalogue_summary", None):
+            try:
+                cat_summary = json.loads(s.catalogue_summary)
+            except Exception:
+                cat_summary = {}
         cats = normalize_categories(s.category)
         result.append(
             {
@@ -73,6 +84,9 @@ def list_searches(db: Session = Depends(get_db)):
                 "categories": cats,
                 "must_exclude": s.must_exclude or "",
                 "exclude_child_sizes": bool(getattr(s, "exclude_child_sizes", False)),
+                "variants_enabled": bool(getattr(s, "variants_enabled", False)),
+                "variants_count": v_count,
+                "catalogue_summary": cat_summary,
                 "antirep_settings": s.antirep_config,
                 "antirep_config": s.antirep_config,
                 "is_active": s.is_active,
@@ -119,11 +133,26 @@ def create_search(data: SearchCreate, db: Session = Depends(get_db)):
         category=cat_json,
         must_exclude=data.must_exclude.strip() if data.must_exclude else None,
         exclude_child_sizes=bool(data.exclude_child_sizes),
+        variants_enabled=bool(data.variants_enabled or data.auto_research_variants),
         antirep_settings=antirep_json,
     )
     db.add(search)
     db.commit()
     db.refresh(search)
+
+    researched_variants: List[Dict[str, Any]] = []
+    if data.auto_research_variants:
+        try:
+            from .variants import run_research_and_train_for_search
+            research_out = run_research_and_train_for_search(
+                db=db,
+                search=search,
+                fetch_live_samples=True,
+                classify_existing=False,
+            )
+            researched_variants = research_out.get("variants", [])
+        except Exception:
+            pass
 
     return {
         "id": search.id,
@@ -133,6 +162,9 @@ def create_search(data: SearchCreate, db: Session = Depends(get_db)):
         "categories": normalize_categories(search.category),
         "must_exclude": search.must_exclude or "",
         "exclude_child_sizes": bool(search.exclude_child_sizes),
+        "variants_enabled": bool(getattr(search, "variants_enabled", False)),
+        "variants_count": len(researched_variants),
+        "variants": researched_variants,
         "antirep_settings": search.antirep_config,
         "antirep_config": search.antirep_config,
         "is_active": search.is_active,
@@ -162,6 +194,8 @@ def update_search(search_id: int, data: SearchUpdate, db: Session = Depends(get_
         search.exclude_child_sizes = bool(data.exclude_child_sizes)
     if data.antirep_settings is not None:
         search.antirep_settings = json.dumps(data.antirep_settings)
+    if data.variants_enabled is not None:
+        search.variants_enabled = bool(data.variants_enabled)
     if data.is_active is not None:
         search.is_active = data.is_active
 

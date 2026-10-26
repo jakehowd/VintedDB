@@ -7,6 +7,10 @@ class VintedApp {
     this.searches = [];
     this.currentSearchId = null;
     this.currentPeriod = 'week'; // 'day' | 'week' | 'month' | 'year'
+    this.currentVariantFilter = 'all'; // 'all' | 'unclassified' | '<variant_id>'
+    this.currentVariantsData = null;
+    this.expandedSniperVariants = new Set();
+    this.aiStatus = null;
     
     // Category Taxonomy & Classifier state
     this.availableCategories = [];
@@ -52,6 +56,7 @@ class VintedApp {
     this.dbExplorerFilters = {
       q: '',
       search_id: '',
+      variant_id: '',
       status_filter: 'all',
       replica_filter: 'all',
       replica_reason: '',
@@ -93,6 +98,7 @@ class VintedApp {
       this.loadSchedulerStatus(),
       this.loadSniperTargetsInfo(),
       this.loadAntiBanStatus(),
+      this.loadAIStatus(),
       this.loadDatabaseSummaryBadges()
     ]);
     this.startSchedulerCountdownLoop();
@@ -262,6 +268,7 @@ class VintedApp {
       { id: 'Shoes', label: 'Shoes', icon: 'footprints' },
       { id: 'Bags', label: 'Bags', icon: 'shopping-bag' },
       { id: 'Accessories', label: 'Accessories', icon: 'watch' },
+      { id: 'Electronics', label: 'Tech & Cameras', icon: 'camera' },
     ];
 
     // 1. Selected Breadcrumb Pills Bar (condense group-all selections to single clean pill)
@@ -639,6 +646,7 @@ class VintedApp {
       state.expandedGroups = new Set(['outerwear', 'jumpers_sweaters']);
       this.renderCategoryChips('category-chips-container', this.selectedCategories);
       this.handleAddChildToggle(false);
+      this.handleAddVariantsToggle(true);
 
       if (input) input.focus();
     }
@@ -711,6 +719,8 @@ class VintedApp {
     if (dormDaysEl) dormDaysEl.value = arc.dormant_account_days || 90;
 
     this.handleEditChildToggle(Boolean(search.exclude_child_sizes));
+    const editVarsEl = document.getElementById('edit-variants-enabled');
+    if (editVarsEl) editVarsEl.checked = Boolean(search.variants_enabled);
 
     this.toggleEditAntiRepFields(arc.antirep_enabled !== false);
 
@@ -782,6 +792,36 @@ class VintedApp {
     this.handleAddChildToggle(!current);
   }
 
+  handleAddVariantsToggle(isChecked) {
+    const input = document.getElementById('add-auto-variants');
+    const badge = document.getElementById('add-variants-status-badge');
+    const card = document.getElementById('add-variants-card');
+    const checked = Boolean(isChecked);
+    if (input) input.checked = checked;
+    if (badge) {
+      if (checked) {
+        badge.textContent = 'AUTO-TRAIN (ON)';
+        badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/25 text-purple-200 border border-purple-500/40';
+      } else {
+        badge.textContent = 'OFF';
+        badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700';
+      }
+    }
+    if (card) {
+      if (checked) {
+        card.className = 'p-3.5 rounded-xl bg-purple-950/20 border border-purple-500/45 hover:border-purple-400/60 transition cursor-pointer select-none';
+      } else {
+        card.className = 'p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 hover:border-purple-500/40 transition cursor-pointer select-none';
+      }
+    }
+  }
+
+  toggleAddAutoVariants() {
+    const input = document.getElementById('add-auto-variants');
+    const current = input ? input.checked : true;
+    this.handleAddVariantsToggle(!current);
+  }
+
   toggleEditAntiRepFields(enabled) {
     const fields = document.getElementById('edit-antirep-fields');
     if (!fields) return;
@@ -806,6 +846,7 @@ class VintedApp {
     const mustExclude = document.getElementById('edit-must-exclude').value.trim();
     const categories = Array.from(this.editSelectedCategories);
     const excludeChildSizes = Boolean(document.getElementById('edit-exclude-child-sizes')?.checked);
+    const variantsEnabled = Boolean(document.getElementById('edit-variants-enabled')?.checked);
 
     const antirepSettings = {
       antirep_enabled: document.getElementById('edit-antirep-enabled')?.checked ?? true,
@@ -837,6 +878,7 @@ class VintedApp {
           categories: categories,
           must_exclude: mustExclude,
           exclude_child_sizes: excludeChildSizes,
+          variants_enabled: variantsEnabled,
           antirep_settings: antirepSettings
         })
       });
@@ -1027,7 +1069,8 @@ class VintedApp {
                 ${s.brand ? `<span class="text-[10px] text-slate-500 block truncate">${s.brand}</span>` : ''}
               </div>
             </div>
-            <div class="flex items-center space-x-1.5 shrink-0">
+            <div class="flex items-center space-x-1 shrink-0">
+              ${s.variants_count > 0 ? `<span class="px-1.5 py-0.5 text-[9px] font-mono font-bold rounded bg-purple-500/20 text-purple-300 border border-purple-500/35" title="${s.variants_count} AI Variants trained">${s.variants_count}v</span>` : ''}
               <span class="px-2 py-0.5 text-[10px] font-mono font-bold rounded-full bg-slate-800 text-slate-300 border border-slate-700/80">${s.item_count}</span>
             </div>
           </button>
@@ -1085,12 +1128,15 @@ class VintedApp {
     };
 
     const excludeChildSizes = Boolean(document.getElementById('add-exclude-child-sizes')?.checked);
+    const autoResearchVariants = Boolean(document.getElementById('add-auto-variants')?.checked);
 
     const submitBtn = e.target.querySelector('button[type="submit"]');
     const origText = submitBtn ? submitBtn.innerHTML : '';
     if (submitBtn) {
       submitBtn.disabled = true;
-      submitBtn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 mr-1.5 animate-spin"></i> Adding...';
+      submitBtn.innerHTML = autoResearchVariants
+        ? '<i data-lucide="loader-2" class="w-3.5 h-3.5 mr-1.5 animate-spin"></i> Researching Variants & Training Vision...'
+        : '<i data-lucide="loader-2" class="w-3.5 h-3.5 mr-1.5 animate-spin"></i> Adding...';
       if (window.lucide) lucide.createIcons();
     }
 
@@ -1104,6 +1150,8 @@ class VintedApp {
           categories: categories.length > 0 ? categories : null,
           must_exclude: mustExclude || null,
           exclude_child_sizes: excludeChildSizes,
+          variants_enabled: autoResearchVariants,
+          auto_research_variants: autoResearchVariants,
           antirep_settings: antirepSettings
         })
       });
@@ -1115,8 +1163,14 @@ class VintedApp {
 
       const newSearch = await res.json();
       this.closeAddModal();
-      this.showToast(`Added '${searchText}' with brand, category & Anti-Rep filters!`, 'success');
+      const vCount = newSearch.variants_count || 0;
+      if (autoResearchVariants && vCount > 0) {
+        this.showToast(`Added '${searchText}' — discovered ${vCount} sub-variants & trained local vision!`, 'success');
+      } else {
+        this.showToast(`Added '${searchText}' with brand, category & Anti-Rep filters!`, 'success');
+      }
       await this.loadSearches();
+      await this.loadSniperTargetsInfo();
       this.selectSearch(newSearch.id);
     } catch (err) {
       this.showToast(err.message, 'error');
@@ -1173,6 +1227,10 @@ class VintedApp {
   }
 
   async selectSearch(id) {
+    if (String(this.currentSearchId) !== String(id)) {
+      this.currentVariantFilter = 'all';
+      this.currentVariantsData = null;
+    }
     this.currentSearchId = id;
     this.isDbExplorerActive = false;
 
@@ -1316,6 +1374,9 @@ class VintedApp {
         editChildPill.textContent = 'All Sizes';
       }
     }
+
+    // Fetch variant catalogue first so Recent Sales inline override dropdowns have exact variant options
+    await this.loadCurrentSearchVariants();
 
     // Fetch summary stats, analytics charts, and recent sales
     await Promise.all([
@@ -1461,7 +1522,10 @@ class VintedApp {
 
   async loadSummaryStats() {
     try {
-      const res = await fetch(`/api/analytics/${this.currentSearchId}/summary`);
+      const vParam = (this.currentVariantFilter && this.currentVariantFilter !== 'all')
+        ? `?variant_id=${encodeURIComponent(this.currentVariantFilter)}`
+        : '';
+      const res = await fetch(`/api/analytics/${this.currentSearchId}/summary${vParam}`);
       if (!res.ok) throw new Error('Failed to load summary');
       const s = await res.json();
 
@@ -1499,7 +1563,10 @@ class VintedApp {
 
   async loadAnalyticsCharts() {
     try {
-      const res = await fetch(`/api/analytics/${this.currentSearchId}/sales-over-time?period=${this.currentPeriod}`);
+      const vParam = (this.currentVariantFilter && this.currentVariantFilter !== 'all')
+        ? `&variant_id=${encodeURIComponent(this.currentVariantFilter)}`
+        : '';
+      const res = await fetch(`/api/analytics/${this.currentSearchId}/sales-over-time?period=${this.currentPeriod}${vParam}`);
       if (!res.ok) throw new Error('Failed to load time series data');
       const data = await res.json();
 
@@ -1663,7 +1730,7 @@ class VintedApp {
       if (countLabel) countLabel.textContent = 'No item selected';
       tbody.innerHTML = `
         <tr>
-          <td colspan="6" class="text-center py-10 text-slate-500">
+          <td colspan="7" class="text-center py-10 text-slate-500">
             Select an item from the left sidebar to view recent sales.
           </td>
         </tr>
@@ -1674,7 +1741,7 @@ class VintedApp {
     // Immediately clear previous rows and show a loading placeholder
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" class="text-center py-10 text-slate-500">
+        <td colspan="7" class="text-center py-10 text-slate-500">
           <div class="inline-flex items-center space-x-2">
             <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-teal-400"></i>
             <span>Loading sales records…</span>
@@ -1685,7 +1752,10 @@ class VintedApp {
     if (window.lucide) lucide.createIcons();
 
     try {
-      const res = await fetch(`/api/analytics/${this.currentSearchId}/recent-sales?limit=40`);
+      const vParam = (this.currentVariantFilter && this.currentVariantFilter !== 'all')
+        ? `&variant_id=${encodeURIComponent(this.currentVariantFilter)}`
+        : '';
+      const res = await fetch(`/api/analytics/${this.currentSearchId}/recent-sales?limit=40${vParam}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to load sales`);
       const data = await res.json();
 
@@ -1696,13 +1766,19 @@ class VintedApp {
       if (data.items.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="6" class="text-center py-10 text-slate-500">
-              No sales recorded yet. Click <strong>"Scrape Vinted (.co.uk)"</strong> above to populate.
+            <td colspan="7" class="text-center py-10 text-slate-500">
+              ${this.currentVariantFilter && this.currentVariantFilter !== 'all'
+                ? 'No listings matched this specific variant filter yet.'
+                : 'No sales recorded yet. Click <strong>"Scrape"</strong> above to populate.'}
             </td>
           </tr>
         `;
         return;
       }
+
+      const knownVariants = (this.currentVariantsData && Array.isArray(this.currentVariantsData.variants))
+        ? this.currentVariantsData.variants
+        : [];
 
       tbody.innerHTML = data.items.map(item => {
         const photo = item.photo_url || 'https://via.placeholder.com/80x80/1e293b/94a3b8?text=Vinted';
@@ -1710,6 +1786,37 @@ class VintedApp {
         const isDupPhoto = Boolean(item.is_duplicate_photo && item.photo_key);
         const dupCountBadge = (item.duplicate_photo_count && item.duplicate_photo_count > 1) ? ` (${item.duplicate_photo_count})` : '';
         const safePk = (item.photo_key || '').replace(/'/g, "\\'");
+
+        const confPct = item.variant_confidence ? Math.round(Number(item.variant_confidence) * 100) : 0;
+        const safeEvidence = this.escapeHtmlAttr(item.variant_evidence || 'Classified by local multimodal vision & OCR');
+        const methodTag = item.variant_method ? item.variant_method.toUpperCase() : 'AI';
+
+        const variantCellHtml = knownVariants.length > 0
+          ? `
+            <div class="space-y-1 max-w-[190px]">
+              ${item.variant_name ? `
+                <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-purple-500/15 text-purple-200 border border-purple-500/35 truncate max-w-full" title="${safeEvidence}">
+                  <i data-lucide="sparkles" class="w-2.5 h-2.5 text-purple-400 shrink-0"></i>
+                  <span class="truncate">${this.escapeHtmlAttr(item.variant_name)}</span>
+                  ${confPct > 0 ? `<span class="text-[9px] font-mono text-purple-300/80 shrink-0">${confPct}%</span>` : ''}
+                </div>
+              ` : `
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] text-slate-500 bg-slate-900 border border-slate-800">Unclassified</span>
+              `}
+              <div class="flex items-center gap-1">
+                <select onchange="app.assignItemVariant(${item.id}, this.value)"
+                        title="Verify or override variant (trains local CLIP prototype via online learning)"
+                        class="w-full bg-slate-950/90 border border-slate-800 hover:border-purple-500/40 rounded px-1.5 py-0.5 text-[10px] text-slate-300 focus:outline-none focus:border-purple-400 cursor-pointer">
+                  <option value="" ${!item.variant_id ? 'selected' : ''}>— Unclassified —</option>
+                  ${knownVariants.map(v => `<option value="${v.id}" ${Number(item.variant_id) === Number(v.id) ? 'selected' : ''}>${this.escapeHtmlAttr(v.variant_name)}</option>`).join('')}
+                </select>
+                ${item.variant_method ? `<span class="text-[9px] font-mono text-slate-500 shrink-0" title="${safeEvidence}">${methodTag}</span>` : ''}
+              </div>
+            </div>
+          `
+          : (item.variant_name
+              ? `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/15 text-purple-200 border border-purple-500/30">${this.escapeHtmlAttr(item.variant_name)}</span>`
+              : `<span class="text-[11px] text-slate-600">—</span>`);
 
         return `
           <tr class="hover:bg-slate-900/70 transition group border-b border-slate-850/60">
@@ -1732,6 +1839,7 @@ class VintedApp {
                 </div>
               </div>
             </td>
+            <td class="py-2.5 px-3">${variantCellHtml}</td>
             <td class="py-2.5 px-3 text-slate-300 font-medium">${item.brand || '—'}</td>
             <td class="py-2.5 px-3">
               <span class="px-2 py-0.5 rounded text-[11px] font-mono bg-slate-800 text-slate-300 border border-slate-700">${item.size || 'N/A'}</span>
@@ -1770,8 +1878,8 @@ class VintedApp {
       console.error(err);
       tbody.innerHTML = `
         <tr>
-          <td colspan="6" class="text-center py-10 text-slate-500">
-            No sales recorded yet. Click <strong>"Scrape Vinted (.co.uk)"</strong> above to fetch listings.
+          <td colspan="7" class="text-center py-10 text-slate-500">
+            No sales recorded yet. Click <strong>"Scrape"</strong> above to fetch listings.
           </td>
         </tr>
       `;
@@ -1826,58 +1934,162 @@ class VintedApp {
       const avgPrice = info && info.avg_sold_price > 0 ? `£${info.avg_sold_price.toFixed(2)}` : null;
       const recPrice = info && info.recommended_profitable_price ? info.recommended_profitable_price : null;
 
+      const variants = (info && Array.isArray(info.variants)) ? info.variants : [];
+      const enabledVariants = variants.filter(v => v.is_sniping_enabled);
+      const isExpanded = this.expandedSniperVariants.has(s.id) || (variants.length > 0 && enabledVariants.length < variants.length && enabledVariants.length > 0);
+      const allVariantsEnabled = variants.length > 0 && enabledVariants.length === variants.length;
+
+      const variantBlockHtml = variants.length > 0 ? `
+        <div class="pt-2.5 mt-1 border-t border-slate-800/80 space-y-2">
+          <div class="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-md font-bold ${
+                allVariantsEnabled
+                  ? 'bg-purple-500/15 text-purple-200 border border-purple-500/35'
+                  : (enabledVariants.length > 0 ? 'bg-teal-500/20 text-teal-200 border border-teal-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/35')
+              }">
+                <i data-lucide="sparkles" class="w-3 h-3 mr-1 text-purple-400"></i>
+                ${allVariantsEnabled
+                  ? `Sniping All ${variants.length} Variants`
+                  : (enabledVariants.length === 1
+                      ? `Single Variant: ${this.escapeHtmlAttr(enabledVariants[0].variant_name)}`
+                      : `${enabledVariants.length}/${variants.length} Variants Active`)}
+              </span>
+
+              <button type="button"
+                      onclick="app.setSniperVariantSelection(${s.id}, 'all')"
+                      class="px-2 py-0.5 rounded text-[10px] font-semibold ${allVariantsEnabled ? 'bg-slate-800 text-white border border-slate-700' : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800'} transition cursor-pointer">
+                All Variants
+              </button>
+
+              <button type="button"
+                      onclick="app.selectHighTierVariantsForSnipe(${s.id})"
+                      class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition cursor-pointer"
+                      title="Snipe only PREMIUM & HIGH resale tier variants">
+                🔥 Grails / High Tier Only
+              </button>
+            </div>
+
+            <button type="button"
+                    onclick="app.toggleExpandSniperVariants(${s.id})"
+                    class="inline-flex items-center text-[10px] font-semibold text-purple-300 hover:text-purple-200 cursor-pointer">
+              <span>${isExpanded ? 'Hide Variant Picker' : `Pick Single / Custom Variant (${variants.length})`}</span>
+              <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" class="w-3.5 h-3.5 ml-0.5"></i>
+            </button>
+          </div>
+
+          ${isExpanded ? `
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-1.5 pt-0.5">
+              ${variants.map(v => {
+                const vEnabled = Boolean(v.is_sniping_enabled);
+                const vMkt = v.sold_avg_price > 0 ? v.sold_avg_price : (v.est_market_value_gbp || 0);
+                const vMaxVal = v.target_max_price != null ? v.target_max_price : '';
+                return `
+                  <div class="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] transition ${
+                    vEnabled
+                      ? 'bg-slate-950/95 border-purple-500/35 text-slate-200'
+                      : 'bg-slate-950/50 border-slate-800/70 text-slate-500 opacity-65'
+                  }">
+                    <div class="flex items-center gap-2 min-w-0 flex-1">
+                      <input type="checkbox" class="custom-checkbox shrink-0" ${vEnabled ? 'checked' : ''} onchange="app.toggleSingleVariantSnipe(${v.id}, this.checked)">
+                      <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold shrink-0 ${this.getTierBadgeClass(v.resale_tier)}">${v.resale_tier || 'STD'}</span>
+                      <span class="font-semibold truncate" title="${this.escapeHtmlAttr(v.variant_name)}">${this.escapeHtmlAttr(v.variant_name)}</span>
+                      ${vMkt > 0 ? `<span class="text-[10px] font-mono text-slate-400 shrink-0">~£${Number(vMkt).toFixed(0)}</span>` : ''}
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                      <button type="button"
+                              onclick="app.setSniperVariantSelection(${s.id}, 'only', [${v.id}])"
+                              class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/15 hover:bg-purple-500/30 text-purple-200 border border-purple-500/30 cursor-pointer"
+                              title="Snipe ONLY this exact variant">
+                        Only
+                      </button>
+                      <div class="flex items-center bg-slate-900 rounded border border-slate-800 px-1 py-0.5" title="Optional max buy price specifically for ${this.escapeHtmlAttr(v.variant_name)}">
+                        <span class="text-[9px] text-slate-500 font-mono mr-0.5">≤£</span>
+                        <input type="number"
+                               value="${vMaxVal}"
+                               placeholder="${currentItemPrice}"
+                               min="1"
+                               max="10000"
+                               step="1"
+                               onchange="app.setVariantMaxPrice(${v.id}, this.value)"
+                               class="w-12 bg-transparent text-[10px] font-mono font-bold text-emerald-400 text-center focus:outline-none">
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          ` : ''}
+        </div>
+      ` : `
+        <div class="pt-2 mt-1 border-t border-slate-800/60 flex items-center justify-between text-[10px] text-slate-500">
+          <span>No AI sub-variants configured yet (sniping all listings matching '${this.escapeHtmlAttr(s.search_text)}')</span>
+          <button type="button"
+                  onclick="app.researchVariantsFromSniper(${s.id})"
+                  id="btn-sniper-research-${s.id}"
+                  class="inline-flex items-center px-2 py-0.5 rounded bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-semibold transition cursor-pointer">
+            <i data-lucide="sparkles" class="w-3 h-3 mr-1 text-purple-400"></i>
+            <span>Research Variants</span>
+          </button>
+        </div>
+      `;
+
       return `
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-xl border transition ${
+        <div class="p-3 rounded-xl border transition ${
           isChecked 
             ? 'bg-slate-900/95 border-teal-500/40 shadow-sm shadow-teal-500/5' 
             : 'bg-slate-950/90 border-slate-800/80 opacity-60 hover:opacity-100'
         }">
-          <!-- Checkbox, Item Name & Historical Market Stats -->
-          <div class="flex items-start sm:items-center space-x-3 min-w-0 flex-1">
-            <input type="checkbox" class="custom-checkbox mt-0.5 sm:mt-0" ${isChecked ? 'checked' : ''} onchange="app.toggleSniperTarget(${s.id})">
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center space-x-2">
-                <span class="text-xs font-bold text-white truncate">${s.search_text}</span>
-                ${s.brand ? `<span class="px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-800 text-slate-400 truncate max-w-[120px]">${s.brand}</span>` : ''}
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <!-- Checkbox, Item Name & Historical Market Stats -->
+            <div class="flex items-start sm:items-center space-x-3 min-w-0 flex-1">
+              <input type="checkbox" class="custom-checkbox mt-0.5 sm:mt-0" ${isChecked ? 'checked' : ''} onchange="app.toggleSniperTarget(${s.id})">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center space-x-2">
+                  <span class="text-xs font-bold text-white truncate cursor-pointer hover:text-teal-300" onclick="app.selectSearch(${s.id})">${s.search_text}</span>
+                  ${s.brand ? `<span class="px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-800 text-slate-400 truncate max-w-[120px]">${s.brand}</span>` : ''}
+                </div>
+                <div class="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-slate-400">
+                  <span class="flex items-center">
+                    <i data-lucide="shopping-bag" class="w-3 h-3 mr-1 text-slate-500"></i>
+                    Sold: <strong class="text-slate-200 ml-1 font-mono">${soldCount} items</strong>
+                  </span>
+                  <span class="text-slate-600">•</span>
+                  <span class="flex items-center">
+                    <i data-lucide="pound-sterling" class="w-3 h-3 mr-1 text-slate-500"></i>
+                    Avg: <strong class="text-emerald-400 ml-1 font-mono">${avgPrice || 'No data'}</strong>
+                  </span>
+                </div>
               </div>
-              <div class="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-slate-400">
-                <span class="flex items-center">
-                  <i data-lucide="shopping-bag" class="w-3 h-3 mr-1 text-slate-500"></i>
-                  Sold: <strong class="text-slate-200 ml-1 font-mono">${soldCount} items</strong>
-                </span>
-                <span class="text-slate-600">•</span>
-                <span class="flex items-center">
-                  <i data-lucide="pound-sterling" class="w-3 h-3 mr-1 text-slate-500"></i>
-                  Avg: <strong class="text-emerald-400 ml-1 font-mono">${avgPrice || 'No data'}</strong>
-                </span>
+            </div>
+
+            <!-- Price Controls & Profitable Recommendation Button -->
+            <div class="flex items-center space-x-2 shrink-0 self-end sm:self-center">
+              ${recPrice ? `
+                <button type="button" 
+                        onclick="app.applyRecommendedPrice(${s.id}, ${recPrice})" 
+                        class="inline-flex items-center px-2 py-1 rounded-lg text-[10px] font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition cursor-pointer" 
+                        title="Apply recommended profitable buy price (£${recPrice}) for ~35% resale margin">
+                  <i data-lucide="sparkles" class="w-3 h-3 mr-1 text-amber-400"></i>
+                  Rec: ≤ £${recPrice}
+                </button>
+              ` : ''}
+
+              <div class="flex items-center space-x-1.5 bg-slate-950 p-1 rounded-lg border border-slate-700/80">
+                <span class="text-[11px] text-slate-400 font-mono pl-1">Max: £</span>
+                <input type="number" 
+                       id="item-max-price-${s.id}" 
+                       value="${currentItemPrice}" 
+                       min="1" 
+                       max="10000" 
+                       step="1"
+                       onchange="app.setItemMaxPrice(${s.id}, this.value)"
+                       class="w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs font-mono font-bold text-emerald-400 text-center focus:outline-none focus:border-vinted">
               </div>
             </div>
           </div>
 
-          <!-- Price Controls & Profitable Recommendation Button -->
-          <div class="flex items-center space-x-2 shrink-0 self-end sm:self-center">
-            ${recPrice ? `
-              <button type="button" 
-                      onclick="app.applyRecommendedPrice(${s.id}, ${recPrice})" 
-                      class="inline-flex items-center px-2 py-1 rounded-lg text-[10px] font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition cursor-pointer" 
-                      title="Apply recommended profitable buy price (£${recPrice}) for ~35% resale margin">
-                <i data-lucide="sparkles" class="w-3 h-3 mr-1 text-amber-400"></i>
-                Rec: ≤ £${recPrice}
-              </button>
-            ` : ''}
-
-            <div class="flex items-center space-x-1.5 bg-slate-950 p-1 rounded-lg border border-slate-700/80">
-              <span class="text-[11px] text-slate-400 font-mono pl-1">Max: £</span>
-              <input type="number" 
-                     id="item-max-price-${s.id}" 
-                     value="${currentItemPrice}" 
-                     min="1" 
-                     max="10000" 
-                     step="1"
-                     onchange="app.setItemMaxPrice(${s.id}, this.value)"
-                     class="w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs font-mono font-bold text-emerald-400 text-center focus:outline-none focus:border-vinted">
-            </div>
-          </div>
+          ${variantBlockHtml}
         </div>
       `;
     }).join('');
@@ -2412,9 +2624,20 @@ class VintedApp {
                 </span>
               </div>
               
-              <h4 class="text-xs font-bold text-white truncate hover:text-teal-300 transition" title="${deal.title}">
+              <h4 class="text-xs font-bold text-white truncate hover:text-teal-300 transition" title="${this.escapeHtmlAttr(deal.title)}">
                 ${deal.title || 'Vinted Listing'}
               </h4>
+
+              ${deal.variant_name ? `
+                <div class="mt-1 flex flex-wrap items-center gap-1" title="${this.escapeHtmlAttr(deal.variant_evidence || 'Local CLIP + Apple Neural OCR match')}">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-500/20 text-purple-200 border border-purple-500/40 truncate max-w-[185px]">
+                    <i data-lucide="sparkles" class="w-2.5 h-2.5 mr-1 text-purple-300 shrink-0"></i>
+                    <span class="truncate">${this.escapeHtmlAttr(deal.variant_name)}</span>
+                  </span>
+                  ${deal.resale_tier ? `<span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold ${this.getTierBadgeClass(deal.resale_tier)}">${deal.resale_tier}</span>` : ''}
+                  ${deal.variant_confidence ? `<span class="text-[9px] font-mono text-purple-300/85">${Math.round(Number(deal.variant_confidence) * 100)}%</span>` : ''}
+                </div>
+              ` : ''}
 
               <!-- Price & Discount -->
               <div class="flex items-baseline space-x-2 mt-1.5">
@@ -3200,7 +3423,10 @@ class VintedApp {
         }).join('');
     }
 
-    // 2. Months dropdown
+    // 2. AI Product Variants dropdown
+    this.populateExplorerVariantDropdown(data);
+
+    // 3. Months dropdown
     const monthSelect = document.getElementById('db-filter-month');
     if (monthSelect && data.monthly_trend) {
       const currentMonth = this.dbExplorerFilters.month;
@@ -3210,6 +3436,50 @@ class VintedApp {
           return `<option value="${m.month_key}" ${currentMonth === m.month_key ? 'selected' : ''}>${m.label} [${m.total}${repInfo}]</option>`;
         }).join('');
     }
+  }
+
+  populateExplorerVariantDropdown(data) {
+    const variantSelect = document.getElementById('db-filter-variant-id');
+    if (!variantSelect) return;
+
+    const analytics = data || this.dbAnalyticsData;
+    const searches = (analytics && Array.isArray(analytics.searches)) ? analytics.searches : [];
+    const selectedSearchId = this.dbExplorerFilters.search_id ? String(this.dbExplorerFilters.search_id) : '';
+    const currentVariantVal = this.dbExplorerFilters.variant_id ? String(this.dbExplorerFilters.variant_id) : '';
+
+    let html = `<option value="" ${!currentVariantVal ? 'selected' : ''}>All Product Variants</option>`;
+    html += `<option value="unclassified" ${currentVariantVal === 'unclassified' ? 'selected' : ''}>Unclassified Items Only</option>`;
+
+    if (selectedSearchId) {
+      const matchSearch = searches.find(s => String(s.id) === selectedSearchId);
+      const variants = (matchSearch && Array.isArray(matchSearch.variants)) ? matchSearch.variants : [];
+      variants.forEach(v => {
+        html += `<option value="${v.id}" ${currentVariantVal === String(v.id) ? 'selected' : ''}>✨ ${this.escapeHtmlAttr(v.variant_name)} [${v.count || 0}]</option>`;
+      });
+    } else {
+      searches.forEach(s => {
+        const variants = Array.isArray(s.variants) ? s.variants : [];
+        if (variants.length > 0) {
+          html += `<optgroup label="${this.escapeHtmlAttr(s.search_text)}">`;
+          variants.forEach(v => {
+            html += `<option value="${v.id}" ${currentVariantVal === String(v.id) ? 'selected' : ''}>${this.escapeHtmlAttr(v.variant_name)} [${v.count || 0}]</option>`;
+          });
+          html += `</optgroup>`;
+        }
+      });
+    }
+
+    variantSelect.innerHTML = html;
+  }
+
+  handleDbSearchSelectChange() {
+    const searchSelect = document.getElementById('db-filter-search-id');
+    const variantSelect = document.getElementById('db-filter-variant-id');
+    this.dbExplorerFilters.search_id = searchSelect ? searchSelect.value : '';
+    this.dbExplorerFilters.variant_id = '';
+    if (variantSelect) variantSelect.value = '';
+    this.populateExplorerVariantDropdown(this.dbAnalyticsData);
+    this.handleDbFilterChange();
   }
 
   renderExplorerAnalytics(data) {
@@ -3409,6 +3679,7 @@ class VintedApp {
       const params = new URLSearchParams();
       if (this.dbExplorerFilters.q) params.set('q', this.dbExplorerFilters.q);
       if (this.dbExplorerFilters.search_id) params.set('search_id', this.dbExplorerFilters.search_id);
+      if (this.dbExplorerFilters.variant_id) params.set('variant_id', this.dbExplorerFilters.variant_id);
       if (this.dbExplorerFilters.status_filter && this.dbExplorerFilters.status_filter !== 'all') {
         params.set('status_filter', this.dbExplorerFilters.status_filter);
       }
@@ -3460,6 +3731,7 @@ class VintedApp {
     if (!tableBody) return;
 
     const items = data.items || [];
+    this.dbExplorerItems = items;
     const totalCount = data.total_count || 0;
     const page = data.page || 1;
     const pageSize = data.page_size || 50;
@@ -3558,6 +3830,26 @@ class VintedApp {
               </a>
 
               <div class="flex flex-wrap items-center gap-1.5 text-[10px]">
+                ${item.variant_name ? `
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-200 border border-purple-500/40 font-semibold" title="${this.escapeHtmlAttr(item.variant_evidence || 'AI Classified Variant')}">
+                    ✨ ${this.escapeHtmlAttr(item.variant_name)}${item.variant_confidence ? ` (${Math.round(Number(item.variant_confidence) * 100)}%)` : ''}
+                  </span>
+                ` : ''}
+                ${(() => {
+                  const searchAnalytics = (this.dbAnalyticsData && Array.isArray(this.dbAnalyticsData.searches))
+                    ? this.dbAnalyticsData.searches.find(s => Number(s.id) === Number(item.tracked_search_id))
+                    : null;
+                  const sVariants = (searchAnalytics && Array.isArray(searchAnalytics.variants)) ? searchAnalytics.variants : [];
+                  if (sVariants.length === 0) return '';
+                  return `
+                    <select onchange="app.assignItemVariant(${item.id}, this.value)"
+                            title="Verify or override AI Variant (updates local CLIP prototype)"
+                            class="bg-slate-950 border border-slate-800 hover:border-purple-500/40 rounded px-1.5 py-0.5 text-[10px] text-purple-200 focus:outline-none cursor-pointer max-w-[155px]">
+                      <option value="" ${!item.variant_id ? 'selected' : ''}>Variant: None</option>
+                      ${sVariants.map(v => `<option value="${v.id}" ${Number(item.variant_id) === Number(v.id) ? 'selected' : ''}>${this.escapeHtmlAttr(v.variant_name)}</option>`).join('')}
+                    </select>
+                  `;
+                })()}
                 ${item.brand ? `<span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/60 font-medium">${item.brand}</span>` : ''}
                 ${item.size ? `<span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700/60">${item.size}</span>` : ''}
                 ${item.is_child_size ? `<span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold" title="${(item.child_size_reason || 'Child / Youth Size').replace(/"/g, '&quot;')}">👶 Child Size</span>` : ''}
@@ -3772,6 +4064,7 @@ class VintedApp {
     this.dbExplorerFilters = {
       q: '',
       search_id: '',
+      variant_id: '',
       status_filter: 'all',
       replica_filter: 'all',
       replica_reason: '',
@@ -3787,6 +4080,7 @@ class VintedApp {
 
     const qInput = document.getElementById('db-filter-query');
     const searchSelect = document.getElementById('db-filter-search-id');
+    const variantSelect = document.getElementById('db-filter-variant-id');
     const monthSelect = document.getElementById('db-filter-month');
     const minPriceInput = document.getElementById('db-filter-min-price');
     const maxPriceInput = document.getElementById('db-filter-max-price');
@@ -3795,11 +4089,13 @@ class VintedApp {
 
     if (qInput) qInput.value = '';
     if (searchSelect) searchSelect.value = '';
+    if (variantSelect) variantSelect.value = '';
     if (monthSelect) monthSelect.value = '';
     if (minPriceInput) minPriceInput.value = '';
     if (maxPriceInput) maxPriceInput.value = '';
     if (sortSelect) sortSelect.value = 'newest';
     if (clearBtn) clearBtn.classList.add('hidden');
+    this.populateExplorerVariantDropdown(this.dbAnalyticsData);
 
     this.updateReplicaFilterPillsUI();
     this.updateChildFilterPillsUI();
@@ -3872,6 +4168,7 @@ class VintedApp {
   handleDbFilterChange() {
     const qInput = document.getElementById('db-filter-query');
     const searchSelect = document.getElementById('db-filter-search-id');
+    const variantSelect = document.getElementById('db-filter-variant-id');
     const monthSelect = document.getElementById('db-filter-month');
     const minPriceInput = document.getElementById('db-filter-min-price');
     const maxPriceInput = document.getElementById('db-filter-max-price');
@@ -3879,6 +4176,7 @@ class VintedApp {
 
     if (qInput) this.dbExplorerFilters.q = (qInput.value || '').trim();
     if (searchSelect) this.dbExplorerFilters.search_id = searchSelect.value;
+    if (variantSelect) this.dbExplorerFilters.variant_id = variantSelect.value;
     if (monthSelect) this.dbExplorerFilters.month = monthSelect.value;
     if (minPriceInput) this.dbExplorerFilters.min_price = minPriceInput.value;
     if (maxPriceInput) this.dbExplorerFilters.max_price = maxPriceInput.value;
@@ -3975,6 +4273,7 @@ class VintedApp {
     this.dbExplorerFilters = {
       q: '',
       search_id: '',
+      variant_id: '',
       status_filter: 'all',
       replica_filter: 'all',
       replica_reason: '',
@@ -3990,6 +4289,7 @@ class VintedApp {
 
     const qInput = document.getElementById('db-filter-query');
     const searchSelect = document.getElementById('db-filter-search-id');
+    const variantSelect = document.getElementById('db-filter-variant-id');
     const monthSelect = document.getElementById('db-filter-month');
     const minPriceInput = document.getElementById('db-filter-min-price');
     const maxPriceInput = document.getElementById('db-filter-max-price');
@@ -3998,11 +4298,13 @@ class VintedApp {
 
     if (qInput) qInput.value = '';
     if (searchSelect) searchSelect.value = '';
+    if (variantSelect) variantSelect.value = '';
     if (monthSelect) monthSelect.value = '';
     if (minPriceInput) minPriceInput.value = '';
     if (maxPriceInput) maxPriceInput.value = '';
     if (sortSelect) sortSelect.value = 'newest';
     if (clearBtn) clearBtn.classList.add('hidden');
+    this.populateExplorerVariantDropdown(this.dbAnalyticsData);
 
     this.setDbStatusFilter('all');
     this.updateReplicaFilterPillsUI();
@@ -4891,7 +5193,8 @@ class VintedApp {
                 <span class="truncate">${ev.title || 'Untitled Listing'}</span>
                 <i data-lucide="external-link" class="w-3.5 h-3.5 ml-1.5 text-slate-400 shrink-0"></i>
               </a>
-              <div class="flex items-center space-x-2 text-[11px] text-slate-400 mt-1 font-sans">
+              <div class="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400 mt-1 font-sans">
+                ${ev.variant_name ? `<span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-500/20 text-purple-200 border border-purple-500/35">✨ ${this.escapeHtmlAttr(ev.variant_name)}</span>` : ''}
                 ${ev.brand ? `<span class="text-slate-300 font-medium">${ev.brand}</span>` : ''}
                 ${ev.brand && ev.size ? `<span>•</span>` : ''}
                 ${ev.size ? `<span class="bg-slate-800 px-1.5 py-0.2 rounded text-[10px] text-slate-300">Size: ${ev.size}</span>` : ''}
@@ -5057,6 +5360,7 @@ class VintedApp {
     this.closeScraperModal();
     this.closeDatabaseModal();
     this.closeAntiBanModal();
+    this.closeAIModal();
     this.closeShortcutsModal();
     this.closeScraperTerminal();
     const mobDrawer = document.getElementById('mobile-items-drawer');
@@ -5125,6 +5429,801 @@ class VintedApp {
       this.showToast('Market Scanner Paused.', 'info');
     }
     if (window.lucide) lucide.createIcons();
+  }
+
+  // ── AI Variant Deep Research, Local Vision & Multi-LLM Router ────────────
+
+  escapeHtmlAttr(str) {
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  getTierBadgeClass(tier) {
+    const t = String(tier || 'STANDARD').toUpperCase();
+    if (t === 'PREMIUM' || t === 'GRAIL') return 'tier-badge-grail';
+    if (t === 'HIGH') return 'tier-badge-high';
+    if (t === 'BUDGET') return 'tier-badge-budget';
+    return 'tier-badge-standard';
+  }
+
+  async openAIModal() {
+    const modal = document.getElementById('ai-modal');
+    if (modal) modal.classList.remove('hidden');
+    const testBox = document.getElementById('ai-test-result-box');
+    if (testBox) testBox.classList.add('hidden');
+    await this.loadAIStatus(true);
+    if (window.lucide) lucide.createIcons();
+  }
+
+  closeAIModal() {
+    const modal = document.getElementById('ai-modal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  toggleAISecretMasking() {
+    const inputs = document.querySelectorAll('.ai-secret-input');
+    const textEl = document.getElementById('ai-mask-text');
+    const iconEl = document.getElementById('ai-mask-icon');
+    if (!inputs.length) return;
+
+    const first = inputs[0];
+    const shouldUnmask = !first.classList.contains('unmasked');
+    inputs.forEach(el => {
+      if (shouldUnmask) el.classList.add('unmasked');
+      else el.classList.remove('unmasked');
+    });
+    if (textEl) textEl.textContent = shouldUnmask ? 'Hide API Keys' : 'Show API Keys';
+    if (iconEl) iconEl.setAttribute('data-lucide', shouldUnmask ? 'eye-off' : 'eye');
+    if (window.lucide) lucide.createIcons();
+  }
+
+  async loadAIStatus(populateInputs = false) {
+    try {
+      const res = await fetch('/api/ai/status');
+      if (!res.ok) return;
+      const data = await res.json();
+      this.aiStatus = data;
+
+      const lv = data.local_vision || {};
+      const activePool = Number(data.active_cloud_endpoints || 0);
+
+      // Header & Sidebar badges
+      const headerBadge = document.getElementById('header-ai-badge');
+      if (headerBadge) {
+        headerBadge.textContent = activePool > 0 ? `${activePool} LLM + CLIP` : 'CLIP Ready';
+      }
+      const sidebarPill = document.getElementById('sidebar-ai-pill');
+      if (sidebarPill) {
+        sidebarPill.textContent = lv.mac_neural_ocr_ready ? 'M2 OCR' : 'ONNX';
+      }
+
+      // Modal telemetry cards
+      const clipStat = document.getElementById('ai-stat-clip');
+      const clipSub = document.getElementById('ai-stat-clip-sub');
+      if (clipStat) {
+        clipStat.textContent = lv.clip_loaded_in_ram
+          ? 'ViT-B/32 Active'
+          : (lv.clip_weights_cached ? 'ViT-B/32 Cached' : 'ONNX ViT-B/32');
+      }
+      if (clipSub) {
+        clipSub.textContent = lv.total_images_classified > 0
+          ? `${lv.total_images_classified} imgs (${lv.last_inference_ms || 0}ms last)`
+          : '£0.00 per Vinted photo';
+      }
+
+      const ocrStat = document.getElementById('ai-stat-ocr');
+      const ocrSub = document.getElementById('ai-stat-ocr-sub');
+      if (ocrStat) {
+        ocrStat.textContent = lv.mac_neural_ocr_ready ? 'Apple M2 Vision' : 'Local OCR';
+      }
+      if (ocrSub) {
+        ocrSub.textContent = lv.mac_neural_ocr_ready
+          ? 'Hardware Neural Engine active'
+          : (lv.ocr_engine || 'Reads labels & lens specs');
+      }
+
+      const poolStat = document.getElementById('ai-stat-pool');
+      const poolSub = document.getElementById('ai-stat-pool-sub');
+      if (poolStat) {
+        poolStat.textContent = activePool > 0
+          ? `${activePool} Endpoint${activePool === 1 ? '' : 's'} Pool`
+          : 'Zero-Key Mode';
+      }
+      if (poolSub) {
+        poolSub.textContent = activePool > 0
+          ? `Strategy: ${data.routing_strategy || 'spread'}`
+          : 'Specialist + Vinted Corpus active';
+      }
+
+      const epList = document.getElementById('ai-endpoints-live-list');
+      if (epList) {
+        const eps = Array.isArray(data.endpoints_summary) ? data.endpoints_summary : [];
+        if (eps.length > 0) {
+          epList.classList.remove('hidden');
+          epList.innerHTML = `<div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Configured Load-Balanced Endpoints</div>` +
+            eps.map(ep => {
+              const cd = ep.cooldown_remaining_s > 0
+                ? `<span class="text-amber-400 font-mono">Cooldown ${ep.cooldown_remaining_s}s</span>`
+                : `<span class="text-emerald-400 font-mono">READY</span>`;
+              return `
+                <div class="flex items-center justify-between py-0.5 text-[11px] border-b border-slate-900 last:border-0">
+                  <div class="flex items-center space-x-2">
+                    <span class="font-mono font-bold text-purple-300">${this.escapeHtmlAttr(ep.id)}</span>
+                    <span class="text-slate-400">${this.escapeHtmlAttr(ep.model)}</span>
+                    ${ep.grounded ? '<span class="px-1.5 py-0.2 rounded text-[9px] bg-teal-500/15 text-teal-300 border border-teal-500/30">Google Search</span>' : ''}
+                  </div>
+                  <div class="flex items-center space-x-2 text-[10px]">
+                    <span class="text-slate-500">${ep.calls || 0} calls</span>
+                    ${cd}
+                  </div>
+                </div>
+              `;
+            }).join('');
+        } else {
+          epList.classList.add('hidden');
+        }
+      }
+
+      if (populateInputs) {
+        const stratEl = document.getElementById('ai-routing-strategy');
+        const groundEl = document.getElementById('ai-google-grounding');
+        const gemKeys = document.getElementById('ai-gemini-keys');
+        const gemModel = document.getElementById('ai-gemini-model');
+        const groqKeys = document.getElementById('ai-groq-keys');
+        const groqModel = document.getElementById('ai-groq-model');
+        const orKeys = document.getElementById('ai-openrouter-keys');
+        const orModel = document.getElementById('ai-openrouter-model');
+        const misKeys = document.getElementById('ai-mistral-keys');
+        const ollUrl = document.getElementById('ai-ollama-url');
+
+        if (stratEl && data.routing_strategy) stratEl.value = data.routing_strategy;
+        if (groundEl) groundEl.checked = data.enable_google_search_grounding !== false;
+        if (gemKeys) gemKeys.value = data.gemini_keys_raw || '';
+        if (gemModel && data.gemini_model) gemModel.value = data.gemini_model;
+        if (groqKeys) groqKeys.value = data.groq_keys_raw || '';
+        if (groqModel && data.groq_model) groqModel.value = data.groq_model;
+        if (orKeys) orKeys.value = data.openrouter_keys_raw || '';
+        if (orModel && data.openrouter_model) orModel.value = data.openrouter_model;
+        if (misKeys) misKeys.value = data.mistral_keys_raw || '';
+        if (ollUrl && data.ollama_base_url) ollUrl.value = data.ollama_base_url;
+      }
+    } catch (err) {
+      console.debug('Failed to load AI status:', err);
+    }
+  }
+
+  async saveAIConfig() {
+    const btn = document.getElementById('btn-save-ai-config');
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 mr-1.5 animate-spin"></i><span>Saving...</span>';
+      if (window.lucide) lucide.createIcons();
+    }
+
+    try {
+      const payload = {
+        routing_strategy: document.getElementById('ai-routing-strategy')?.value || 'spread',
+        enable_google_search_grounding: Boolean(document.getElementById('ai-google-grounding')?.checked),
+        gemini_api_keys: document.getElementById('ai-gemini-keys')?.value || '',
+        gemini_model: document.getElementById('ai-gemini-model')?.value || 'gemini-2.5-flash',
+        groq_api_keys: document.getElementById('ai-groq-keys')?.value || '',
+        groq_model: document.getElementById('ai-groq-model')?.value || 'llama-3.3-70b-versatile',
+        openrouter_api_keys: document.getElementById('ai-openrouter-keys')?.value || '',
+        openrouter_model: document.getElementById('ai-openrouter-model')?.value || 'meta-llama/llama-3.3-70b-instruct:free',
+        mistral_api_keys: document.getElementById('ai-mistral-keys')?.value || '',
+        ollama_base_url: document.getElementById('ai-ollama-url')?.value || 'http://127.0.0.1:11434',
+      };
+
+      const res = await fetch('/api/ai/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('Failed to save AI configuration');
+      await this.loadAIStatus(false);
+      this.showToast('Saved Multi-LLM Router & Local Vision settings!', 'success');
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+  }
+
+  async testAIPipeline() {
+    const btn = document.getElementById('btn-test-ai');
+    const box = document.getElementById('ai-test-result-box');
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 mr-1.5 animate-spin"></i><span>Testing CLIP, OCR & LLM...</span>';
+      if (window.lucide) lucide.createIcons();
+    }
+
+    try {
+      // Save current inputs first so any newly pasted key is tested immediately
+      await this.saveAIConfig();
+      const res = await fetch('/api/ai/test', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'AI pipeline test failed');
+
+      if (box) {
+        box.classList.remove('hidden');
+        const lv = data.local_vision || {};
+        box.innerHTML = `
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-white">Local ONNX CLIP Vision (${this.escapeHtmlAttr(lv.vision_backbone || 'ViT-B/32')}):</span>
+              <span class="font-mono font-bold ${data.local_clip_ready ? 'text-emerald-400' : 'text-amber-400'}">${data.local_clip_ready ? '✅ READY IN RAM (£0/img)' : '⚠️ Fallback Mode'}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-white">Local Label & Camera Lens OCR:</span>
+              <span class="font-mono font-bold text-cyan-300">✅ ${this.escapeHtmlAttr(lv.ocr_engine || 'Ready')}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-white">Deep Research LLM Router:</span>
+              <span class="font-mono font-semibold text-purple-300">${this.escapeHtmlAttr(data.cloud_provider_used)}</span>
+            </div>
+          </div>
+        `;
+      }
+      await this.loadAIStatus(false);
+    } catch (err) {
+      if (box) {
+        box.classList.remove('hidden');
+        box.innerHTML = `<span class="text-rose-400 font-semibold">${this.escapeHtmlAttr(err.message)}</span>`;
+      }
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+  }
+
+  async loadCurrentSearchVariants() {
+    if (!this.currentSearchId) return;
+    try {
+      const res = await fetch(`/api/searches/${this.currentSearchId}/variants`);
+      if (!res.ok) return;
+      this.currentVariantsData = await res.json();
+      this.renderCurrentSearchVariantsPanel();
+    } catch (err) {
+      console.warn('Failed to load variants for search:', err);
+    }
+  }
+
+  renderCurrentSearchVariantsPanel() {
+    const pillsContainer = document.getElementById('item-variants-pills-container');
+    const inspector = document.getElementById('item-variant-inspector');
+    const providerBadge = document.getElementById('item-variants-provider-badge');
+    const coverageBadge = document.getElementById('item-variants-coverage-badge');
+    const retrainBtn = document.getElementById('btn-retrain-vision');
+    const classifyBtn = document.getElementById('btn-classify-existing');
+    const researchText = document.getElementById('text-research-variants');
+
+    if (!pillsContainer) return;
+
+    const data = this.currentVariantsData;
+    const variants = (data && Array.isArray(data.variants)) ? data.variants : [];
+    const meta = (data && data.catalogue_summary) ? data.catalogue_summary : {};
+
+    if (providerBadge) {
+      providerBadge.textContent = meta.provider_used
+        ? `${meta.provider_used} + Local CLIP/OCR`
+        : 'Local CLIP + M2 Neural OCR';
+    }
+
+    if (variants.length === 0) {
+      if (coverageBadge) coverageBadge.classList.add('hidden');
+      if (retrainBtn) retrainBtn.classList.add('hidden');
+      if (classifyBtn) classifyBtn.classList.add('hidden');
+      if (researchText) researchText.textContent = 'Deep Research Variants';
+      if (inspector) inspector.classList.add('hidden');
+
+      pillsContainer.innerHTML = `
+        <div class="w-full p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-400">
+          <div>
+            <span class="text-slate-200 font-semibold">No product sub-variants researched yet.</span>
+            Click <strong>Deep Research Variants</strong> above to discover exact sub-models, train local 512-D CLIP + Apple Neural OCR prototypes, and classify every listing automatically.
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    if (coverageBadge) {
+      coverageBadge.classList.remove('hidden');
+      coverageBadge.textContent = `${data.classified_count || 0}/${data.total_clean_items || 0} classified`;
+    }
+    if (retrainBtn) retrainBtn.classList.remove('hidden');
+    if (classifyBtn) classifyBtn.classList.remove('hidden');
+    if (researchText) researchText.textContent = 'Re-Research';
+
+    const activeFilter = String(this.currentVariantFilter || 'all');
+
+    let html = `
+      <div onclick="app.setVariantFilter('all')"
+           class="variant-pill-card ${activeFilter === 'all' ? 'active' : ''} px-3.5 py-2.5 rounded-xl bg-slate-950/90 min-w-[155px] flex flex-col justify-between">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-xs font-bold text-white flex items-center">
+            <i data-lucide="layers" class="w-3.5 h-3.5 mr-1.5 text-purple-400"></i>
+            All Variants
+          </span>
+          <span class="px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-800 text-slate-300">${data.total_clean_items || 0}</span>
+        </div>
+        <div class="text-[10px] text-slate-400 mt-1.5 font-mono">
+          ${variants.length} sub-models active
+        </div>
+      </div>
+    `;
+
+    variants.forEach(v => {
+      const isSelected = activeFilter === String(v.id);
+      const dispPrice = v.sold_count > 0
+        ? `£${v.sold_avg_price.toFixed(0)} sold`
+        : (v.effective_market_value_gbp > 0 ? `~£${v.effective_market_value_gbp.toFixed(0)} est` : 'No price');
+      const protoDot = v.has_trained_prototype
+        ? `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" title="512-D CLIP visual prototype calibrated (${v.training_sample_count} samples)"></span>`
+        : `<span class="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" title="Text/OCR cues active"></span>`;
+
+      html += `
+        <div onclick="app.setVariantFilter('${v.id}')"
+             class="variant-pill-card ${isSelected ? 'active' : ''} px-3.5 py-2.5 rounded-xl bg-slate-950/90 min-w-[185px] max-w-[260px] flex flex-col justify-between">
+          <div class="flex items-center justify-between gap-1.5">
+            <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold ${this.getTierBadgeClass(v.resale_tier)}">${this.escapeHtmlAttr(v.resale_tier)}</span>
+            <div class="flex items-center gap-1.5 text-[10px] font-mono text-slate-400">
+              ${protoDot}
+              <span>${v.total_items || 0} items</span>
+            </div>
+          </div>
+          <div class="text-xs font-bold text-white truncate mt-1" title="${this.escapeHtmlAttr(v.variant_name)}">
+            ${this.escapeHtmlAttr(v.variant_name)}
+          </div>
+          <div class="flex items-center justify-between gap-2 text-[10px] mt-1 font-mono">
+            <span class="text-emerald-400 font-semibold">${dispPrice}</span>
+            <span class="${v.is_sniping_enabled ? 'text-teal-400' : 'text-slate-600'}">${v.is_sniping_enabled ? '🎯 Sniping' : 'Muted'}</span>
+          </div>
+        </div>
+      `;
+    });
+
+    if ((data.unclassified_count || 0) > 0) {
+      html += `
+        <div onclick="app.setVariantFilter('unclassified')"
+             class="variant-pill-card ${activeFilter === 'unclassified' ? 'active' : ''} px-3 py-2.5 rounded-xl bg-slate-950/75 min-w-[135px] flex flex-col justify-between">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-semibold text-slate-300">Unclassified</span>
+            <span class="px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-800 text-slate-400">${data.unclassified_count}</span>
+          </div>
+          <div class="text-[10px] text-slate-500 mt-1">Generic / ambiguous</div>
+        </div>
+      `;
+    }
+
+    pillsContainer.innerHTML = html;
+
+    // Render Single-Variant Inspector when a specific variant is selected
+    const selectedVariant = variants.find(v => String(v.id) === activeFilter);
+    if (inspector && selectedVariant) {
+      inspector.classList.remove('hidden');
+      const ocrPills = (selectedVariant.ocr_signatures || []).slice(0, 8)
+        .map(s => `<code class="px-1.5 py-0.5 rounded bg-slate-900 border border-cyan-500/30 text-[10px] text-cyan-300 font-mono">${this.escapeHtmlAttr(s)}</code>`)
+        .join(' ');
+      const cuePills = (selectedVariant.visual_cues || []).slice(0, 3)
+        .map(c => `<span class="px-2 py-0.5 rounded bg-slate-900 border border-purple-500/25 text-[10px] text-purple-200">${this.escapeHtmlAttr(c)}</span>`)
+        .join(' ');
+
+      inspector.innerHTML = `
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div class="space-y-1.5 flex-1 min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold ${this.getTierBadgeClass(selectedVariant.resale_tier)}">${this.escapeHtmlAttr(selectedVariant.resale_tier)}</span>
+              <h4 class="text-sm font-bold text-white">${this.escapeHtmlAttr(selectedVariant.variant_name)}</h4>
+              <span class="text-[11px] font-mono text-emerald-400">Est. Market: £${(selectedVariant.effective_market_value_gbp || 0).toFixed(2)}</span>
+              <span class="text-[10px] font-mono text-slate-500">• Prototype samples: ${selectedVariant.training_sample_count || 0}</span>
+            </div>
+            ${selectedVariant.short_description ? `<p class="text-xs text-slate-300 leading-relaxed">${this.escapeHtmlAttr(selectedVariant.short_description)}</p>` : ''}
+            <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
+              ${ocrPills ? `<span class="text-[10px] text-slate-400 font-semibold mr-1">OCR Lens/Label Cues:</span>${ocrPills}` : ''}
+            </div>
+            ${cuePills ? `<div class="flex flex-wrap items-center gap-1.5 pt-0.5"><span class="text-[10px] text-slate-400 font-semibold mr-1">CLIP Visual Prototypes:</span>${cuePills}</div>` : ''}
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 shrink-0">
+            <div class="flex items-center space-x-1.5 bg-slate-900 px-2.5 py-1.5 rounded-lg border border-slate-700">
+              <span class="text-[11px] text-slate-400 font-mono">Snipe Max: £</span>
+              <input type="number"
+                     value="${selectedVariant.target_max_price != null ? selectedVariant.target_max_price : ''}"
+                     placeholder="${selectedVariant.recommended_snipe_price || 35}"
+                     min="1"
+                     max="10000"
+                     step="1"
+                     onchange="app.setVariantMaxPrice(${selectedVariant.id}, this.value)"
+                     class="w-16 bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-xs font-mono font-bold text-emerald-400 text-center focus:outline-none focus:border-purple-400">
+            </div>
+
+            <button type="button"
+                    onclick="app.snipeOnlyVariantFromDetail(${selectedVariant.id}, ${selectedVariant.recommended_snipe_price || 35})"
+                    class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-teal-500/20 hover:bg-teal-500/30 text-teal-200 border border-teal-500/40 transition cursor-pointer">
+              <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1.5 text-teal-400"></i>
+              <span>Snipe ONLY This Variant</span>
+            </button>
+
+            <button type="button"
+                    onclick="app.deleteVariantById(${selectedVariant.id})"
+                    class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                    title="Delete this variant">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      `;
+    } else if (inspector) {
+      inspector.classList.add('hidden');
+    }
+
+    if (window.lucide) lucide.createIcons();
+  }
+
+  async setVariantFilter(variantId) {
+    this.currentVariantFilter = String(variantId || 'all');
+    this.renderCurrentSearchVariantsPanel();
+    await Promise.all([
+      this.loadSummaryStats(),
+      this.loadAnalyticsCharts(),
+      this.loadRecentSales(),
+    ]);
+    if (window.lucide) lucide.createIcons();
+  }
+
+  async researchCurrentItemVariants() {
+    if (!this.currentSearchId) return;
+    const btn = document.getElementById('btn-research-variants');
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 mr-1.5 animate-spin"></i><span>Researching & Training Vision...</span>';
+      if (window.lucide) lucide.createIcons();
+    }
+    this.showToast('Running Deep Research & calibrating local 512-D CLIP + M2 Neural OCR prototypes...', 'info');
+
+    try {
+      const res = await fetch(`/api/searches/${this.currentSearchId}/variants/research`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fetch_live_samples: true,
+          classify_existing: true,
+          replace_existing: false,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Variant deep research failed');
+
+      const vLen = Array.isArray(data.variants) ? data.variants.length : 0;
+      const clsCount = data.classified_items_updated || 0;
+      const prov = data.catalogue_summary?.provider_used || 'AI Router';
+      this.showToast(`Built ${vLen} variants (${prov}), trained local CLIP prototypes & classified ${clsCount} items!`, 'success');
+
+      await this.loadSearches();
+      await this.loadSniperTargetsInfo();
+      await this.loadItemDetail();
+      await this.loadAIStatus(false);
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+  }
+
+  async researchVariantsFromSniper(searchId) {
+    if (!searchId) return;
+    const btn = document.getElementById(`btn-sniper-research-${searchId}`);
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i data-lucide="loader-2" class="w-3 h-3 mr-1 animate-spin"></i><span>Training...</span>';
+      if (window.lucide) lucide.createIcons();
+    }
+    this.showToast('Researching sub-variants & calibrating local image prototypes...', 'info');
+
+    try {
+      const res = await fetch(`/api/searches/${searchId}/variants/research`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fetch_live_samples: true, classify_existing: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Variant research failed');
+
+      this.expandedSniperVariants.add(Number(searchId));
+      await this.loadSearches();
+      await this.loadSniperTargetsInfo();
+      this.showToast(`Ready! Discovered ${(data.variants || []).length} sub-variants for Deal Sniper.`, 'success');
+    } catch (err) {
+      this.showToast(err.message, 'error');
+      this.renderSniperTargets();
+    }
+  }
+
+  async retrainCurrentItemVision() {
+    if (!this.currentSearchId) return;
+    const btn = document.getElementById('btn-retrain-vision');
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 mr-1.5 animate-spin"></i><span>Calibrating...</span>';
+      if (window.lucide) lucide.createIcons();
+    }
+
+    try {
+      const res = await fetch(`/api/searches/${this.currentSearchId}/variants/train`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Vision training failed');
+
+      this.currentVariantsData = data;
+      this.renderCurrentSearchVariantsPanel();
+      await this.loadAIStatus(false);
+      this.showToast('Recalibrated local 512-D contrastive CLIP prototypes!', 'success');
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+  }
+
+  async classifyCurrentItemExisting() {
+    if (!this.currentSearchId) return;
+    const btn = document.getElementById('btn-classify-existing');
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 mr-1.5 animate-spin"></i><span>Classifying...</span>';
+      if (window.lucide) lucide.createIcons();
+    }
+
+    try {
+      const res = await fetch(`/api/searches/${this.currentSearchId}/variants/classify-existing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ only_unclassified: false, max_vision_items: 80 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Batch classification failed');
+
+      this.showToast(`Classified ${data.classified_items_updated || 0} stored listings using local CLIP + M2 OCR!`, 'success');
+      await this.loadItemDetail();
+      await this.loadSniperTargetsInfo();
+      await this.loadAIStatus(false);
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+  }
+
+  async promptAddCustomVariant() {
+    if (!this.currentSearchId) return;
+    const name = prompt('Enter exact sub-variant name (e.g. "1996 Retro Nuptse 700" or "Canon IXUS 70 CCD"):');
+    if (!name || !name.trim()) return;
+
+    const kwRaw = prompt('Optional detection keywords / model numbers (comma-separated, e.g. "1996, retro, boxy"):', name.toLowerCase());
+    const ocrRaw = prompt('Optional label / lens OCR signatures printed on the item (comma-separated, e.g. "700, IXUS 70, 3x"):', '');
+    const estRaw = prompt('Optional estimated UK resale value (£):', '95');
+
+    const keywords = (kwRaw || '').split(',').map(s => s.trim()).filter(Boolean);
+    const ocrSigs = (ocrRaw || '').split(',').map(s => s.trim()).filter(Boolean);
+    const estVal = parseFloat(estRaw);
+
+    try {
+      const res = await fetch(`/api/searches/${this.currentSearchId}/variants`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          variant_name: name.trim(),
+          resale_tier: 'HIGH',
+          est_market_value_gbp: !isNaN(estVal) && estVal > 0 ? estVal : null,
+          text_keywords: keywords,
+          ocr_signatures: ocrSigs,
+          visual_cues: [name.trim()],
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Failed to create variant');
+      }
+      this.showToast(`Added custom variant '${name.trim()}' and calibrated visual prototype!`, 'success');
+      await this.loadSearches();
+      await this.loadSniperTargetsInfo();
+      await this.loadItemDetail();
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    }
+  }
+
+  async deleteVariantById(variantId) {
+    if (!variantId) return;
+    if (!confirm('Delete this variant definition? Stored listings will remain intact (unassigned).')) return;
+
+    try {
+      const res = await fetch(`/api/variants/${variantId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete variant');
+      this.currentVariantFilter = 'all';
+      this.showToast('Variant removed.', 'info');
+      await this.loadSearches();
+      await this.loadSniperTargetsInfo();
+      await this.loadItemDetail();
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    }
+  }
+
+  toggleExpandSniperVariants(searchId) {
+    const idNum = Number(searchId);
+    if (this.expandedSniperVariants.has(idNum)) {
+      this.expandedSniperVariants.delete(idNum);
+    } else {
+      this.expandedSniperVariants.add(idNum);
+    }
+    this.renderSniperTargets();
+  }
+
+  async toggleSingleVariantSnipe(variantId, enabled) {
+    try {
+      const res = await fetch(`/api/variants/${variantId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_sniping_enabled: Boolean(enabled) }),
+      });
+      if (!res.ok) throw new Error('Failed to update variant sniping toggle');
+      await this.loadSniperTargetsInfo();
+      if (this.currentSearchId) await this.loadCurrentSearchVariants();
+      if (this.sniperActive) await this.pollSniperStatus();
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    }
+  }
+
+  async setSniperVariantSelection(searchId, mode, variantIds = []) {
+    try {
+      const res = await fetch(`/api/searches/${searchId}/variants/select-sniping`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, variant_ids: variantIds }),
+      });
+      if (!res.ok) throw new Error('Failed to update variant sniping selection');
+      if (mode === 'only') {
+        this.expandedSniperVariants.add(Number(searchId));
+      }
+      await this.loadSniperTargetsInfo();
+      if (String(this.currentSearchId) === String(searchId)) {
+        await this.loadCurrentSearchVariants();
+      }
+      if (this.sniperActive) await this.pollSniperStatus();
+
+      if (mode === 'all') {
+        this.showToast('Deal Sniper set to snipe ALL variants for this product.', 'info');
+      } else if (mode === 'only' && variantIds.length === 1) {
+        this.showToast('Deal Sniper locked onto single selected variant!', 'success');
+      } else if (mode === 'only') {
+        this.showToast(`Deal Sniper locked onto ${variantIds.length} high-tier variants!`, 'success');
+      }
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    }
+  }
+
+  async selectHighTierVariantsForSnipe(searchId) {
+    const info = this.sniperTargetInfo ? this.sniperTargetInfo.get(Number(searchId)) : null;
+    const variants = (info && Array.isArray(info.variants)) ? info.variants : [];
+    if (variants.length === 0) return;
+
+    let ids = variants
+      .filter(v => ['PREMIUM', 'GRAIL', 'HIGH'].includes(String(v.resale_tier || '').toUpperCase()))
+      .map(v => v.id);
+    if (ids.length === 0) {
+      ids = [variants[0].id];
+    }
+    await this.setSniperVariantSelection(searchId, 'only', ids);
+  }
+
+  async setVariantMaxPrice(variantId, priceVal) {
+    const parsed = parseFloat(priceVal);
+    const hasValidPrice = !isNaN(parsed) && parsed > 0;
+
+    try {
+      const res = await fetch(`/api/variants/${variantId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target_max_price: hasValidPrice ? parsed : null,
+          clear_target_max_price: !hasValidPrice,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to update variant max price');
+      await this.loadSniperTargetsInfo();
+      if (this.currentSearchId) await this.loadCurrentSearchVariants();
+      if (this.sniperActive) await this.pollSniperStatus();
+      this.showToast(
+        hasValidPrice ? `Variant max snipe price set to £${parsed.toFixed(0)}` : 'Cleared custom variant max price (using item fallback)',
+        'info'
+      );
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    }
+  }
+
+  async snipeOnlyVariantFromDetail(variantId, recPrice) {
+    const searchId = Number(this.currentSearchId);
+    if (!searchId || !variantId) return;
+
+    this.sniperTargetsInitialized = true;
+    this.sniperTargets.add(searchId);
+    this.expandedSniperVariants.add(searchId);
+
+    await this.setSniperVariantSelection(searchId, 'only', [Number(variantId)]);
+    if (recPrice && recPrice > 0) {
+      const vObj = (this.currentVariantsData?.variants || []).find(v => Number(v.id) === Number(variantId));
+      if (vObj && vObj.target_max_price == null) {
+        await this.setVariantMaxPrice(variantId, recPrice);
+      }
+    }
+    this.showSniperView();
+  }
+
+  async assignItemVariant(itemId, variantVal) {
+    const variantId = (variantVal !== '' && variantVal != null) ? Number(variantVal) : null;
+    try {
+      const res = await fetch(`/api/items/${itemId}/variant`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ variant_id: variantId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to assign variant');
+
+      this.showToast(
+        data.variant_name
+          ? `Assigned to '${data.variant_name}' & updated local CLIP visual prototype!`
+          : 'Cleared item variant assignment.',
+        'success'
+      );
+
+      await this.loadSniperTargetsInfo();
+      if (this.isDbExplorerActive) {
+        await this.loadDatabaseExplorerData();
+      } else if (this.currentSearchId) {
+        await this.loadCurrentSearchVariants();
+        await Promise.all([
+          this.loadSummaryStats(),
+          this.loadAnalyticsCharts(),
+          this.loadRecentSales(),
+        ]);
+      }
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    }
   }
 }
 

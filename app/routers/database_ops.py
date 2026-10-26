@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, and_, desc, asc, case
 
 from ..database import get_db
-from ..models import SoldItem, TrackedSearch, ScrapedPhotoRecord
+from ..models import ProductVariant, SoldItem, TrackedSearch, ScrapedPhotoRecord
 from ..config import DB_PATH
 from ..services.antirep import extract_photo_key, is_new_with_tags, record_photo_fingerprint
 from ..services.item_classifier import is_child_size
@@ -202,12 +202,23 @@ def get_database_analytics(db: Session = Depends(get_db)):
     for s in searches:
         t_cnt = db.query(SoldItem).filter(SoldItem.tracked_search_id == s.id).count()
         r_cnt = db.query(SoldItem).filter(SoldItem.tracked_search_id == s.id, SoldItem.is_replica == True).count()
+        s_vars = (
+            db.query(ProductVariant)
+            .filter(ProductVariant.tracked_search_id == s.id)
+            .order_by(ProductVariant.id)
+            .all()
+        )
         search_stats.append({
             "id": s.id,
             "search_text": s.search_text,
             "total": t_cnt,
             "replicas": r_cnt,
             "clean": t_cnt - r_cnt,
+            "variants_enabled": bool(getattr(s, "variants_enabled", False)),
+            "variants": [
+                {"id": v.id, "variant_name": v.variant_name, "resale_tier": v.resale_tier or "STANDARD"}
+                for v in s_vars
+            ],
         })
 
     return {
@@ -236,8 +247,9 @@ def get_database_analytics(db: Session = Depends(get_db)):
 
 @router.get("/items")
 def get_database_items(
-    q: Optional[str] = Query(None, description="Search keyword in title, brand, seller, or ID"),
+    q: Optional[str] = Query(None, description="Search keyword in title, brand, seller, variant, or ID"),
     search_id: Optional[int] = Query(None, description="Filter by tracked search ID"),
+    variant_id: Optional[str] = Query(None, description="Filter by variant ID or 'unclassified'"),
     status_filter: Optional[str] = Query("all", description="Listing status: 'all', 'sold', 'active'"),
     replica_filter: Optional[str] = Query("all", description="Replica status: 'all', 'clean', 'replica'"),
     replica_reason: Optional[str] = Query(None, description="Filter by replica reason category: 'bnwt', 'photo', 'multiple', 'reviews', 'dormant'"),
@@ -288,12 +300,19 @@ def get_database_items(
                 SoldItem.brand.ilike(term),
                 SoldItem.seller_username.ilike(term),
                 SoldItem.vinted_item_id.ilike(term),
+                SoldItem.variant_name.ilike(term),
             )
         )
 
-    # 2. Tracked Search Filter
+    # 2. Tracked Search & Variant Filter
     if search_id:
         query = query.filter(SoldItem.tracked_search_id == search_id)
+    if variant_id and str(variant_id).strip().lower() not in ("", "all"):
+        v_str = str(variant_id).strip().lower()
+        if v_str == "unclassified":
+            query = query.filter(SoldItem.variant_id.is_(None))
+        elif v_str.isdigit():
+            query = query.filter(SoldItem.variant_id == int(v_str))
 
     # 3. Sold Status Filter
     if status_filter == "sold":
@@ -432,6 +451,11 @@ def get_database_items(
             "replica_reason": item.replica_reason,
             "is_child_size": bool(item.is_child_size),
             "child_size_reason": item.child_size_reason,
+            "variant_id": getattr(item, "variant_id", None),
+            "variant_name": getattr(item, "variant_name", None),
+            "variant_confidence": round(float(getattr(item, "variant_confidence", 0.0) or 0.0), 3),
+            "variant_method": getattr(item, "variant_method", None),
+            "variant_evidence": getattr(item, "variant_evidence", None),
             "tracked_search_id": item.tracked_search_id,
             "search_text": s_text or f"Search #{item.tracked_search_id}",
             "captured_at": item.captured_at.isoformat() if item.captured_at else None,
