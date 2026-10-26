@@ -89,7 +89,9 @@ def get_sniper_targets_info():
 
             variant_data = serialize_search_variants(db, s)
             variants_list = variant_data.get("variants", [])
+            models_list = variant_data.get("models", [])
             enabled_variants_count = sum(1 for v in variants_list if v.get("is_sniping_enabled"))
+            enabled_models_count = sum(1 for m in models_list if m.get("is_sniping_enabled"))
 
             results.append({
                 "id": s.id,
@@ -103,6 +105,9 @@ def get_sniper_targets_info():
                 "target_margin_pct": 35.0,
                 "variants_enabled": bool(getattr(s, "variants_enabled", False)),
                 "dimensions": variant_data.get("dimensions", []),
+                "models": models_list,
+                "models_count": len(models_list),
+                "enabled_models_count": enabled_models_count,
                 "variants": variants_list,
                 "variants_count": len(variants_list),
                 "enabled_variants_count": enabled_variants_count,

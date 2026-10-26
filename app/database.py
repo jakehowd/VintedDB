@@ -49,9 +49,10 @@ def ensure_db_schema(target_engine=engine):
             CREATE TABLE IF NOT EXISTS product_variants (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 tracked_search_id INTEGER NOT NULL REFERENCES tracked_searches(id) ON DELETE CASCADE,
+                parent_variant_id INTEGER REFERENCES product_variants(id) ON DELETE CASCADE,
                 variant_slug TEXT NOT NULL,
                 variant_name TEXT NOT NULL,
-                dimension TEXT DEFAULT 'Style',
+                dimension TEXT DEFAULT 'Model',
                 modality TEXT DEFAULT 'visual',
                 short_description TEXT,
                 resale_tier TEXT DEFAULT 'STANDARD',
@@ -71,10 +72,13 @@ def ensure_db_schema(target_engine=engine):
         cursor.execute("CREATE INDEX IF NOT EXISTS ix_product_variants_search ON product_variants (tracked_search_id);")
         pv_cols = [c[1] for c in cursor.execute("PRAGMA table_info(product_variants)").fetchall()]
         if pv_cols:
+            if "parent_variant_id" not in pv_cols:
+                cursor.execute("ALTER TABLE product_variants ADD COLUMN parent_variant_id INTEGER REFERENCES product_variants(id) ON DELETE CASCADE;")
             if "dimension" not in pv_cols:
-                cursor.execute("ALTER TABLE product_variants ADD COLUMN dimension TEXT DEFAULT 'Style';")
+                cursor.execute("ALTER TABLE product_variants ADD COLUMN dimension TEXT DEFAULT 'Model';")
             if "modality" not in pv_cols:
                 cursor.execute("ALTER TABLE product_variants ADD COLUMN modality TEXT DEFAULT 'visual';")
+        cursor.execute("CREATE INDEX IF NOT EXISTS ix_product_variants_parent ON product_variants (parent_variant_id);")
 
         # 1. tracked_searches columns
         ts_cols = [c[1] for c in cursor.execute("PRAGMA table_info(tracked_searches)").fetchall()]

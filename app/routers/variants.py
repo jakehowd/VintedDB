@@ -1,4 +1,4 @@
-"""Endpoints for AI Variant Deep Research, Local Vision Training, and Multi-Category Facets."""
+"""Endpoints for Hierarchical AI Model & Exclusive Style Research, Local Vision Training, and Analytics."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, func, or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -25,10 +25,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["variants"])
 
 
-# ── Shared SQL & Sniper Multi-Category Facet Helpers ────────────────────────
+# ── Shared SQL & Sniper Hierarchical Model -> Exclusive Style Helpers ───────
 
 def item_has_variant_clause(vid: int):
-    """Exact SQLite membership check for `vid` inside compact `variant_ids_json` (e.g. '[6,8]') or legacy `variant_id`."""
+    """Exact SQLite membership check for `vid` inside compact `variant_ids_json` (e.g. '[6,8]') or `variant_id`.
+
+    Because hierarchical items store `[model_id]` or `[model_id, style_id]`:
+    - `item_has_variant_clause(model_id)` matches ALL items in that Model (including all its exclusive sub-styles).
+    - `item_has_variant_clause(style_id)` matches STRICTLY items in that exclusive sub-style.
+    """
     return or_(
         SoldItem.variant_id == vid,
         SoldItem.variant_ids_json == f"[{vid}]",
@@ -44,9 +49,9 @@ def build_variant_filter_clauses(db: Session, variant_filter: Optional[str]) -> 
     Supports:
     - None / '' / 'all' -> []
     - 'unclassified' -> [SoldItem.variant_id.is_(None)]
-    - Single ID '6' -> [item_has_variant_clause(6)]
-    - Multi-ID '6,8' -> OR within the same `dimension`, AND across different `dimension`s
-      (e.g. Style='Cable-Knit' AND Material='Wool / Merino').
+    - Single Model ID or Sub-Style ID '6' -> [item_has_variant_clause(6)]
+    - Multi-ID '6,8' -> If both a parent Model and one of its own Sub-Styles are passed, narrows to the Sub-Style(s);
+      if multiple sibling Models or sibling Sub-Styles are passed, matches any of them (`OR`).
     """
     if not variant_filter:
         return []
@@ -56,7 +61,7 @@ def build_variant_filter_clauses(db: Session, variant_filter: Optional[str]) -> 
     if raw == "unclassified":
         return [SoldItem.variant_id.is_(None)]
 
-    vids = []
+    vids: List[int] = []
     for part in raw.split(","):
         p = part.strip()
         if p.isdigit():
@@ -69,29 +74,26 @@ def build_variant_filter_clauses(db: Session, variant_filter: Optional[str]) -> 
     if len(vids) == 1:
         return [item_has_variant_clause(vids[0])]
 
-    rows = db.query(ProductVariant.id, ProductVariant.dimension).filter(ProductVariant.id.in_(vids)).all()
-    dim_by_id = {r[0]: ((r[1] or "Style").strip() or "Style") for r in rows}
+    rows = db.query(ProductVariant.id, ProductVariant.parent_variant_id).filter(ProductVariant.id.in_(vids)).all()
+    parents_with_selected_child = {r[1] for r in rows if r[1] is not None and r[1] in vids}
+    effective_vids = [vid for vid in vids if vid not in parents_with_selected_child] or vids
 
-    grouped: Dict[str, List[int]] = {}
-    for vid in vids:
-        dim = dim_by_id.get(vid, f"dim_{vid}")
-        grouped.setdefault(dim, []).append(vid)
-
-    clauses: List[Any] = []
-    for dim_vids in grouped.values():
-        if len(dim_vids) == 1:
-            clauses.append(item_has_variant_clause(dim_vids[0]))
-        else:
-            clauses.append(or_(*(item_has_variant_clause(vid) for vid in dim_vids)))
-    return clauses
+    if len(effective_vids) == 1:
+        return [item_has_variant_clause(effective_vids[0])]
+    return [or_(*(item_has_variant_clause(vid) for vid in effective_vids))]
 
 
 def evaluate_sniper_variant_match(
     matched_ids: List[int],
     all_variants: List[ProductVariant],
 ) -> Tuple[bool, Optional[float]]:
-    """Evaluate faceted Deal Sniper selection (`OR` within dimension, `AND` across active dimensions).
+    """Evaluate hierarchical `Model -> Exclusive Sub-Styles` Deal Sniper selection.
 
+    Rules:
+    - All variants enabled -> Snipes all listings (applying most specific matched price cap if present).
+    - Specific Model(s) enabled with ALL (or 0) of its sub-styles enabled -> Snipes any listing in that Model.
+    - Specific Sub-Style(s) enabled under a Model (proper subset of that Model's sub-styles) -> Snipes ONLY listings
+      matching one of those enabled exclusive Sub-Styles!
     Returns `(allowed_for_snipe, variant_price_override)`.
     """
     if not all_variants:
@@ -101,34 +103,64 @@ def evaluate_sniper_variant_match(
     if not enabled:
         return False, None
 
-    matched_set = set(matched_ids or [])
     v_map = {v.id: v for v in all_variants}
-    matched_objs = [v_map[vid] for vid in matched_ids if vid in v_map]
+    matched_objs = [v_map[vid] for vid in (matched_ids or []) if vid in v_map]
 
-    # Price cap: if matched variants define custom max prices, use the highest matched tier cap
-    # unless multiple facets restrict it (when specific facets are filtered, respect the tightest enabled cap).
-    all_enabled = len(enabled) == len(all_variants)
+    def _resolve_cap(objs: List[ProductVariant]) -> Optional[float]:
+        # Prefer sub-style cap over parent model cap when available
+        styles_with_cap = [
+            float(v.target_max_price)
+            for v in objs
+            if v.parent_variant_id is not None and v.target_max_price and float(v.target_max_price) > 0
+        ]
+        if styles_with_cap:
+            return min(styles_with_cap)
+        models_with_cap = [
+            float(v.target_max_price)
+            for v in objs
+            if v.parent_variant_id is None and v.target_max_price and float(v.target_max_price) > 0
+        ]
+        if models_with_cap:
+            return min(models_with_cap)
+        return None
 
-    if all_enabled:
-        caps = [float(v.target_max_price) for v in matched_objs if v.target_max_price and float(v.target_max_price) > 0]
-        return True, (max(caps) if caps else None)
+    if len(enabled) == len(all_variants):
+        return True, _resolve_cap(matched_objs)
 
-    if not matched_set:
+    if not matched_objs:
         return False, None
 
-    enabled_by_dim: Dict[str, set[int]] = {}
-    for v in enabled:
-        dim_key = (v.dimension or "Style").strip() or "Style"
-        enabled_by_dim.setdefault(dim_key, set()).add(v.id)
+    matched_model = next((v for v in matched_objs if v.parent_variant_id is None), None)
+    matched_style = next((v for v in matched_objs if v.parent_variant_id is not None), None)
+    if matched_model is None and matched_style is not None:
+        matched_model = v_map.get(matched_style.parent_variant_id)
 
-    # Every dimension where the user enabled >= 1 chip MUST be satisfied!
-    for dim_key, allowed_vids in enabled_by_dim.items():
-        if not (matched_set & allowed_vids):
+    if matched_model is None:
+        return False, None
+
+    m_children = [v for v in all_variants if v.parent_variant_id == matched_model.id]
+    enabled_children = [c for c in m_children if c.is_sniping_enabled]
+
+    if 0 < len(enabled_children) < len(m_children):
+        # User narrowed this Model to specific exclusive sub-style(s)
+        if matched_style is None or not matched_style.is_sniping_enabled:
             return False, None
+        return True, _resolve_cap([matched_model, matched_style])
 
-    active_matched = [v for v in matched_objs if v.id in {ev.id for ev in enabled}]
-    caps = [float(v.target_max_price) for v in active_matched if v.target_max_price and float(v.target_max_price) > 0]
-    return True, (min(caps) if caps else None)
+    if len(enabled_children) == len(m_children) and len(m_children) > 0:
+        # All sub-styles of this model are enabled (whole Model targeted)
+        active_objs = [matched_model] + ([matched_style] if matched_style else [])
+        return True, _resolve_cap(active_objs)
+
+    # Zero sub-styles enabled: allowed only if the Model itself is enabled and has no disabled child restriction,
+    # OR if the Model has no sub-styles at all
+    if matched_model.is_sniping_enabled and len(m_children) == 0:
+        return True, _resolve_cap([matched_model])
+    if matched_model.is_sniping_enabled and len(enabled_children) == 0:
+        # User toggled Model chip ON directly while sub-styles were off -> allow whole model unless style explicitly off
+        return True, _resolve_cap([matched_model])
+
+    return False, None
 
 
 # ── Pydantic Payloads ───────────────────────────────────────────────────────
@@ -163,6 +195,7 @@ class ClassifyExistingRequest(BaseModel):
 
 class VariantCreateUpdateRequest(BaseModel):
     variant_name: Optional[str] = None
+    parent_variant_id: Optional[int] = None
     dimension: Optional[str] = None
     modality: Optional[str] = None
     short_description: Optional[str] = None
@@ -187,7 +220,7 @@ class AssignItemVariantRequest(BaseModel):
     variant_ids: Optional[List[int]] = None
 
 
-# ── Helper: Enrich Variant Serialization with Multi-Category Metrics ────────
+# ── Helper: Enrich Hierarchical Model -> Exclusive Styles Metrics ────────────
 
 def serialize_search_variants(db: Session, search: TrackedSearch) -> Dict[str, Any]:
     variants = (
@@ -212,13 +245,13 @@ def serialize_search_variants(db: Session, search: TrackedSearch) -> Dict[str, A
         or 0
     )
 
-    dimensions_order: List[str] = []
-    out_variants: List[Dict[str, Any]] = []
+    by_id: Dict[int, ProductVariant] = {v.id: v for v in variants}
+    raw_serialized: Dict[int, Dict[str, Any]] = {}
 
     for v in variants:
-        dim_name = (v.dimension or "Style").strip() or "Style"
-        if dim_name not in dimensions_order:
-            dimensions_order.append(dim_name)
+        is_sub = v.parent_variant_id is not None and v.parent_variant_id in by_id
+        parent_obj = by_id.get(v.parent_variant_id) if is_sub else None
+        dim_name = "Style" if is_sub else "Model"
         has_clause = item_has_variant_clause(v.id)
 
         v_all = (
@@ -251,9 +284,12 @@ def serialize_search_variants(db: Session, search: TrackedSearch) -> Dict[str, A
         )
         rec_snipe = max(5.0, round(effective_market * 0.65, 0)) if effective_market > 0 else 35.0
 
-        out_variants.append({
+        raw_serialized[v.id] = {
             "id": v.id,
             "tracked_search_id": v.tracked_search_id,
+            "parent_variant_id": v.parent_variant_id if is_sub else None,
+            "parent_variant_name": parent_obj.variant_name if parent_obj else None,
+            "is_sub_style": is_sub,
             "variant_slug": v.variant_slug,
             "variant_name": v.variant_name,
             "dimension": dim_name,
@@ -276,7 +312,28 @@ def serialize_search_variants(db: Session, search: TrackedSearch) -> Dict[str, A
             "active_count": active_cnt,
             "sold_avg_price": round(sold_avg, 2),
             "active_avg_price": round(active_avg, 2),
-        })
+        }
+
+    # Build hierarchical `models` tree AND tree-ordered flat `variants` list
+    models_tree: List[Dict[str, Any]] = []
+    ordered_variants: List[Dict[str, Any]] = []
+    top_models = [v for v in variants if v.parent_variant_id is None or v.parent_variant_id not in by_id]
+
+    for m in top_models:
+        m_dict = dict(raw_serialized[m.id])
+        children = [v for v in variants if v.parent_variant_id == m.id]
+        sub_dicts = [dict(raw_serialized[c.id]) for c in children]
+        sub_sum = sum(sd["total_items"] for sd in sub_dicts)
+        m_dict["sub_styles"] = sub_dicts
+        m_dict["sub_styles_count"] = len(sub_dicts)
+        m_dict["model_only_items"] = max(0, m_dict["total_items"] - sub_sum)
+        models_tree.append(m_dict)
+
+        ordered_variants.append(raw_serialized[m.id])
+        for c in children:
+            ordered_variants.append(raw_serialized[c.id])
+
+    dimensions_order = ["Model"] + (["Style"] if any(v["is_sub_style"] for v in ordered_variants) else [])
 
     catalogue_meta = {}
     if search.catalogue_summary:
@@ -294,7 +351,8 @@ def serialize_search_variants(db: Session, search: TrackedSearch) -> Dict[str, A
         "total_clean_items": total_clean,
         "unclassified_count": unclassified_count,
         "classified_count": max(0, total_clean - unclassified_count),
-        "variants": out_variants,
+        "models": models_tree,
+        "variants": ordered_variants,
     }
 
 
@@ -305,7 +363,7 @@ def run_research_and_train_for_search(
     classify_existing: bool = True,
     replace_existing: bool = True,
 ) -> Dict[str, Any]:
-    """Execute end-to-end Deep Research -> Faceted Catalogue Sync -> Per-Dimension Vision Training -> Backfill."""
+    """Execute end-to-end Deep Research -> Hierarchical Model/Style Sync -> 2-Stage Vision Training -> Backfill."""
     db_samples = (
         db.query(SoldItem)
         .filter(SoldItem.tracked_search_id == search.id, SoldItem.is_replica.isnot(True))
@@ -335,6 +393,12 @@ def run_research_and_train_for_search(
         sample_listings=sample_dicts,
     )
 
+    # Preserve custom user snipe price caps & snipe toggles across re-research when slugs match
+    preserved_prefs: Dict[str, Tuple[Optional[float], bool]] = {
+        v.variant_slug: (v.target_max_price, bool(v.is_sniping_enabled))
+        for v in db.query(ProductVariant).filter(ProductVariant.tracked_search_id == search.id).all()
+    }
+
     if replace_existing:
         db.query(SoldItem).filter(SoldItem.tracked_search_id == search.id).update(
             {
@@ -356,28 +420,32 @@ def run_research_and_train_for_search(
         for v in db.query(ProductVariant).filter(ProductVariant.tracked_search_id == search.id).all()
     }
 
-    for v_spec in catalogue.get("variants", []):
+    def _upsert_variant_node(v_spec: Dict[str, Any], parent_id: Optional[int] = None) -> ProductVariant:
         slug = v_spec["variant_slug"]
-        dim = v_spec.get("dimension") or "Style"
+        dim = "Style" if parent_id is not None else "Model"
         mod = v_spec.get("modality") or "visual"
+        est_mkt = v_spec.get("est_market_value_gbp")
+        default_snipe_max = max(5.0, round(float(est_mkt) * 0.65, 0)) if est_mkt else None
+        prev_cap, prev_enabled = preserved_prefs.get(slug, (default_snipe_max, True))
+
         if slug in existing_by_slug:
             v_obj = existing_by_slug[slug]
+            v_obj.parent_variant_id = parent_id
             v_obj.variant_name = v_spec["variant_name"]
             v_obj.dimension = dim
             v_obj.modality = mod
             v_obj.short_description = v_spec.get("short_description")
             v_obj.resale_tier = v_spec.get("resale_tier", "STANDARD")
-            v_obj.est_market_value_gbp = v_spec.get("est_market_value_gbp")
+            v_obj.est_market_value_gbp = est_mkt
             v_obj.visual_cues = json.dumps(v_spec.get("visual_cues", []))
             v_obj.ocr_signatures = json.dumps(v_spec.get("ocr_signatures", []))
             v_obj.text_keywords = json.dumps(v_spec.get("text_keywords", []))
             v_obj.negative_keywords = json.dumps(v_spec.get("negative_keywords", []))
             v_obj.updated_at = datetime.now(timezone.utc)
         else:
-            est_mkt = v_spec.get("est_market_value_gbp")
-            default_snipe_max = max(5.0, round(float(est_mkt) * 0.65, 0)) if est_mkt else None
             v_obj = ProductVariant(
                 tracked_search_id=search.id,
+                parent_variant_id=parent_id,
                 variant_slug=slug,
                 variant_name=v_spec["variant_name"],
                 dimension=dim,
@@ -389,10 +457,19 @@ def run_research_and_train_for_search(
                 ocr_signatures=json.dumps(v_spec.get("ocr_signatures", [])),
                 text_keywords=json.dumps(v_spec.get("text_keywords", [])),
                 negative_keywords=json.dumps(v_spec.get("negative_keywords", [])),
-                target_max_price=default_snipe_max,
-                is_sniping_enabled=True,
+                target_max_price=prev_cap if prev_cap is not None else default_snipe_max,
+                is_sniping_enabled=prev_enabled,
             )
             db.add(v_obj)
+            db.flush()
+            existing_by_slug[slug] = v_obj
+        return v_obj
+
+    for model_spec in catalogue.get("variants", []):
+        parent_model = _upsert_variant_node(model_spec, parent_id=None)
+        for sub_spec in (model_spec.get("sub_styles") or []):
+            if isinstance(sub_spec, dict):
+                _upsert_variant_node(sub_spec, parent_id=parent_model.id)
 
     search.variants_enabled = True
     search.catalogue_summary = json.dumps({
@@ -694,23 +771,53 @@ def create_custom_variant(
     data: VariantCreateUpdateRequest,
     db: Session = Depends(get_db),
 ):
-    """Add a custom category/variant tag to a tracked search."""
+    """Add a custom Top-Level Model (`parent_variant_id=None`) or Exclusive Sub-Style (`parent_variant_id=<model_id>`)."""
     search = db.query(TrackedSearch).filter(TrackedSearch.id == search_id).first()
     if not search:
         raise HTTPException(status_code=404, detail="Tracked search not found")
 
     name = (data.variant_name or "").strip()
     if not name:
-        raise HTTPException(status_code=400, detail="Variant name is required")
+        raise HTTPException(status_code=400, detail="Model / Style name is required")
 
-    dim = (data.dimension or "Style").strip().title() or "Style"
-    mod = (data.modality or ("label" if dim.lower() in ("material", "fabric", "kit", "bundle") else "visual")).strip().lower()
+    parent_id: Optional[int] = None
+    parent_model: Optional[ProductVariant] = None
+    if data.parent_variant_id is not None:
+        parent_row = (
+            db.query(ProductVariant)
+            .filter(
+                ProductVariant.id == int(data.parent_variant_id),
+                ProductVariant.tracked_search_id == search.id,
+            )
+            .first()
+        )
+        if not parent_row:
+            raise HTTPException(status_code=404, detail="Parent model not found in this search")
+        # Keep tree strictly 2-tier (Model -> Exclusive Style)
+        if parent_row.parent_variant_id is not None:
+            parent_row = (
+                db.query(ProductVariant)
+                .filter(ProductVariant.id == parent_row.parent_variant_id)
+                .first()
+                or parent_row
+            )
+        parent_model = parent_row
+        parent_id = parent_row.id
+
+    dim = "Style" if parent_id is not None else "Model"
+    mod = (data.modality or "visual").strip().lower()
     if mod not in ("visual", "label"):
         mod = "visual"
 
     slug = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_") or "custom_variant"
+    default_vcue_prefix = (
+        f"{search.search_text} {parent_model.variant_name} {name}"
+        if parent_model is not None
+        else f"{search.search_text} {name}"
+    )
     v = ProductVariant(
         tracked_search_id=search.id,
+        parent_variant_id=parent_id,
         variant_slug=f"{slug}_{int(datetime.now(timezone.utc).timestamp()) % 10000}",
         variant_name=name,
         dimension=dim,
@@ -718,7 +825,7 @@ def create_custom_variant(
         short_description=data.short_description or "",
         resale_tier=(data.resale_tier or "STANDARD").upper(),
         est_market_value_gbp=data.est_market_value_gbp,
-        visual_cues=json.dumps([] if mod == "label" else (data.visual_cues or [f"{search.search_text} {name}"])),
+        visual_cues=json.dumps([] if mod == "label" else (data.visual_cues or [default_vcue_prefix])),
         ocr_signatures=json.dumps(data.ocr_signatures or []),
         text_keywords=json.dumps(data.text_keywords or [name.lower()]),
         negative_keywords=json.dumps(data.negative_keywords or []),
@@ -740,15 +847,20 @@ def update_variant(
     data: VariantCreateUpdateRequest,
     db: Session = Depends(get_db),
 ):
-    """Update a variant's sniping status, dimension, custom target max buy price, or detection keywords."""
+    """Update a Model or Exclusive Style's sniping status, custom target max buy price, or detection keywords."""
     v = db.query(ProductVariant).filter(ProductVariant.id == variant_id).first()
     if not v:
         raise HTTPException(status_code=404, detail="Variant not found")
 
-    if data.variant_name is not None:
+    if data.variant_name is not None and data.variant_name.strip():
         v.variant_name = data.variant_name.strip()
-    if data.dimension is not None and data.dimension.strip():
-        v.dimension = data.dimension.strip().title()
+    if data.parent_variant_id is not None:
+        if data.parent_variant_id <= 0:
+            v.parent_variant_id = None
+            v.dimension = "Model"
+        elif data.parent_variant_id != v.id:
+            v.parent_variant_id = int(data.parent_variant_id)
+            v.dimension = "Style"
     if data.modality is not None and data.modality.strip().lower() in ("visual", "label"):
         v.modality = data.modality.strip().lower()
     if data.short_description is not None:
@@ -787,30 +899,36 @@ def update_variant(
 
 @router.delete("/variants/{variant_id}")
 def delete_variant(variant_id: int, db: Session = Depends(get_db)):
-    """Remove a variant definition and clean its ID from any multi-tagged items."""
+    """Remove a Model (plus its exclusive sub-styles) or a single Sub-Style and clean item references."""
     v = db.query(ProductVariant).filter(ProductVariant.id == variant_id).first()
     if not v:
         raise HTTPException(status_code=404, detail="Variant not found")
 
     search_id = v.tracked_search_id
-    affected_items = db.query(SoldItem).filter(item_has_variant_clause(variant_id)).all()
+    child_rows = db.query(ProductVariant).filter(ProductVariant.parent_variant_id == variant_id).all()
+    removed_ids = {variant_id} | {c.id for c in child_rows}
+
+    clause = or_(*(item_has_variant_clause(rid) for rid in removed_ids))
+    affected_items = db.query(SoldItem).filter(clause).all()
     remaining_map = {
         rv.id: rv.variant_name
         for rv in db.query(ProductVariant)
-        .filter(ProductVariant.tracked_search_id == search_id, ProductVariant.id != variant_id)
+        .filter(ProductVariant.tracked_search_id == search_id, ~ProductVariant.id.in_(removed_ids))
         .all()
     }
     for it in affected_items:
-        kept_ids = [vid for vid in it.parsed_variant_ids() if vid != variant_id and vid in remaining_map]
+        kept_ids = [vid for vid in it.parsed_variant_ids() if vid not in removed_ids and vid in remaining_map]
         if kept_ids:
             kept_names = [remaining_map[vid] for vid in kept_ids]
-            it.variant_id = kept_ids[0]
+            it.variant_id = kept_ids[-1]
             it.variant_ids_json = json.dumps(kept_ids, separators=(",", ":"))
-            it.variant_name = " · ".join(kept_names)
+            it.variant_name = " › ".join(kept_names)
             it.variant_names_json = json.dumps(kept_names)
         else:
             it.apply_variant_result(None)
 
+    for c in child_rows:
+        db.delete(c)
     db.delete(v)
     db.commit()
 

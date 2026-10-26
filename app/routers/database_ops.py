@@ -197,6 +197,8 @@ def get_database_analytics(db: Session = Depends(get_db)):
     ]
 
     # Searches breakdown
+    from .variants import item_has_variant_clause
+
     searches = db.query(TrackedSearch).filter(TrackedSearch.is_active == True).all()
     search_stats = []
     for s in searches:
@@ -208,6 +210,40 @@ def get_database_analytics(db: Session = Depends(get_db)):
             .order_by(ProductVariant.id)
             .all()
         )
+        v_by_id = {v.id: v for v in s_vars}
+        top_models = [v for v in s_vars if v.parent_variant_id is None or v.parent_variant_id not in v_by_id]
+        ordered_s_vars = []
+        for m in top_models:
+            ordered_s_vars.append(m)
+            for c in s_vars:
+                if c.parent_variant_id == m.id:
+                    ordered_s_vars.append(c)
+
+        serialized_s_vars = []
+        for v in ordered_s_vars:
+            is_sub = v.parent_variant_id is not None and v.parent_variant_id in v_by_id
+            parent_v = v_by_id.get(v.parent_variant_id) if is_sub else None
+            v_cnt = (
+                db.query(func.count(SoldItem.id))
+                .filter(
+                    SoldItem.tracked_search_id == s.id,
+                    SoldItem.is_replica.isnot(True),
+                    item_has_variant_clause(v.id),
+                )
+                .scalar()
+                or 0
+            )
+            serialized_s_vars.append({
+                "id": v.id,
+                "parent_variant_id": v.parent_variant_id if is_sub else None,
+                "parent_variant_name": parent_v.variant_name if parent_v else None,
+                "is_sub_style": is_sub,
+                "variant_name": v.variant_name,
+                "dimension": "Style" if is_sub else "Model",
+                "resale_tier": v.resale_tier or "STANDARD",
+                "count": int(v_cnt),
+            })
+
         search_stats.append({
             "id": s.id,
             "search_text": s.search_text,
@@ -215,15 +251,7 @@ def get_database_analytics(db: Session = Depends(get_db)):
             "replicas": r_cnt,
             "clean": t_cnt - r_cnt,
             "variants_enabled": bool(getattr(s, "variants_enabled", False)),
-            "variants": [
-                {
-                    "id": v.id,
-                    "variant_name": v.variant_name,
-                    "dimension": (v.dimension or "Style").strip() or "Style",
-                    "resale_tier": v.resale_tier or "STANDARD",
-                }
-                for v in s_vars
-            ],
+            "variants": serialized_s_vars,
         })
 
     return {

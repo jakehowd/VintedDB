@@ -133,6 +133,7 @@ class VintedApp {
       if (e.key === 'Escape') {
         const pop = document.getElementById('item-tag-popover');
         if (pop) pop.classList.add('hidden');
+        this.closeCustomVariantModal();
       }
     });
 
@@ -1243,6 +1244,7 @@ class VintedApp {
     if (String(this.currentSearchId) !== String(id)) {
       this.currentVariantFilter = 'all';
       this.currentVariantsData = null;
+      this.showModelsCompare = false;
     }
     this.currentSearchId = id;
     this.isDbExplorerActive = false;
@@ -1802,22 +1804,20 @@ class VintedApp {
 
         const vNames = (Array.isArray(item.variant_names) && item.variant_names.length > 0)
           ? item.variant_names
-          : (item.variant_name ? [item.variant_name] : []);
+          : (item.variant_name ? String(item.variant_name).split(/\s*[›·]\s*/).filter(Boolean) : []);
         const vIds = (Array.isArray(item.variant_ids) && item.variant_ids.length > 0)
           ? item.variant_ids
           : (item.variant_id ? [item.variant_id] : []);
         const safeEvidence = this.escapeHtmlAttr(item.variant_evidence || '');
 
-        const inlineTagsHtml = vNames.map(vn =>
-          `<span class="item-tag-pill" ${safeEvidence ? `title="${safeEvidence}"` : ''}>${this.escapeHtmlAttr(vn)}</span>`
-        ).join('');
+        const inlineTagsHtml = this.renderItemHierarchyBadge(vNames, safeEvidence);
 
         const editTagBtnHtml = knownVariants.length > 0
           ? `<button type="button"
                      onclick="app.openItemTagPopover(event, ${item.id}, ${this.currentSearchId}, '${vIds.join(',')}')"
                      class="tag-popover-trigger inline-flex items-center px-1.5 py-0.5 rounded text-[10px] text-slate-400 hover:text-teal-300 hover:bg-slate-800 transition cursor-pointer opacity-60 group-hover:opacity-100"
-                     title="Edit categories / tags">
-               <i data-lucide="tag" class="w-2.5 h-2.5 mr-0.5"></i><span>${vNames.length > 0 ? 'Edit' : '+ Tag'}</span>
+                     title="Assign product model & exclusive style">
+               <i data-lucide="layers" class="w-2.5 h-2.5 mr-0.5"></i><span>${vNames.length > 0 ? 'Edit' : '+ Model'}</span>
              </button>`
           : '';
 
@@ -1939,62 +1939,99 @@ class VintedApp {
       const recPrice = info && info.recommended_profitable_price ? info.recommended_profitable_price : null;
 
       const variants = (info && Array.isArray(info.variants)) ? info.variants : [];
+      const models = (info && Array.isArray(info.models) && info.models.length > 0)
+        ? info.models
+        : this.buildModelsTreeFromFlat(variants);
       const enabledVariants = variants.filter(v => v.is_sniping_enabled);
       const allVariantsEnabled = variants.length > 0 && enabledVariants.length === variants.length;
 
-      // Group variants by dimension for clean inline multi-category selection
-      const dimMap = new Map();
-      variants.forEach(v => {
-        const d = (v.dimension || 'Style').trim() || 'Style';
-        if (!dimMap.has(d)) dimMap.set(d, []);
-        dimMap.get(d).push(v);
-      });
+      // Focused models = models enabled when NOT in 'All Models' mode
+      const focusedModels = !allVariantsEnabled
+        ? models.filter(m => m.is_sniping_enabled || (Array.isArray(m.sub_styles) && m.sub_styles.some(st => st.is_sniping_enabled)))
+        : [];
+      const singleFocusedModel = focusedModels.length === 1 ? focusedModels[0] : null;
+      const focusedModelSubs = (singleFocusedModel && Array.isArray(singleFocusedModel.sub_styles))
+        ? singleFocusedModel.sub_styles
+        : [];
+      const enabledFocusedSubs = focusedModelSubs.filter(st => st.is_sniping_enabled);
+      const allFocusedSubsOn = focusedModelSubs.length > 0 && enabledFocusedSubs.length === focusedModelSubs.length;
 
-      const variantBlockHtml = variants.length > 0 ? `
-        <div class="pt-2 mt-1.5 border-t border-slate-800/70 flex flex-wrap items-center gap-1.5">
-          <button type="button"
-                  onclick="app.setSniperVariantSelection(${s.id}, 'all')"
-                  class="facet-chip ${allVariantsEnabled ? 'active' : ''}"
-                  title="Snipe all listings matching '${this.escapeHtmlAttr(s.search_text)}'">
-            <span>All</span>
-          </button>
-          ${Array.from(dimMap.entries()).map(([dimName, dimVars]) => `
+      // Determine single active price target (specific sub-style if 1 sub-style narrowed, else single model)
+      const priceTargetVariant = (!allVariantsEnabled && singleFocusedModel)
+        ? ((enabledFocusedSubs.length === 1 && !allFocusedSubsOn) ? enabledFocusedSubs[0] : singleFocusedModel)
+        : null;
+
+      const variantBlockHtml = models.length > 0 ? `
+        <div class="pt-2 mt-1.5 border-t border-slate-800/70 space-y-1.5">
+          <div class="flex flex-wrap items-center gap-1.5">
+            <button type="button"
+                    onclick="app.setSniperVariantSelection(${s.id}, 'all')"
+                    class="facet-chip ${allVariantsEnabled ? 'active' : ''}"
+                    title="Snipe all models & styles of '${this.escapeHtmlAttr(s.search_text)}'">
+              <span>All Models</span>
+            </button>
             <div class="facet-group">
-              <span class="facet-label">${this.escapeHtmlAttr(dimName)}</span>
-              ${dimVars.map(v => {
-                const isChipActive = !allVariantsEnabled && Boolean(v.is_sniping_enabled);
+              <span class="facet-label">Models</span>
+              ${models.map(m => {
+                const isModelActive = !allVariantsEnabled && (
+                  m.is_sniping_enabled || (Array.isArray(m.sub_styles) && m.sub_styles.some(st => st.is_sniping_enabled))
+                );
+                const subCountBadge = (m.sub_styles && m.sub_styles.length > 0) ? ` ▾` : '';
                 return `
                   <button type="button"
-                          onclick="app.toggleSniperFacetChip(${s.id}, ${v.id})"
-                          class="facet-chip ${isChipActive ? 'active' : ''}"
-                          title="Click to combine categories (e.g. Style + Material)">
-                    <span>${this.escapeHtmlAttr(v.variant_name)}</span>
+                          onclick="app.toggleSniperModelChip(${s.id}, ${m.id})"
+                          class="facet-chip ${isModelActive ? 'active' : ''}"
+                          title="${this.escapeHtmlAttr(m.short_description || m.variant_name)}">
+                    <span>${this.escapeHtmlAttr(m.variant_name)}${subCountBadge}</span>
                   </button>
                 `;
               }).join('')}
             </div>
-          `).join('')}
-          ${(!allVariantsEnabled && enabledVariants.length === 1) ? `
-            <div class="inline-flex items-center bg-slate-950 rounded-md border border-slate-800 px-1.5 py-0.5 ml-auto" title="Optional custom max price for ${this.escapeHtmlAttr(enabledVariants[0].variant_name)}">
-              <span class="text-[10px] text-slate-400 font-mono mr-1">Tag ≤£</span>
-              <input type="number"
-                     value="${enabledVariants[0].target_max_price != null ? enabledVariants[0].target_max_price : ''}"
-                     placeholder="${currentItemPrice}"
-                     min="1" max="10000" step="1"
-                     onchange="app.setVariantMaxPrice(${enabledVariants[0].id}, this.value)"
-                     class="w-12 bg-transparent text-[11px] font-mono font-bold text-emerald-400 text-center focus:outline-none">
+
+            ${priceTargetVariant ? `
+              <div class="inline-flex items-center bg-slate-950 rounded-md border border-slate-800 px-1.5 py-0.5 ml-auto" title="Custom max snipe price for ${this.escapeHtmlAttr(priceTargetVariant.variant_name)}">
+                <span class="text-[10px] text-slate-400 font-mono mr-1">Cap ≤£</span>
+                <input type="number"
+                       value="${priceTargetVariant.target_max_price != null ? priceTargetVariant.target_max_price : ''}"
+                       placeholder="${priceTargetVariant.recommended_snipe_price || currentItemPrice}"
+                       min="1" max="10000" step="1"
+                       onchange="app.setVariantMaxPrice(${priceTargetVariant.id}, this.value)"
+                       class="w-12 bg-transparent text-[11px] font-mono font-bold text-emerald-400 text-center focus:outline-none">
+              </div>
+            ` : ''}
+          </div>
+
+          ${(singleFocusedModel && focusedModelSubs.length > 0) ? `
+            <div class="substyle-bar">
+              <span class="text-[10px] font-bold text-cyan-300/90 font-mono mr-0.5">↳ ${this.escapeHtmlAttr(singleFocusedModel.variant_name)} Styles:</span>
+              <button type="button"
+                      onclick="app.selectAllSniperSubStyles(${s.id}, ${singleFocusedModel.id})"
+                      class="substyle-chip ${allFocusedSubsOn || enabledFocusedSubs.length === 0 ? 'active' : ''}">
+                <span>All ${this.escapeHtmlAttr(singleFocusedModel.variant_name)}</span>
+              </button>
+              ${focusedModelSubs.map(st => {
+                const isSubActive = !allFocusedSubsOn && Boolean(st.is_sniping_enabled);
+                return `
+                  <button type="button"
+                          onclick="app.toggleSniperSubStyleChip(${s.id}, ${singleFocusedModel.id}, ${st.id})"
+                          class="substyle-chip ${isSubActive ? 'active' : ''}"
+                          title="${this.escapeHtmlAttr(st.short_description || st.variant_name)} (Exclusive to ${this.escapeHtmlAttr(singleFocusedModel.variant_name)})">
+                    <span>${this.escapeHtmlAttr(st.variant_name)}</span>
+                  </button>
+                `;
+              }).join('')}
             </div>
           ` : ''}
         </div>
       ` : `
         <div class="pt-2 mt-1 border-t border-slate-800/50 flex items-center justify-between text-[10px] text-slate-500">
-          <span>Sniping all listings</span>
+          <span>Sniping all listings (no specific models researched yet)</span>
           <button type="button"
                   onclick="app.researchVariantsFromSniper(${s.id})"
                   id="btn-sniper-research-${s.id}"
                   class="inline-flex items-center px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 font-medium transition cursor-pointer">
-            <i data-lucide="tags" class="w-2.5 h-2.5 mr-1 text-teal-400"></i>
-            <span>Auto-categorise</span>
+            <i data-lucide="sparkles" class="w-2.5 h-2.5 mr-1 text-teal-400"></i>
+            <span>Discover Models</span>
           </button>
         </div>
       `;
@@ -3412,10 +3449,9 @@ class VintedApp {
     const currentVariantVal = this.dbExplorerFilters.variant_id ? String(this.dbExplorerFilters.variant_id) : '';
 
     if (variantSelect) {
-      let html = `<option value="" ${!currentVariantVal ? 'selected' : ''}>All Categories / Tags</option>`;
+      let html = `<option value="" ${!currentVariantVal ? 'selected' : ''}>All Models & Styles</option>`;
       html += `<option value="unclassified" ${currentVariantVal === 'unclassified' ? 'selected' : ''}>Untagged Items Only</option>`;
 
-      // If multiple categories are combined via chips (e.g. '6,9'), reflect that in the dropdown too
       if (currentVariantVal && currentVariantVal.includes(',')) {
         const activeIds = currentVariantVal.split(',').map(s => Number(s.trim())).filter(Boolean);
         const allVars = searches.flatMap(s => Array.isArray(s.variants) ? s.variants : []);
@@ -3423,14 +3459,19 @@ class VintedApp {
           const found = allVars.find(v => Number(v.id) === id);
           return found ? found.variant_name : `#${id}`;
         });
-        html += `<option value="${this.escapeHtmlAttr(currentVariantVal)}" selected>Combined: ${this.escapeHtmlAttr(names.join(' + '))}</option>`;
+        html += `<option value="${this.escapeHtmlAttr(currentVariantVal)}" selected>Styles: ${this.escapeHtmlAttr(names.join(' / '))}</option>`;
       }
+
+      const renderOption = (v) => {
+        const prefix = v.is_sub_style || v.parent_variant_id ? '   ↳ ' : '';
+        return `<option value="${v.id}" ${currentVariantVal === String(v.id) ? 'selected' : ''}>${prefix}${this.escapeHtmlAttr(v.variant_name)} [${v.count || 0}]</option>`;
+      };
 
       if (selectedSearchId) {
         const matchSearch = searches.find(s => String(s.id) === selectedSearchId);
         const variants = (matchSearch && Array.isArray(matchSearch.variants)) ? matchSearch.variants : [];
         variants.forEach(v => {
-          html += `<option value="${v.id}" ${currentVariantVal === String(v.id) ? 'selected' : ''}>${this.escapeHtmlAttr(v.variant_name)} [${v.count || 0}]</option>`;
+          html += renderOption(v);
         });
       } else {
         searches.forEach(s => {
@@ -3438,7 +3479,7 @@ class VintedApp {
           if (variants.length > 0) {
             html += `<optgroup label="${this.escapeHtmlAttr(s.search_text)}">`;
             variants.forEach(v => {
-              html += `<option value="${v.id}" ${currentVariantVal === String(v.id) ? 'selected' : ''}>${this.escapeHtmlAttr(v.variant_name)} [${v.count || 0}]</option>`;
+              html += renderOption(v);
             });
             html += `</optgroup>`;
           }
@@ -3466,7 +3507,8 @@ class VintedApp {
 
     const matchSearch = searches.find(s => String(s.id) === selectedSearchId);
     const variants = (matchSearch && Array.isArray(matchSearch.variants)) ? matchSearch.variants : [];
-    if (variants.length === 0) {
+    const models = this.buildModelsTreeFromFlat(variants);
+    if (models.length === 0) {
       bar.classList.add('hidden');
       bar.innerHTML = '';
       return;
@@ -3479,69 +3521,109 @@ class VintedApp {
         : []
     );
 
-    const dimMap = new Map();
-    variants.forEach(v => {
-      const d = (v.dimension || 'Style').trim() || 'Style';
-      if (!dimMap.has(d)) dimMap.set(d, []);
-      dimMap.get(d).push(v);
-    });
+    // Identify active model (either directly selected or via one of its exclusive sub-styles)
+    let activeModel = null;
+    for (const m of models) {
+      if (selectedSet.has(Number(m.id))) {
+        activeModel = m;
+        break;
+      }
+      if (Array.isArray(m.sub_styles) && m.sub_styles.some(st => selectedSet.has(Number(st.id)))) {
+        activeModel = m;
+        break;
+      }
+    }
 
-    let html = `
-      <button type="button"
-              onclick="app.setDbFacetFilter('')"
-              class="facet-chip ${!rawVal ? 'active' : ''}">
-        <span>All</span>
-      </button>
+    let modelsHtml = `
+      <div class="w-full flex flex-wrap items-center gap-1.5">
+        <button type="button"
+                onclick="app.setDbFacetFilter('')"
+                class="facet-chip ${!rawVal ? 'active' : ''}">
+          <span>All Models</span>
+        </button>
+        <div class="facet-group">
+          <span class="facet-label">Models</span>
+          ${models.map(m => {
+            const isModelActive = activeModel && Number(activeModel.id) === Number(m.id);
+            const hasSubs = Array.isArray(m.sub_styles) && m.sub_styles.length > 0;
+            return `
+              <button type="button"
+                      onclick="app.selectDbModelChip(${m.id})"
+                      class="facet-chip ${isModelActive ? 'active' : ''}">
+                <span>${this.escapeHtmlAttr(m.variant_name)}${hasSubs ? ' ▾' : ''}</span>
+                <span class="text-[10px] font-mono opacity-65">${m.count || 0}</span>
+              </button>
+            `;
+          }).join('')}
+        </div>
+        <button type="button"
+                onclick="app.setDbFacetFilter('unclassified')"
+                class="facet-chip ${rawVal === 'unclassified' ? 'active' : ''}">
+          <span>Untagged</span>
+        </button>
+      </div>
     `;
 
-    dimMap.forEach((dimVars, dimName) => {
-      html += `<div class="facet-group"><span class="facet-label">${this.escapeHtmlAttr(dimName)}</span>`;
-      dimVars.forEach(v => {
-        const isActive = selectedSet.has(Number(v.id));
-        html += `
+    if (activeModel && Array.isArray(activeModel.sub_styles) && activeModel.sub_styles.length > 0) {
+      const anySubSelected = activeModel.sub_styles.some(st => selectedSet.has(Number(st.id)));
+      modelsHtml += `
+        <div class="w-full substyle-bar mt-1">
+          <span class="text-[10px] font-bold text-cyan-300/90 font-mono mr-0.5">↳ ${this.escapeHtmlAttr(activeModel.variant_name)} Styles:</span>
           <button type="button"
-                  onclick="app.toggleDbFacetChip(${v.id})"
-                  class="facet-chip ${isActive ? 'active' : ''}"
-                  title="Click to combine categories across facets">
-            <span>${this.escapeHtmlAttr(v.variant_name)}</span>
-            <span class="text-[10px] font-mono opacity-65">${v.count || 0}</span>
+                  onclick="app.setDbFacetFilter('${activeModel.id}')"
+                  class="substyle-chip ${!anySubSelected ? 'active' : ''}">
+            <span>All ${this.escapeHtmlAttr(activeModel.variant_name)}</span>
+            <span class="text-[10px] font-mono opacity-65">${activeModel.count || 0}</span>
           </button>
-        `;
-      });
-      html += `</div>`;
-    });
-
-    html += `
-      <button type="button"
-              onclick="app.setDbFacetFilter('unclassified')"
-              class="facet-chip ${rawVal === 'unclassified' ? 'active' : ''}">
-        <span>Untagged</span>
-      </button>
-    `;
+          ${activeModel.sub_styles.map(st => {
+            const isSubActive = selectedSet.has(Number(st.id));
+            return `
+              <button type="button"
+                      onclick="app.toggleDbSubStyleChip(${activeModel.id}, ${st.id})"
+                      class="substyle-chip ${isSubActive ? 'active' : ''}">
+                <span>${this.escapeHtmlAttr(st.variant_name)}</span>
+                <span class="text-[10px] font-mono opacity-65">${st.count || 0}</span>
+              </button>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
 
     bar.classList.remove('hidden');
-    bar.innerHTML = html;
+    bar.innerHTML = modelsHtml;
+  }
+
+  selectDbModelChip(modelId) {
+    const rawVal = String(this.dbExplorerFilters.variant_id || '');
+    if (rawVal === String(modelId)) {
+      this.setDbFacetFilter('');
+    } else {
+      this.setDbFacetFilter(String(modelId));
+    }
+  }
+
+  toggleDbSubStyleChip(modelId, styleId) {
+    const sId = Number(styleId);
+    const mId = Number(modelId);
+    const analytics = this.dbAnalyticsData;
+    const matchSearch = (analytics?.searches || []).find(s => String(s.id) === String(this.dbExplorerFilters.search_id));
+    const variants = matchSearch?.variants || [];
+    const validSubIds = new Set(variants.filter(v => Number(v.parent_variant_id) === mId).map(v => Number(v.id)));
+
+    const rawVal = String(this.dbExplorerFilters.variant_id || '');
+    const currentSet = new Set(
+      rawVal.split(',').map(x => Number(x.trim())).filter(n => validSubIds.has(n))
+    );
+    if (currentSet.has(sId)) currentSet.delete(sId);
+    else currentSet.add(sId);
+
+    const nextVal = currentSet.size > 0 ? Array.from(currentSet).join(',') : String(mId);
+    this.setDbFacetFilter(nextVal);
   }
 
   setDbFacetFilter(val) {
     this.dbExplorerFilters.variant_id = val || '';
-    this.populateExplorerVariantDropdown(this.dbAnalyticsData);
-    this.dbExplorerFilters.page = 1;
-    this.loadExplorerItems();
-  }
-
-  toggleDbFacetChip(variantId) {
-    const idNum = Number(variantId);
-    const rawVal = String(this.dbExplorerFilters.variant_id || '');
-    const activeSet = new Set(
-      (rawVal && rawVal !== 'unclassified')
-        ? rawVal.split(',').map(x => Number(x.trim())).filter(Boolean)
-        : []
-    );
-    if (activeSet.has(idNum)) activeSet.delete(idNum);
-    else activeSet.add(idNum);
-
-    this.dbExplorerFilters.variant_id = activeSet.size > 0 ? Array.from(activeSet).join(',') : '';
     this.populateExplorerVariantDropdown(this.dbAnalyticsData);
     this.dbExplorerFilters.page = 1;
     this.loadExplorerItems();
@@ -3916,7 +3998,7 @@ class VintedApp {
                 ${(() => {
                   const vNames = (Array.isArray(item.variant_names) && item.variant_names.length > 0)
                     ? item.variant_names
-                    : (item.variant_name ? [item.variant_name] : []);
+                    : (item.variant_name ? String(item.variant_name).split(/\s*[›·]\s*/).filter(Boolean) : []);
                   const vIds = (Array.isArray(item.variant_ids) && item.variant_ids.length > 0)
                     ? item.variant_ids
                     : (item.variant_id ? [item.variant_id] : []);
@@ -3926,16 +4008,14 @@ class VintedApp {
                   const sVariants = (searchAnalytics && Array.isArray(searchAnalytics.variants)) ? searchAnalytics.variants : [];
                   const safeEv = this.escapeHtmlAttr(item.variant_evidence || '');
 
-                  const pills = vNames.map(vn =>
-                    `<span class="item-tag-pill" ${safeEv ? `title="${safeEv}"` : ''}>${this.escapeHtmlAttr(vn)}</span>`
-                  ).join('');
+                  const pills = this.renderItemHierarchyBadge(vNames, safeEv);
 
                   const editBtn = sVariants.length > 0
                     ? `<button type="button"
                                onclick="app.openItemTagPopover(event, ${item.id}, ${item.tracked_search_id}, '${vIds.join(',')}')"
                                class="tag-popover-trigger inline-flex items-center px-1.5 py-0.5 rounded text-[10px] text-slate-400 hover:text-teal-300 hover:bg-slate-800 transition cursor-pointer opacity-70 group-hover:opacity-100"
-                               title="Edit categories / tags">
-                         <i data-lucide="tag" class="w-2.5 h-2.5 mr-0.5"></i><span>${vNames.length > 0 ? 'Edit' : '+ Tag'}</span>
+                               title="Assign product model & exclusive style">
+                         <i data-lucide="layers" class="w-2.5 h-2.5 mr-0.5"></i><span>${vNames.length > 0 ? 'Edit' : '+ Model'}</span>
                        </button>`
                     : '';
 
@@ -5795,76 +5875,138 @@ class VintedApp {
     );
   }
 
+  buildModelsTreeFromFlat(variants) {
+    const list = Array.isArray(variants) ? variants : [];
+    const byId = new Map();
+    list.forEach(v => byId.set(Number(v.id), v));
+
+    const roots = list.filter(v => !v.parent_variant_id || !byId.has(Number(v.parent_variant_id)));
+    return roots.map(r => {
+      const subs = list.filter(c => Number(c.parent_variant_id) === Number(r.id));
+      return { ...r, sub_styles: subs };
+    });
+  }
+
+  renderItemHierarchyBadge(vNames, safeEvidence = '') {
+    const clean = (Array.isArray(vNames) ? vNames : []).filter(Boolean);
+    if (clean.length === 0) return '';
+    if (clean.length === 1) {
+      return `<span class="item-tag-pill" ${safeEvidence ? `title="${safeEvidence}"` : ''}>${this.escapeHtmlAttr(clean[0])}</span>`;
+    }
+    const modelName = this.escapeHtmlAttr(clean[0]);
+    const styleName = this.escapeHtmlAttr(clean.slice(1).join(' › '));
+    return `<span class="item-tag-pill" ${safeEvidence ? `title="${safeEvidence}"` : ''}><span>${modelName}</span><span class="tag-sep">›</span><span class="tag-sub">${styleName}</span></span>`;
+  }
+
+  getTierBadgeClass(tier) {
+    const t = String(tier || 'STANDARD').toUpperCase();
+    if (t === 'PREMIUM' || t === 'GRAIL') return 'tier-badge-premium';
+    if (t === 'HIGH') return 'tier-badge-high';
+    if (t === 'BUDGET') return 'tier-badge-budget';
+    return 'tier-badge-standard';
+  }
+
   renderCurrentSearchVariantsPanel() {
     const pillsContainer = document.getElementById('item-variants-pills-container');
+    const subStylesRow = document.getElementById('item-substyles-row');
     const inspector = document.getElementById('item-variant-inspector');
+    const comparePanel = document.getElementById('item-models-compare-panel');
+    const compareBtn = document.getElementById('btn-compare-models');
+    const syncBtn = document.getElementById('btn-sync-variants');
     const researchText = document.getElementById('text-research-variants');
 
     if (!pillsContainer) return;
 
     const data = this.currentVariantsData;
     const variants = (data && Array.isArray(data.variants)) ? data.variants : [];
+    const models = (data && Array.isArray(data.models) && data.models.length > 0)
+      ? data.models
+      : this.buildModelsTreeFromFlat(variants);
 
-    if (variants.length === 0) {
-      if (researchText) researchText.textContent = 'Auto-Categorise';
+    if (models.length === 0) {
+      if (researchText) researchText.textContent = 'Discover Models';
+      if (subStylesRow) subStylesRow.classList.add('hidden');
       if (inspector) inspector.classList.add('hidden');
+      if (comparePanel) comparePanel.classList.add('hidden');
+      if (compareBtn) {
+        compareBtn.classList.add('hidden');
+        compareBtn.classList.remove('inline-flex');
+      }
+      if (syncBtn) {
+        syncBtn.classList.add('hidden');
+        syncBtn.classList.remove('inline-flex');
+      }
 
       pillsContainer.innerHTML = `
         <span class="text-xs text-slate-400">
-          No category tags set up for this item yet — click <strong>Auto-Categorise</strong> to group sub-models, cuts & materials automatically.
+          No product models discovered yet — click <strong>Discover Models</strong> to research product-specific models & exclusive styles.
         </span>
       `;
       return;
     }
 
-    if (researchText) researchText.textContent = 'Sync Tags';
+    if (researchText) researchText.textContent = 'Re-Research';
+    if (compareBtn) {
+      compareBtn.classList.remove('hidden');
+      compareBtn.classList.add('inline-flex');
+    }
+    if (syncBtn) {
+      syncBtn.classList.remove('hidden');
+      syncBtn.classList.add('inline-flex');
+    }
 
     const activeFilter = String(this.currentVariantFilter || 'all');
     const selectedIds = this.getSelectedVariantIdsSet();
 
-    // Group variants by orthogonal dimension (e.g. Style + Material, Edition + Cut, Series + Kit)
-    const dimMap = new Map();
-    variants.forEach(v => {
-      const dim = (v.dimension || 'Style').trim() || 'Style';
-      if (!dimMap.has(dim)) dimMap.set(dim, []);
-      dimMap.get(dim).push(v);
-    });
+    // Determine currently active parent Model (either directly selected or via one of its exclusive sub-styles)
+    let activeModel = null;
+    for (const m of models) {
+      if (selectedIds.has(Number(m.id))) {
+        activeModel = m;
+        break;
+      }
+      if (Array.isArray(m.sub_styles) && m.sub_styles.some(st => selectedIds.has(Number(st.id)))) {
+        activeModel = m;
+        break;
+      }
+    }
 
+    // Tier 1: Product-Specific Models Row
     let html = `
       <button type="button"
               onclick="app.setVariantFilter('all')"
               class="facet-chip ${activeFilter === 'all' ? 'active' : ''}">
-        <span>All</span>
+        <span>All Models</span>
         <span class="text-[10px] font-mono opacity-70">${data.total_clean_items || 0}</span>
       </button>
+      <div class="facet-group">
+        <span class="facet-label">Models</span>
     `;
 
-    dimMap.forEach((dimVars, dimName) => {
-      html += `<div class="facet-group"><span class="facet-label">${this.escapeHtmlAttr(dimName)}</span>`;
-      dimVars.forEach(v => {
-        const isSelected = selectedIds.has(Number(v.id));
-        const priceHint = v.sold_count > 0
-          ? ` · £${v.sold_avg_price.toFixed(0)}`
-          : '';
-        html += `
-          <button type="button"
-                  onclick="app.toggleVariantFilterChip(${v.id})"
-                  class="facet-chip ${isSelected ? 'active' : ''}"
-                  title="${this.escapeHtmlAttr(v.short_description || v.variant_name)} — click multiple tags to combine (e.g. Cable-Knit + Wool)">
-            <span>${this.escapeHtmlAttr(v.variant_name)}</span>
-            <span class="text-[10px] font-mono opacity-70">${v.total_items || 0}${priceHint}</span>
-          </button>
-        `;
-      });
-      html += `</div>`;
+    models.forEach(m => {
+      const isModelActive = activeModel && Number(activeModel.id) === Number(m.id);
+      const priceHint = m.sold_count > 0
+        ? ` · £${m.sold_avg_price.toFixed(0)}`
+        : (m.est_market_value_gbp ? ` · ~£${Number(m.est_market_value_gbp).toFixed(0)}` : '');
+      const hasSubs = Array.isArray(m.sub_styles) && m.sub_styles.length > 0;
+      html += `
+        <button type="button"
+                onclick="app.selectModelChip(${m.id})"
+                class="facet-chip ${isModelActive ? 'active' : ''}"
+                title="${this.escapeHtmlAttr(m.short_description || m.variant_name)}">
+          <span>${this.escapeHtmlAttr(m.variant_name)}${hasSubs ? ' ▾' : ''}</span>
+          <span class="text-[10px] font-mono opacity-75">${m.total_items || 0}${priceHint}</span>
+        </button>
+      `;
     });
+    html += `</div>`;
 
     if ((data.unclassified_count || 0) > 0) {
       html += `
         <button type="button"
                 onclick="app.setVariantFilter('unclassified')"
                 class="facet-chip ${activeFilter === 'unclassified' ? 'active' : ''}"
-                title="Listings without a specific sub-model or material tag yet">
+                title="Listings without a specific model tag yet">
           <span>Untagged</span>
           <span class="text-[10px] font-mono opacity-65">${data.unclassified_count}</span>
         </button>
@@ -5873,46 +6015,91 @@ class VintedApp {
 
     pillsContainer.innerHTML = html;
 
-    // Contextual 1-line selection strip when 1+ category chips are active
-    if (inspector && selectedIds.size > 0) {
-      const chosenVariants = variants.filter(v => selectedIds.has(Number(v.id)));
-      // Build readable formula grouped by dimension (OR within dimension, AND across dimensions)
-      const chosenByDim = new Map();
-      chosenVariants.forEach(v => {
-        const d = (v.dimension || 'Style').trim() || 'Style';
-        if (!chosenByDim.has(d)) chosenByDim.set(d, []);
-        chosenByDim.get(d).push(v.variant_name);
-      });
-      const formulaParts = [];
-      chosenByDim.forEach(names => {
-        formulaParts.push(names.length > 1 ? `(${names.join(' or ')})` : names[0]);
-      });
-      const formulaLabel = formulaParts.join(' + ');
+    // Tier 2: Model-Exclusive Sub-Styles Bar (ONLY shown when a Model is active!)
+    if (subStylesRow) {
+      if (activeModel) {
+        const subs = Array.isArray(activeModel.sub_styles) ? activeModel.sub_styles : [];
+        const selectedSubs = subs.filter(st => selectedIds.has(Number(st.id)));
+        const isWholeModelActive = selectedSubs.length === 0;
 
-      const singleVar = chosenVariants.length === 1 ? chosenVariants[0] : null;
-      const recPrice = singleVar
-        ? (singleVar.recommended_snipe_price || 35)
-        : Math.round(Math.min(...chosenVariants.map(v => v.recommended_snipe_price || 40)));
+        subStylesRow.classList.remove('hidden');
+        subStylesRow.innerHTML = `
+          <span class="text-[11px] font-bold text-cyan-300/90 font-mono mr-1">
+            ↳ ${this.escapeHtmlAttr(activeModel.variant_name)} Exclusive Styles:
+          </span>
+          <button type="button"
+                  onclick="app.setVariantFilter('${activeModel.id}')"
+                  class="substyle-chip ${isWholeModelActive ? 'active' : ''}">
+            <span>All ${this.escapeHtmlAttr(activeModel.variant_name)}</span>
+            <span class="text-[10px] font-mono opacity-75">${activeModel.total_items || 0}</span>
+          </button>
+          ${subs.map(st => {
+            const isSubSelected = selectedIds.has(Number(st.id));
+            const subPrice = st.sold_count > 0
+              ? ` · £${st.sold_avg_price.toFixed(0)}`
+              : '';
+            return `
+              <button type="button"
+                      onclick="app.toggleSubStyleChip(${activeModel.id}, ${st.id})"
+                      class="substyle-chip ${isSubSelected ? 'active' : ''}"
+                      title="${this.escapeHtmlAttr(st.short_description || st.variant_name)} — exclusive to ${this.escapeHtmlAttr(activeModel.variant_name)}">
+                <span>${this.escapeHtmlAttr(st.variant_name)}</span>
+                <span class="text-[10px] font-mono opacity-75">${st.total_items || 0}${subPrice}</span>
+              </button>
+            `;
+          }).join('')}
+          <button type="button"
+                  onclick="app.openCustomVariantModal(${activeModel.id})"
+                  class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold text-teal-300 hover:text-white bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/25 transition cursor-pointer ml-auto"
+                  title="Add an exclusive sub-style strictly under ${this.escapeHtmlAttr(activeModel.variant_name)}">
+            <i data-lucide="plus" class="w-2.5 h-2.5 mr-0.5"></i>
+            <span>Style</span>
+          </button>
+        `;
+      } else {
+        subStylesRow.classList.add('hidden');
+        subStylesRow.innerHTML = '';
+      }
+    }
+
+    // Tier 3: Collector Guide & Sniper Lock-On Strip
+    if (inspector && activeModel) {
+      const subs = Array.isArray(activeModel.sub_styles) ? activeModel.sub_styles : [];
+      const selectedSubs = subs.filter(st => selectedIds.has(Number(st.id)));
+      const focusNode = selectedSubs.length === 1 ? selectedSubs[0] : (selectedSubs.length === 0 ? activeModel : null);
+
+      const breadcrumb = selectedSubs.length > 0
+        ? `${activeModel.variant_name} › ${selectedSubs.map(s => s.variant_name).join(' / ')}`
+        : activeModel.variant_name;
+
+      const recPrice = focusNode
+        ? (focusNode.recommended_snipe_price || 35)
+        : Math.round(Math.min(...selectedSubs.map(v => v.recommended_snipe_price || 40)));
+      const tierBadge = focusNode ? focusNode.resale_tier : activeModel.resale_tier;
+      const modeBadge = focusNode
+        ? (focusNode.modality === 'label' ? 'Tag OCR + Text' : 'CLIP Vision + Text')
+        : 'Combined Styles';
 
       inspector.classList.remove('hidden');
       inspector.innerHTML = `
         <div class="flex flex-wrap items-center gap-2 min-w-0">
-          <span class="text-slate-400">Showing:</span>
-          <strong class="text-teal-300 font-semibold truncate">${this.escapeHtmlAttr(formulaLabel)}</strong>
-          ${singleVar && singleVar.short_description
-            ? `<span class="hidden xl:inline text-slate-500 truncate max-w-md">— ${this.escapeHtmlAttr(singleVar.short_description)}</span>`
+          <span class="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${this.getTierBadgeClass(tierBadge)}">${this.escapeHtmlAttr(tierBadge || 'STANDARD')}</span>
+          <strong class="text-teal-300 font-semibold truncate">${this.escapeHtmlAttr(breadcrumb)}</strong>
+          <span class="px-1.5 py-0.5 rounded bg-slate-950 text-slate-400 border border-slate-800 text-[10px] font-mono">${modeBadge}</span>
+          ${focusNode && focusNode.short_description
+            ? `<span class="hidden lg:inline text-slate-400 truncate max-w-md">— ${this.escapeHtmlAttr(focusNode.short_description)}</span>`
             : ''}
         </div>
 
         <div class="flex flex-wrap items-center gap-2 shrink-0">
-          ${singleVar ? `
-            <div class="inline-flex items-center space-x-1 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800">
+          ${focusNode ? `
+            <div class="inline-flex items-center space-x-1 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800" title="Custom Deal Sniper max buy threshold for ${this.escapeHtmlAttr(focusNode.variant_name)}">
               <span class="text-[10px] text-slate-400 font-mono">Max £</span>
               <input type="number"
-                     value="${singleVar.target_max_price != null ? singleVar.target_max_price : ''}"
+                     value="${focusNode.target_max_price != null ? focusNode.target_max_price : ''}"
                      placeholder="${recPrice}"
                      min="1" max="10000" step="1"
-                     onchange="app.setVariantMaxPrice(${singleVar.id}, this.value)"
+                     onchange="app.setVariantMaxPrice(${focusNode.id}, this.value)"
                      class="w-14 bg-transparent text-xs font-mono font-bold text-emerald-400 text-center focus:outline-none">
             </div>
           ` : ''}
@@ -5921,14 +6108,14 @@ class VintedApp {
                   onclick="app.snipeSelectionFromDetail(${recPrice})"
                   class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-teal-500/20 hover:bg-teal-500/30 text-teal-200 border border-teal-500/40 transition cursor-pointer">
             <i data-lucide="crosshair" class="w-3 h-3 mr-1 text-teal-400"></i>
-            <span>Snipe Selection</span>
+            <span>${selectedSubs.length > 0 ? 'Snipe Style' : 'Snipe Model'}</span>
           </button>
 
-          ${singleVar ? `
+          ${focusNode ? `
             <button type="button"
-                    onclick="app.deleteVariantById(${singleVar.id})"
+                    onclick="app.deleteVariantById(${focusNode.id})"
                     class="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
-                    title="Delete '${this.escapeHtmlAttr(singleVar.variant_name)}' tag">
+                    title="Delete '${this.escapeHtmlAttr(focusNode.variant_name)}'${focusNode.is_sub_style ? '' : ' and its sub-styles'}">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             </button>
           ` : ''}
@@ -5944,7 +6131,97 @@ class VintedApp {
       inspector.classList.add('hidden');
     }
 
+    // Tier 4: Collapsible Compare Models & Exclusive Styles Market Matrix
+    if (comparePanel) {
+      if (this.showModelsCompare) {
+        const catMeta = data.catalogue_summary || {};
+        comparePanel.classList.remove('hidden');
+        let rowsHtml = '';
+        models.forEach(m => {
+          const mAvg = m.sold_count > 0
+            ? `£${m.sold_avg_price.toFixed(2)}`
+            : `~£${Number(m.effective_market_value_gbp || m.est_market_value_gbp || 0).toFixed(0)} est.`;
+          const mCap = m.target_max_price != null ? m.target_max_price : m.recommended_snipe_price;
+          rowsHtml += `
+            <tr class="border-b border-slate-800/70 bg-slate-950/40 hover:bg-slate-900/90 transition">
+              <td class="py-2 px-3">
+                <div class="flex items-center gap-2">
+                  <span class="px-1.5 py-0.5 rounded text-[9px] font-bold font-mono ${this.getTierBadgeClass(m.resale_tier)}">${this.escapeHtmlAttr(m.resale_tier || 'STANDARD')}</span>
+                  <span class="font-bold text-white">${this.escapeHtmlAttr(m.variant_name)}</span>
+                </div>
+                ${m.short_description ? `<div class="text-[11px] text-slate-400 mt-0.5 line-clamp-1">${this.escapeHtmlAttr(m.short_description)}</div>` : ''}
+              </td>
+              <td class="py-2 px-3 font-mono text-slate-200">${m.total_items || 0} <span class="text-slate-500 text-[10px]">(${m.sold_count || 0} sold)</span></td>
+              <td class="py-2 px-3 font-mono font-bold text-emerald-400">${mAvg}</td>
+              <td class="py-2 px-3 font-mono text-amber-300">≤ £${Number(mCap || 35).toFixed(0)}</td>
+              <td class="py-2 px-3 text-right space-x-1">
+                <button type="button" onclick="app.setVariantFilter('${m.id}')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium cursor-pointer">Filter</button>
+                <button type="button" onclick="app.snipeSelectionFromDetail(${Number(mCap || 35)}, [${m.id}])" class="px-2 py-0.5 rounded bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/30 text-[11px] font-semibold cursor-pointer">Snipe</button>
+              </td>
+            </tr>
+          `;
+          (m.sub_styles || []).forEach(st => {
+            const stAvg = st.sold_count > 0
+              ? `£${st.sold_avg_price.toFixed(2)}`
+              : `~£${Number(st.effective_market_value_gbp || st.est_market_value_gbp || 0).toFixed(0)} est.`;
+            const stCap = st.target_max_price != null ? st.target_max_price : st.recommended_snipe_price;
+            rowsHtml += `
+              <tr class="border-b border-slate-800/40 bg-slate-950/75 hover:bg-slate-900/70 transition text-[11px]">
+                <td class="py-1.5 pl-7 pr-3">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-cyan-400 font-mono">↳</span>
+                    <span class="font-semibold text-indigo-200">${this.escapeHtmlAttr(st.variant_name)}</span>
+                    <span class="px-1 py-0.2 rounded text-[9px] font-mono ${this.getTierBadgeClass(st.resale_tier)}">${this.escapeHtmlAttr(st.resale_tier || 'STANDARD')}</span>
+                  </div>
+                </td>
+                <td class="py-1.5 px-3 font-mono text-slate-300">${st.total_items || 0} <span class="text-slate-500 text-[10px]">(${st.sold_count || 0} sold)</span></td>
+                <td class="py-1.5 px-3 font-mono text-emerald-300">${stAvg}</td>
+                <td class="py-1.5 px-3 font-mono text-amber-300/90">≤ £${Number(stCap || 35).toFixed(0)}</td>
+                <td class="py-1.5 px-3 text-right space-x-1">
+                  <button type="button" onclick="app.setVariantFilter('${st.id}')" class="px-2 py-0.5 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-300 text-[10px] cursor-pointer">Filter</button>
+                  <button type="button" onclick="app.snipeSelectionFromDetail(${Number(stCap || 35)}, [${m.id}, ${st.id}])" class="px-2 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 border border-indigo-500/30 text-[10px] font-semibold cursor-pointer">Snipe</button>
+                </td>
+              </tr>
+            `;
+          });
+        });
+
+        comparePanel.innerHTML = `
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2 text-xs">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-white">Model & Exclusive Style Market Comparison</span>
+              ${catMeta.provider_used ? `<span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-[10px] font-mono text-slate-400">${this.escapeHtmlAttr(catMeta.provider_used)}</span>` : ''}
+            </div>
+            <button type="button" onclick="app.toggleModelsComparePanel()" class="text-[11px] text-slate-400 hover:text-white cursor-pointer">Hide Matrix</button>
+          </div>
+          ${catMeta.research_notes ? `<p class="text-[11px] text-slate-400 mb-2">${this.escapeHtmlAttr(catMeta.research_notes)}</p>` : ''}
+          <div class="overflow-x-auto rounded-lg border border-slate-800">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-950 text-[10px] uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                  <th class="py-2 px-3">Model / Exclusive Style</th>
+                  <th class="py-2 px-3">Volume</th>
+                  <th class="py-2 px-3">Avg Sold £</th>
+                  <th class="py-2 px-3">35% ROI Buy Cap</th>
+                  <th class="py-2 px-3 text-right">Quick Action</th>
+                </tr>
+              </thead>
+              <tbody>${rowsHtml}</tbody>
+            </table>
+          </div>
+        `;
+      } else {
+        comparePanel.classList.add('hidden');
+        comparePanel.innerHTML = '';
+      }
+    }
+
     if (window.lucide) lucide.createIcons();
+  }
+
+  toggleModelsComparePanel() {
+    this.showModelsCompare = !this.showModelsCompare;
+    this.renderCurrentSearchVariantsPanel();
   }
 
   async setVariantFilter(variantId) {
@@ -5958,18 +6235,69 @@ class VintedApp {
     if (window.lucide) lucide.createIcons();
   }
 
-  async toggleVariantFilterChip(variantId) {
-    const idNum = Number(variantId);
-    if (!idNum) return this.setVariantFilter('all');
+  async selectModelChip(modelId) {
+    const mId = Number(modelId);
+    if (!mId) return this.setVariantFilter('all');
 
-    const selected = this.getSelectedVariantIdsSet();
-    if (selected.has(idNum)) {
-      selected.delete(idNum);
-    } else {
-      selected.add(idNum);
+    // If this exact Model (and none of its sub-styles) is already selected, clicking toggles back to 'All Models'
+    if (String(this.currentVariantFilter) === String(mId)) {
+      return this.setVariantFilter('all');
     }
-    const nextFilter = selected.size > 0 ? Array.from(selected).join(',') : 'all';
+    await this.setVariantFilter(String(mId));
+  }
+
+  async toggleSubStyleChip(modelId, styleId) {
+    const mId = Number(modelId);
+    const sId = Number(styleId);
+    if (!sId) return this.setVariantFilter(String(mId));
+
+    const variants = this.currentVariantsData?.variants || [];
+    const validSiblingSubIds = new Set(
+      variants.filter(v => Number(v.parent_variant_id) === mId).map(v => Number(v.id))
+    );
+
+    // Keep ONLY sibling sub-styles belonging strictly to `modelId`
+    const currentSelected = Array.from(this.getSelectedVariantIdsSet()).filter(id => validSiblingSubIds.has(id));
+    const nextSet = new Set(currentSelected);
+    if (nextSet.has(sId)) nextSet.delete(sId);
+    else nextSet.add(sId);
+
+    const nextFilter = nextSet.size > 0 ? Array.from(nextSet).join(',') : String(mId);
     await this.setVariantFilter(nextFilter);
+  }
+
+  async syncCurrentItemVariants() {
+    if (!this.currentSearchId) return;
+    const btn = document.getElementById('btn-sync-variants');
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i data-lucide="loader-2" class="w-3 h-3 mr-1 animate-spin"></i><span>Syncing…</span>';
+      if (window.lucide) lucide.createIcons();
+    }
+    this.showToast('Running local Vision CLIP + Neural OCR across stored listings…', 'info');
+
+    try {
+      const res = await fetch(`/api/searches/${this.currentSearchId}/variants/classify-existing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ only_unclassified: false, max_vision_items: 300 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Local sync failed');
+
+      this.showToast(`Classified ${data.classified_items_updated || 0} listings using local AI!`, 'success');
+      await this.loadSniperTargetsInfo();
+      await this.loadItemDetail();
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        if (window.lucide) lucide.createIcons();
+      }
+    }
   }
 
   async researchCurrentItemVariants() {
@@ -5978,10 +6306,10 @@ class VintedApp {
     const orig = btn ? btn.innerHTML : '';
     if (btn) {
       btn.disabled = true;
-      btn.innerHTML = '<i data-lucide="loader-2" class="w-3 h-3 mr-1 animate-spin"></i><span>Syncing…</span>';
+      btn.innerHTML = '<i data-lucide="loader-2" class="w-3 h-3 mr-1 animate-spin"></i><span>Researching…</span>';
       if (window.lucide) lucide.createIcons();
     }
-    this.showToast('Syncing category tags across photos & labels…', 'info');
+    this.showToast('Researching product-specific models & exclusive styles…', 'info');
 
     try {
       const res = await fetch(`/api/searches/${this.currentSearchId}/variants/research`, {
@@ -5990,15 +6318,16 @@ class VintedApp {
         body: JSON.stringify({
           fetch_live_samples: true,
           classify_existing: true,
-          replace_existing: false,
+          replace_existing: true,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Category sync failed');
+      if (!res.ok) throw new Error(data.detail || 'Model discovery failed');
 
-      const vLen = Array.isArray(data.variants) ? data.variants.length : 0;
+      const mLen = Array.isArray(data.models) ? data.models.length : 0;
       const clsCount = data.classified_items_updated || 0;
-      this.showToast(`Synced ${vLen} categories across ${clsCount} listings!`, 'success');
+      this.currentVariantFilter = 'all';
+      this.showToast(`Discovered ${mLen} product models & classified ${clsCount} listings!`, 'success');
 
       await this.loadSearches();
       await this.loadSniperTargetsInfo();
@@ -6020,76 +6349,137 @@ class VintedApp {
     const btn = document.getElementById(`btn-sniper-research-${searchId}`);
     if (btn) {
       btn.disabled = true;
-      btn.innerHTML = '<i data-lucide="loader-2" class="w-3 h-3 mr-1 animate-spin"></i><span>Tagging…</span>';
+      btn.innerHTML = '<i data-lucide="loader-2" class="w-3 h-3 mr-1 animate-spin"></i><span>Researching…</span>';
       if (window.lucide) lucide.createIcons();
     }
-    this.showToast('Discovering sub-models & tagging listings…', 'info');
+    this.showToast('Researching product models & training local vision…', 'info');
 
     try {
       const res = await fetch(`/api/searches/${searchId}/variants/research`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fetch_live_samples: true, classify_existing: true }),
+        body: JSON.stringify({ fetch_live_samples: true, classify_existing: true, replace_existing: true }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Category discovery failed');
+      if (!res.ok) throw new Error(data.detail || 'Model discovery failed');
 
       await this.loadSearches();
       await this.loadSniperTargetsInfo();
-      this.showToast(`Ready! Added ${(data.variants || []).length} category tags for Deal Sniper.`, 'success');
+      this.showToast(`Ready! Discovered ${(data.models || []).length} product models for Deal Sniper.`, 'success');
     } catch (err) {
       this.showToast(err.message, 'error');
       this.renderSniperTargets();
     }
   }
 
-  async promptAddCustomVariant() {
+  openCustomVariantModal(defaultParentId = null) {
     if (!this.currentSearchId) return;
-    const name = prompt('Category / tag name (e.g. "Cable-Knit", "Merino Wool", "1996 Retro", "IXUS 70"):');
-    if (!name || !name.trim()) return;
+    const modal = document.getElementById('custom-variant-modal');
+    const parentSelect = document.getElementById('cv-parent-id');
+    const form = document.getElementById('custom-variant-form');
+    if (!modal || !parentSelect) return;
 
-    const dimRaw = prompt('Category group / facet (e.g. "Style", "Material", "Edition", "Cut", "Series"):', 'Style');
-    const kwRaw = prompt('Keywords or label text to match (comma-separated):', name.toLowerCase());
-    const isMaterial = /material|fabric|kit|bundle/i.test(dimRaw || '');
+    if (form) form.reset();
 
-    const keywords = (kwRaw || '').split(',').map(s => s.trim()).filter(Boolean);
+    const models = (this.currentVariantsData && Array.isArray(this.currentVariantsData.models))
+      ? this.currentVariantsData.models
+      : this.buildModelsTreeFromFlat(this.currentVariantsData?.variants || []);
+
+    let opts = `<option value="">Top-Level Product Model</option>`;
+    models.forEach(m => {
+      const sel = defaultParentId && Number(defaultParentId) === Number(m.id) ? 'selected' : '';
+      opts += `<option value="${m.id}" ${sel}>Exclusive Style under: ${this.escapeHtmlAttr(m.variant_name)}</option>`;
+    });
+    parentSelect.innerHTML = opts;
+    this.handleCustomVariantParentChange(parentSelect.value);
+
+    modal.classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+    setTimeout(() => document.getElementById('cv-name')?.focus(), 40);
+  }
+
+  closeCustomVariantModal() {
+    const modal = document.getElementById('custom-variant-modal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  handleCustomVariantParentChange(parentVal) {
+    const nameLabel = document.getElementById('cv-name-label');
+    const nameInput = document.getElementById('cv-name');
+    if (parentVal) {
+      if (nameLabel) nameLabel.textContent = 'Exclusive Style Name';
+      if (nameInput) nameInput.placeholder = 'e.g. Wool & Cashmere Cable, Cropped Short, Boxed Kit';
+    } else {
+      if (nameLabel) nameLabel.textContent = 'Product Model Name';
+      if (nameInput) nameInput.placeholder = 'e.g. 1996 Retro Nuptse (700), IXUS 70 / 75 IS';
+    }
+  }
+
+  async submitCustomVariantModal(event) {
+    if (event) event.preventDefault();
+    if (!this.currentSearchId) return;
+
+    const parentVal = document.getElementById('cv-parent-id')?.value || '';
+    const name = (document.getElementById('cv-name')?.value || '').trim();
+    const tier = document.getElementById('cv-tier')?.value || 'HIGH';
+    const modality = document.getElementById('cv-modality')?.value || 'visual';
+    const maxPriceRaw = parseFloat(document.getElementById('cv-max-price')?.value || '');
+    const kwRaw = document.getElementById('cv-keywords')?.value || name.toLowerCase();
+    const negRaw = document.getElementById('cv-negatives')?.value || '';
+    const desc = (document.getElementById('cv-desc')?.value || '').trim();
+
+    if (!name) return;
+
+    const keywords = kwRaw.split(',').map(s => s.trim()).filter(Boolean);
+    const negatives = negRaw.split(',').map(s => s.trim()).filter(Boolean);
+    const submitBtn = document.getElementById('cv-submit-btn');
+    if (submitBtn) submitBtn.disabled = true;
 
     try {
+      const payload = {
+        variant_name: name,
+        parent_variant_id: parentVal ? Number(parentVal) : null,
+        modality,
+        resale_tier: tier,
+        short_description: desc,
+        text_keywords: keywords.map(k => k.toLowerCase()),
+        ocr_signatures: keywords,
+        negative_keywords: negatives.map(k => k.toLowerCase()),
+        visual_cues: modality === 'visual' ? [desc || name] : [],
+        target_max_price: (!isNaN(maxPriceRaw) && maxPriceRaw > 0) ? maxPriceRaw : null,
+      };
       const res = await fetch(`/api/searches/${this.currentSearchId}/variants`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          variant_name: name.trim(),
-          dimension: (dimRaw || 'Style').trim() || 'Style',
-          modality: isMaterial ? 'label' : 'visual',
-          resale_tier: 'HIGH',
-          text_keywords: keywords,
-          ocr_signatures: keywords,
-          visual_cues: [name.trim()],
-        }),
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || 'Failed to create tag');
-      }
-      this.showToast(`Added '${name.trim()}' tag!`, 'success');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to save model/style');
+
+      this.closeCustomVariantModal();
+      this.showToast(
+        parentVal ? `Added exclusive style '${name}'!` : `Added product model '${name}'!`,
+        'success'
+      );
       await this.loadSearches();
       await this.loadSniperTargetsInfo();
       await this.loadItemDetail();
     } catch (err) {
       this.showToast(err.message, 'error');
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
     }
   }
 
   async deleteVariantById(variantId) {
     if (!variantId) return;
-    if (!confirm('Remove this category tag? Stored listings will remain intact.')) return;
+    if (!confirm('Remove this model/style? Stored Vinted listings will remain intact.')) return;
 
     try {
       const res = await fetch(`/api/variants/${variantId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to delete tag');
+      if (!res.ok) throw new Error('Failed to delete model/style');
       this.currentVariantFilter = 'all';
-      this.showToast('Category tag removed.', 'info');
+      this.showToast('Model / style removed.', 'info');
       await this.loadSearches();
       await this.loadSniperTargetsInfo();
       await this.loadItemDetail();
@@ -6098,25 +6488,34 @@ class VintedApp {
     }
   }
 
-  async toggleSniperFacetChip(searchId, variantId) {
+  async toggleSniperModelChip(searchId, modelId) {
     const info = this.sniperTargetInfo ? this.sniperTargetInfo.get(Number(searchId)) : null;
     const variants = (info && Array.isArray(info.variants)) ? info.variants : [];
-    if (variants.length === 0) return;
+    const models = (info && Array.isArray(info.models) && info.models.length > 0)
+      ? info.models
+      : this.buildModelsTreeFromFlat(variants);
+    if (models.length === 0) return;
 
-    const enabled = variants.filter(v => v.is_sniping_enabled);
-    const allEnabled = enabled.length === variants.length;
-    const targetId = Number(variantId);
+    const mId = Number(modelId);
+    const targetModel = models.find(m => Number(m.id) === mId);
+    if (!targetModel) return;
 
-    // If 'All' was active, clicking a chip starts a focused selection with that chip.
-    // Otherwise, clicking toggles that chip in the multi-category combination!
-    let nextIds;
+    const allEnabled = variants.every(v => v.is_sniping_enabled);
+    const modelFamilyIds = [mId, ...(targetModel.sub_styles || []).map(st => Number(st.id))];
+
+    let nextIds = [];
     if (allEnabled) {
-      nextIds = [targetId];
+      // Transition from 'All Models' -> focus cleanly on this Model (including all its sub-styles)
+      nextIds = modelFamilyIds;
     } else {
-      const set = new Set(enabled.map(v => Number(v.id)));
-      if (set.has(targetId)) set.delete(targetId);
-      else set.add(targetId);
-      nextIds = Array.from(set);
+      const currentlyOn = new Set(variants.filter(v => v.is_sniping_enabled).map(v => Number(v.id)));
+      const isModelCurrentlyOn = currentlyOn.has(mId) || (targetModel.sub_styles || []).some(st => currentlyOn.has(Number(st.id)));
+      if (isModelCurrentlyOn) {
+        modelFamilyIds.forEach(id => currentlyOn.delete(id));
+      } else {
+        modelFamilyIds.forEach(id => currentlyOn.add(id));
+      }
+      nextIds = Array.from(currentlyOn);
     }
 
     if (nextIds.length === 0 || nextIds.length === variants.length) {
@@ -6126,6 +6525,47 @@ class VintedApp {
     }
   }
 
+  async selectAllSniperSubStyles(searchId, modelId) {
+    const info = this.sniperTargetInfo ? this.sniperTargetInfo.get(Number(searchId)) : null;
+    const variants = (info && Array.isArray(info.variants)) ? info.variants : [];
+    const mId = Number(modelId);
+    const currentlyOn = new Set(variants.filter(v => v.is_sniping_enabled).map(v => Number(v.id)));
+    currentlyOn.add(mId);
+    variants.filter(v => Number(v.parent_variant_id) === mId).forEach(st => currentlyOn.add(Number(st.id)));
+    await this.setSniperVariantSelection(searchId, 'only', Array.from(currentlyOn));
+  }
+
+  async toggleSniperSubStyleChip(searchId, modelId, styleId) {
+    const info = this.sniperTargetInfo ? this.sniperTargetInfo.get(Number(searchId)) : null;
+    const variants = (info && Array.isArray(info.variants)) ? info.variants : [];
+    const mId = Number(modelId);
+    const sId = Number(styleId);
+
+    const siblingSubs = variants.filter(v => Number(v.parent_variant_id) === mId);
+    const enabledSubs = siblingSubs.filter(v => v.is_sniping_enabled);
+    const allSubsCurrentlyOn = enabledSubs.length === siblingSubs.length;
+
+    const currentlyOn = new Set(variants.filter(v => v.is_sniping_enabled).map(v => Number(v.id)));
+    currentlyOn.add(mId);
+
+    if (allSubsCurrentlyOn) {
+      // Narrow from 'All Styles of Model' -> strictly this clicked exclusive style!
+      siblingSubs.forEach(st => currentlyOn.delete(Number(st.id)));
+      currentlyOn.add(sId);
+    } else {
+      if (currentlyOn.has(sId)) currentlyOn.delete(sId);
+      else currentlyOn.add(sId);
+
+      const remainingSubs = siblingSubs.filter(st => currentlyOn.has(Number(st.id)));
+      if (remainingSubs.length === 0) {
+        // Re-enable all sub-styles of this model when last sub-style is toggled off
+        siblingSubs.forEach(st => currentlyOn.add(Number(st.id)));
+      }
+    }
+
+    await this.setSniperVariantSelection(searchId, 'only', Array.from(currentlyOn));
+  }
+
   async setSniperVariantSelection(searchId, mode, variantIds = []) {
     try {
       const res = await fetch(`/api/searches/${searchId}/variants/select-sniping`, {
@@ -6133,7 +6573,7 @@ class VintedApp {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode, variant_ids: variantIds }),
       });
-      if (!res.ok) throw new Error('Failed to update sniper category filter');
+      if (!res.ok) throw new Error('Failed to update sniper model filter');
       await this.loadSniperTargetsInfo();
       if (String(this.currentSearchId) === String(searchId)) {
         await this.loadCurrentSearchVariants();
@@ -6162,7 +6602,7 @@ class VintedApp {
       if (this.currentSearchId) await this.loadCurrentSearchVariants();
       if (this.sniperActive) await this.pollSniperStatus();
       this.showToast(
-        hasValidPrice ? `Tag max snipe price set to £${parsed.toFixed(0)}` : 'Reset to item max price',
+        hasValidPrice ? `Max snipe cap set to £${parsed.toFixed(0)}` : 'Reset to item max price',
         'info'
       );
     } catch (err) {
@@ -6170,22 +6610,48 @@ class VintedApp {
     }
   }
 
-  async snipeSelectionFromDetail(recPrice) {
+  async snipeSelectionFromDetail(recPrice, explicitIds = null) {
     const searchId = Number(this.currentSearchId);
-    const selected = Array.from(this.getSelectedVariantIdsSet());
-    if (!searchId || selected.length === 0) return;
+    const rawSelected = Array.isArray(explicitIds) ? explicitIds : Array.from(this.getSelectedVariantIdsSet());
+    if (!searchId || rawSelected.length === 0) return;
+
+    const allVars = this.currentVariantsData?.variants || [];
+    const byId = new Map(allVars.map(v => [Number(v.id), v]));
+
+    // Build exact hierarchical Sniper IDs:
+    // - If a Model (without sub-styles selected) is targeted, include Model + all its sub-styles so the whole Model snipes.
+    // - If specific exclusive Sub-Style(s) are targeted, include Parent Model + ONLY those Sub-Style(s)!
+    const snipeSet = new Set();
+    let capTargetId = null;
+
+    const selectedSubStyles = rawSelected.map(id => byId.get(Number(id))).filter(v => v && v.parent_variant_id);
+    const selectedModels = rawSelected.map(id => byId.get(Number(id))).filter(v => v && !v.parent_variant_id);
+
+    if (selectedSubStyles.length > 0) {
+      selectedSubStyles.forEach(st => {
+        snipeSet.add(Number(st.parent_variant_id));
+        snipeSet.add(Number(st.id));
+      });
+      if (selectedSubStyles.length === 1) capTargetId = Number(selectedSubStyles[0].id);
+    } else if (selectedModels.length > 0) {
+      selectedModels.forEach(m => {
+        snipeSet.add(Number(m.id));
+        allVars.filter(v => Number(v.parent_variant_id) === Number(m.id)).forEach(st => snipeSet.add(Number(st.id)));
+      });
+      if (selectedModels.length === 1) capTargetId = Number(selectedModels[0].id);
+    }
 
     this.sniperTargetsInitialized = true;
     this.sniperTargets.add(searchId);
 
-    await this.setSniperVariantSelection(searchId, 'only', selected);
-    if (selected.length === 1 && recPrice && recPrice > 0) {
-      const vObj = (this.currentVariantsData?.variants || []).find(v => Number(v.id) === Number(selected[0]));
+    await this.setSniperVariantSelection(searchId, 'only', Array.from(snipeSet));
+    if (capTargetId && recPrice && recPrice > 0) {
+      const vObj = byId.get(capTargetId);
       if (vObj && vObj.target_max_price == null) {
-        await this.setVariantMaxPrice(selected[0], recPrice);
+        await this.setVariantMaxPrice(capTargetId, recPrice);
       }
     }
-    this.showToast('Deal Sniper locked onto your selected category combination!', 'success');
+    this.showToast('Deal Sniper locked onto your selected product model / style!', 'success');
     this.showSniperView();
   }
 
@@ -6214,7 +6680,8 @@ class VintedApp {
     if (!pop) return;
 
     const variants = this.getVariantsForSearchId(searchId);
-    if (variants.length === 0) return;
+    const models = this.buildModelsTreeFromFlat(variants);
+    if (models.length === 0) return;
 
     const activeIds = new Set(
       String(currentIdsCsv || '')
@@ -6223,63 +6690,75 @@ class VintedApp {
         .filter(n => !isNaN(n) && n > 0)
     );
 
-    const dimMap = new Map();
-    variants.forEach(v => {
-      const d = (v.dimension || 'Style').trim() || 'Style';
-      if (!dimMap.has(d)) dimMap.set(d, []);
-      dimMap.get(d).push(v);
-    });
+    let initialModelId = '';
+    let initialStyleId = '';
+    for (const m of models) {
+      if (activeIds.has(Number(m.id))) initialModelId = String(m.id);
+      for (const st of (m.sub_styles || [])) {
+        if (activeIds.has(Number(st.id))) {
+          initialModelId = String(m.id);
+          initialStyleId = String(st.id);
+        }
+      }
+    }
 
-    let groupsHtml = '';
-    dimMap.forEach((dimVars, dimName) => {
-      groupsHtml += `
-        <div class="space-y-1">
-          <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">${this.escapeHtmlAttr(dimName)}</div>
-          <div class="space-y-1">
-            ${dimVars.map(v => `
-              <label class="flex items-center space-x-2 px-2 py-1 rounded-lg hover:bg-slate-800/80 cursor-pointer text-slate-200">
-                <input type="checkbox" class="custom-checkbox item-tag-cb" value="${v.id}" ${activeIds.has(Number(v.id)) ? 'checked' : ''}>
-                <span class="truncate">${this.escapeHtmlAttr(v.variant_name)}</span>
-              </label>
-            `).join('')}
-          </div>
-        </div>
-      `;
-    });
+    pop.dataset.itemId = String(itemId);
+    pop.dataset.searchId = String(searchId);
+    pop.dataset.initialStyleId = initialStyleId;
 
     pop.innerHTML = `
       <div class="flex items-center justify-between pb-1.5 border-b border-slate-800">
-        <span class="font-bold text-white text-xs">Edit Item Tags</span>
+        <span class="font-bold text-white text-xs">Assign Model & Exclusive Style</span>
         <button type="button" onclick="document.getElementById('item-tag-popover').classList.add('hidden')" class="text-slate-400 hover:text-white cursor-pointer">
           <i data-lucide="x" class="w-3.5 h-3.5"></i>
         </button>
       </div>
-      <div class="max-h-56 overflow-y-auto space-y-2 pr-0.5">
-        ${groupsHtml}
+
+      <div class="space-y-2.5">
+        <div>
+          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">1. Product Model</label>
+          <select id="popover-model-select"
+                  onchange="app.handleTagPopoverModelChange(${Number(searchId)}, this.value)"
+                  class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-vinted">
+            <option value="" ${!initialModelId ? 'selected' : ''}>— Untagged / None —</option>
+            ${models.map(m => `
+              <option value="${m.id}" ${String(m.id) === initialModelId ? 'selected' : ''}>${this.escapeHtmlAttr(m.variant_name)}</option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div id="popover-style-container" class="hidden">
+          <label class="block text-[10px] font-bold uppercase tracking-wider text-cyan-400 mb-1">2. Exclusive Style (Optional)</label>
+          <select id="popover-style-select"
+                  class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-indigo-200 focus:outline-none focus:border-vinted">
+          </select>
+        </div>
       </div>
-      <div class="pt-1.5 border-t border-slate-800 flex items-center justify-between gap-2">
+
+      <div class="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
         <button type="button"
                 onclick="app.saveItemVariantTags(${itemId}, [])"
                 class="px-2 py-1 rounded-lg text-[11px] text-slate-400 hover:text-rose-300 hover:bg-slate-800 transition cursor-pointer">
-          Clear All
+          Clear
         </button>
         <button type="button"
                 onclick="app.submitItemTagPopover(${itemId})"
                 class="px-3 py-1 rounded-lg text-[11px] font-bold bg-vinted hover:bg-vinted-dark text-white transition cursor-pointer">
-          Save Tags
+          Save & Train AI
         </button>
       </div>
     `;
 
+    this.handleTagPopoverModelChange(Number(searchId), initialModelId, initialStyleId);
+
     pop.classList.remove('hidden');
     if (window.lucide) lucide.createIcons();
 
-    // Position cleanly near trigger within viewport bounds
     const triggerRect = event && event.currentTarget
       ? event.currentTarget.getBoundingClientRect()
-      : { left: window.innerWidth / 2 - 128, bottom: window.innerHeight / 2 - 100, top: window.innerHeight / 2 - 120 };
-    const popWidth = 256;
-    const popHeight = pop.offsetHeight || 240;
+      : { left: window.innerWidth / 2 - 144, bottom: window.innerHeight / 2 - 100, top: window.innerHeight / 2 - 120 };
+    const popWidth = 288;
+    const popHeight = pop.offsetHeight || 220;
     let left = Math.min(window.innerWidth - popWidth - 12, Math.max(12, triggerRect.left));
     let top = triggerRect.bottom + 6;
     if (top + popHeight > window.innerHeight - 12) {
@@ -6289,13 +6768,43 @@ class VintedApp {
     pop.style.top = `${top}px`;
   }
 
+  handleTagPopoverModelChange(searchId, selectedModelVal, preselectedStyleId = '') {
+    const styleContainer = document.getElementById('popover-style-container');
+    const styleSelect = document.getElementById('popover-style-select');
+    if (!styleContainer || !styleSelect) return;
+
+    if (!selectedModelVal) {
+      styleContainer.classList.add('hidden');
+      styleSelect.innerHTML = '';
+      return;
+    }
+
+    const models = this.buildModelsTreeFromFlat(this.getVariantsForSearchId(searchId));
+    const chosenModel = models.find(m => String(m.id) === String(selectedModelVal));
+    const subs = (chosenModel && Array.isArray(chosenModel.sub_styles)) ? chosenModel.sub_styles : [];
+
+    if (subs.length === 0) {
+      styleContainer.classList.add('hidden');
+      styleSelect.innerHTML = '';
+      return;
+    }
+
+    styleContainer.classList.remove('hidden');
+    styleSelect.innerHTML = `
+      <option value="" ${!preselectedStyleId ? 'selected' : ''}>Model Only (${this.escapeHtmlAttr(chosenModel.variant_name)})</option>
+      ${subs.map(st => `
+        <option value="${st.id}" ${String(st.id) === String(preselectedStyleId) ? 'selected' : ''}>↳ ${this.escapeHtmlAttr(st.variant_name)}</option>
+      `).join('')}
+    `;
+  }
+
   async submitItemTagPopover(itemId) {
-    const pop = document.getElementById('item-tag-popover');
-    if (!pop) return;
-    const checked = Array.from(pop.querySelectorAll('.item-tag-cb:checked'))
-      .map(cb => Number(cb.value))
-      .filter(n => !isNaN(n) && n > 0);
-    await this.saveItemVariantTags(itemId, checked);
+    const modelVal = document.getElementById('popover-model-select')?.value || '';
+    const styleVal = document.getElementById('popover-style-select')?.value || '';
+    const ids = [];
+    if (modelVal) ids.push(Number(modelVal));
+    if (modelVal && styleVal) ids.push(Number(styleVal));
+    await this.saveItemVariantTags(itemId, ids);
   }
 
   async saveItemVariantTags(itemId, variantIds) {
@@ -6309,13 +6818,13 @@ class VintedApp {
         body: JSON.stringify({ variant_ids: Array.isArray(variantIds) ? variantIds : [] }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to update item tags');
+      if (!res.ok) throw new Error(data.detail || 'Failed to update item model/style');
 
       const names = Array.isArray(data.variant_names) ? data.variant_names : [];
       this.showToast(
         names.length > 0
-          ? `Tagged '${names.join(' + ')}' & updated visual model!`
-          : 'Cleared item tags.',
+          ? `Assigned '${names.join(' › ')}' & refined local vision!`
+          : 'Cleared item model tag.',
         'success'
       );
 

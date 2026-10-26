@@ -695,11 +695,11 @@ class DealSniperService:
                     ]
                     if existing_item and cached_ids:
                         matched_v_ids = cached_ids
-                        matched_v_obj = variants_map.get(cached_ids[0])
+                        matched_v_obj = variants_map.get(cached_ids[-1])
                         matched_var_res = {
-                            "variant_id": cached_ids[0],
+                            "variant_id": cached_ids[-1],
                             "variant_ids": cached_ids,
-                            "variant_name": existing_item.variant_name or " · ".join(variants_map[i].variant_name for i in cached_ids),
+                            "variant_name": existing_item.variant_name or " › ".join(variants_map[i].variant_name for i in cached_ids),
                             "variant_names": [variants_map[i].variant_name for i in cached_ids],
                             "confidence": float(existing_item.variant_confidence or 0.78),
                             "method": existing_item.variant_method or "cached",
@@ -720,7 +720,7 @@ class DealSniperService:
                         )
                         if matched_var_res:
                             matched_v_ids = list(matched_var_res.get("variant_ids") or ([matched_var_res["variant_id"]] if matched_var_res.get("variant_id") else []))
-                            matched_v_obj = variants_map.get(matched_v_ids[0]) if matched_v_ids else None
+                            matched_v_obj = variants_map.get(matched_v_ids[-1]) if matched_v_ids else None
                             if existing_item and existing_item.variant_method != "manual":
                                 existing_item.apply_variant_result(matched_var_res)
                                 updated_existing = True

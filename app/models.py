@@ -160,8 +160,9 @@ class SoldItem(Base):
         if not v_names and res.get("variant_name"):
             v_names = [str(res["variant_name"])]
 
-        self.variant_id = v_ids[0] if v_ids else None
-        self.variant_name = " · ".join(v_names) if v_names else None
+        # Store the most specific matched variant ID (sub-style if matched, else parent model)
+        self.variant_id = v_ids[-1] if v_ids else None
+        self.variant_name = " › ".join(v_names) if v_names else None
         self.variant_ids_json = json.dumps(v_ids, separators=(",", ":")) if v_ids else None
         self.variant_names_json = json.dumps(v_names, ensure_ascii=False) if v_names else None
         self.variant_confidence = float(res.get("confidence") or 0.0)
@@ -170,7 +171,7 @@ class SoldItem(Base):
 
 
 class ProductVariant(Base):
-    """Specific product variant / facet tag generated via Deep Research & learned by Local Vision AI."""
+    """Hierarchical Product Model (`parent_variant_id=None`) or Model-Exclusive Sub-Style (`parent_variant_id=<model.id>`)."""
 
     __tablename__ = "product_variants"
 
@@ -178,9 +179,12 @@ class ProductVariant(Base):
     tracked_search_id = Column(
         Integer, ForeignKey("tracked_searches.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    parent_variant_id = Column(
+        Integer, ForeignKey("product_variants.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     variant_slug = Column(String, nullable=False, index=True)
     variant_name = Column(String, nullable=False)
-    dimension = Column(String, default="Style", nullable=False)  # Facet group e.g. 'Style', 'Material', 'Cut', 'Series'
+    dimension = Column(String, default="Model", nullable=False)  # 'Model' (top-level) or 'Style' (exclusive sub-style)
     modality = Column(String, default="visual", nullable=False)  # 'visual' (CLIP+OCR+Text) or 'label' (Text+OCR only)
     short_description = Column(Text, nullable=True)
     resale_tier = Column(String, default="STANDARD")  # PREMIUM, HIGH, STANDARD, BUDGET
@@ -198,6 +202,13 @@ class ProductVariant(Base):
 
     tracked_search = relationship("TrackedSearch", back_populates="variants")
     items = relationship("SoldItem", back_populates="variant")
+    parent = relationship("ProductVariant", remote_side=[id], back_populates="sub_styles")
+    sub_styles = relationship(
+        "ProductVariant",
+        back_populates="parent",
+        cascade="all, delete-orphan",
+        order_by="ProductVariant.id",
+    )
 
     def parsed_list(self, field_name: str) -> list[str]:
         raw = getattr(self, field_name, None)
