@@ -317,6 +317,337 @@ class ArbitrageRadarService:
 
         return discovered
 
+    def analyze_broad_market(
+        self,
+        db: Session,
+        keyword: str,
+        brand: Optional[str] = None,
+        fetch_live: bool = True,
+    ) -> Dict[str, Any]:
+        """Deeply inspects a broad market keyword, decomposes it into discrete product models,
+        evaluates individual model profitability, and synthesizes a strategic arbitrage recommendation."""
+        from ..scraper import _extract_item, _search_vinted
+        from .llm_router import llm_router
+        from .resale_evaluator import calculate_landed_buy_cost
+
+        q_clean = keyword.strip()
+        if not q_clean:
+            return {"error": "Keyword cannot be empty"}
+
+        now = datetime.now(timezone.utc)
+        d30 = now - timedelta(days=30)
+
+        # 1. Gather all local database items matching this keyword
+        tracked_search = (
+            db.query(TrackedSearch)
+            .filter(TrackedSearch.search_text.ilike(f"%{q_clean}%"))
+            .first()
+        )
+
+        db_items: List[Dict[str, Any]] = []
+        if tracked_search:
+            s_rows = (
+                db.query(SoldItem)
+                .filter(SoldItem.tracked_search_id == tracked_search.id)
+                .all()
+            )
+            for s in s_rows:
+                if s.price and float(s.price) > 0:
+                    db_items.append({
+                        "id": str(s.vinted_item_id or s.id),
+                        "title": s.title,
+                        "price": float(s.price),
+                        "is_sold": bool(s.is_sold),
+                        "captured_at": s.captured_at,
+                        "condition": s.condition or "Good",
+                        "size": s.size or "",
+                        "photo_url": s.photo_url,
+                        "url": s.url or (f"{VINTED_BASE_URL}/items/{s.vinted_item_id}" if s.vinted_item_id else ""),
+                    })
+
+        # 2. Optionally fetch live market listings via Vinted UK
+        live_items: List[Dict[str, Any]] = []
+        if fetch_live or len(db_items) < 10:
+            try:
+                for page_num in (1, 2):
+                    raw_hits = _search_vinted(q_clean, page=page_num, per_page=30)
+                    if not raw_hits:
+                        break
+                    for r in raw_hits:
+                        item = _extract_item(r)
+                        if item and float(item.get("price") or 0) > 0:
+                            live_items.append({
+                                "id": str(item.get("id") or ""),
+                                "title": str(item.get("title") or ""),
+                                "price": float(item.get("price") or 0.0),
+                                "is_sold": False,
+                                "captured_at": now,
+                                "condition": str(item.get("condition") or "Good"),
+                                "size": str(item.get("size") or ""),
+                                "photo_url": item.get("photo_url"),
+                                "url": str(item.get("url") or (f"{VINTED_BASE_URL}/items/{item.get('id')}" if item.get("id") else "")),
+                            })
+            except Exception as exc:
+                logger.warning("Live market fetch for '%s' encountered: %s", q_clean, exc)
+
+        # Combine items deduplicating by ID
+        seen_ids = set()
+        all_pool: List[Dict[str, Any]] = []
+        for it in (db_items + live_items):
+            str_id = str(it.get("id") or "")
+            if str_id and str_id in seen_ids:
+                continue
+            if str_id:
+                seen_ids.add(str_id)
+            all_pool.append(it)
+
+        # 3. Discover Models & Exclusive Styles via Local Knowledge Base & Multi-LLM Router
+        catalogue = llm_router.deep_research_product_variants(
+            search_text=q_clean,
+            brand=brand or (tracked_search.brand if tracked_search else None),
+            sample_listings=all_pool[:60],
+        )
+
+        models_raw = catalogue.get("variants") or []
+        family_name = catalogue.get("product_family") or q_clean.title()
+        research_notes = catalogue.get("research_notes") or ""
+
+        # Separate into parent Models and sub-styles
+        model_defs: List[Dict[str, Any]] = []
+        style_defs: List[Dict[str, Any]] = []
+        for v in models_raw:
+            if v.get("parent_variant_name"):
+                style_defs.append(v)
+            else:
+                model_defs.append(v)
+
+        if not model_defs:
+            # Fallback if no models returned
+            model_defs = [
+                {
+                    "variant_name": f"{family_name} Standard",
+                    "resale_tier": "STANDARD",
+                    "est_market_value_gbp": 50.0,
+                    "target_max_price": 25.0,
+                    "text_keywords": [q_clean.lower()],
+                }
+            ]
+
+        # 4. Classify listings into discrete models
+        classified_by_model: Dict[str, List[Dict[str, Any]]] = {m["variant_name"]: [] for m in model_defs}
+        unclassified_items: List[Dict[str, Any]] = []
+
+        for item in all_pool:
+            t_lower = item["title"].lower()
+            best_model = None
+            best_score = 0
+
+            for m in model_defs:
+                score = 0
+                # Check negative keywords
+                negatives = [k.lower() for k in (m.get("negative_keywords") or [])]
+                if any(neg in t_lower for neg in negatives):
+                    continue
+
+                keywords = [k.lower() for k in (m.get("text_keywords") or []) + (m.get("ocr_signatures") or [])]
+                for kw in keywords:
+                    if kw in t_lower:
+                        score += len(kw) * 2  # Longer specific phrases weigh more
+
+                if score > best_score:
+                    best_score = score
+                    best_model = m["variant_name"]
+
+            if best_model and best_score >= 4:
+                classified_by_model[best_model].append(item)
+            else:
+                unclassified_items.append(item)
+
+        # 5. Evaluate individual model characteristics & profitability
+        model_analyses: List[Dict[str, Any]] = []
+        all_sold_prices = [p["price"] for p in all_pool if p.get("is_sold")]
+        broad_median_sold = (
+            sorted(all_sold_prices)[len(all_sold_prices) // 2]
+            if all_sold_prices
+            else (sorted([p["price"] for p in all_pool])[len(all_pool) // 2] if all_pool else 45.0)
+        )
+
+        for m_def in model_defs:
+            m_name = m_def["variant_name"]
+            m_items = classified_by_model.get(m_name, [])
+            m_tier = m_def.get("resale_tier") or "STANDARD"
+            benchmark_val = float(m_def.get("est_market_value_gbp") or broad_median_sold)
+
+            # Separate sold vs active
+            m_sold = [it for it in m_items if it.get("is_sold")]
+            m_active = [it for it in m_items if not it.get("is_sold")]
+
+            if m_sold:
+                m_sold_prices = sorted([it["price"] for it in m_sold])
+                med_sold = round(m_sold_prices[len(m_sold_prices) // 2], 2)
+                p75_sold = round(m_sold_prices[min(len(m_sold_prices) - 1, int(len(m_sold_prices) * 0.75))], 2)
+            else:
+                med_sold = round(benchmark_val, 2)
+                p75_sold = round(benchmark_val * 1.2, 2)
+
+            # Determine cheap entry price (where misinformed sellers price this model)
+            if m_active:
+                m_active_prices = sorted([it["price"] for it in m_active])
+                # Bottom 20% or lowest asking price
+                cheap_entry = round(m_active_prices[max(0, int(len(m_active_prices) * 0.20))], 2)
+                # Cap cheap entry if someone posted an outlier
+                cheap_entry = min(cheap_entry, round(med_sold * 0.65, 2))
+            else:
+                # Benchmark cheap entry: 40% of market value
+                cheap_entry = round(med_sold * 0.40, 2)
+
+            cost_breakdown = calculate_landed_buy_cost(cheap_entry)
+            total_landed = cost_breakdown["total_landed_cost"]
+            net_spread = round(med_sold - total_landed, 2)
+            roi_pct = round((net_spread / total_landed) * 100, 1) if total_landed > 0 else 0.0
+
+            # Count cheap inflow listings (active listings at or below 60% of sold median)
+            cheap_threshold = round(med_sold * 0.60, 2)
+            cheap_inflow = [it for it in m_active if it["price"] <= cheap_threshold]
+
+            # Model status & velocity
+            if net_spread >= 35.0 and roi_pct >= 75.0:
+                m_status = "🌟 GRAIL ARBITRAGE"
+                badge_type = "grail"
+            elif net_spread >= 20.0 and roi_pct >= 45.0:
+                m_status = "🔥 HIGH PROFIT"
+                badge_type = "high"
+            elif net_spread >= 12.0:
+                m_status = "⚡ VOLUME FLIP"
+                badge_type = "standard"
+            elif net_spread >= 6.0:
+                m_status = "⚖️ STANDARD"
+                badge_type = "standard"
+            else:
+                m_status = "⚠️ MARGINAL"
+                badge_type = "budget"
+
+            velocity_tag = "⚡ Rapid (< 48 hrs)" if (len(m_sold) >= 4 or m_tier in ("GRAIL", "PREMIUM")) else "🔥 Active Market (2-5 days)"
+            opp_index = int(min(99, max(10, (net_spread * 0.45) + (min(100, roi_pct) * 0.35) + (20 if badge_type in ("grail", "high") else 10))))
+
+            rec_cap = float(m_def.get("target_max_price") or round(cheap_entry * 1.15, 2))
+
+            preview = [
+                {
+                    "id": str(it.get("id")),
+                    "title": it.get("title"),
+                    "price": float(it.get("price")),
+                    "photo_url": it.get("photo_url"),
+                    "url": it.get("url"),
+                }
+                for it in (cheap_inflow[:3] if cheap_inflow else m_active[:3])
+            ]
+
+            model_analyses.append({
+                "model_name": m_name,
+                "resale_tier": m_tier,
+                "short_description": m_def.get("short_description") or "",
+                "total_items_found": len(m_items),
+                "sold_count": len(m_sold),
+                "active_count": len(m_active),
+                "market_sold_median": med_sold,
+                "market_sold_high": p75_sold,
+                "cheap_entry_price": cheap_entry,
+                "total_landed_cost": total_landed,
+                "net_spread_gbp": net_spread,
+                "roi_pct": roi_pct,
+                "status": m_status,
+                "badge_type": badge_type,
+                "velocity_tag": velocity_tag,
+                "cheap_inflow_count": len(cheap_inflow),
+                "opportunity_index": opp_index,
+                "recommended_snipe_price": rec_cap,
+                "preview_deals": preview,
+                "keywords": m_def.get("text_keywords") or [],
+            })
+
+        # Sort models by net spread descending
+        model_analyses.sort(key=lambda x: x["net_spread_gbp"], reverse=True)
+
+        # 6. Synthesize Overarching Broad Product Analysis & Recommendation
+        all_active_prices = sorted([p["price"] for p in all_pool if not p.get("is_sold")])
+        broad_entry = (
+            round(all_active_prices[max(0, int(len(all_active_prices) * 0.20))], 2)
+            if all_active_prices
+            else round(broad_median_sold * 0.45, 2)
+        )
+        broad_landed = calculate_landed_buy_cost(broad_entry)["total_landed_cost"]
+        broad_spread = round(broad_median_sold - broad_landed, 2)
+        broad_roi = round((broad_spread / broad_landed) * 100, 1) if broad_landed > 0 else 0.0
+
+        high_profit_models = [m for m in model_analyses if m["net_spread_gbp"] >= 18.0 and m["roi_pct"] >= 40.0]
+        marginal_models = [m for m in model_analyses if m["net_spread_gbp"] < 10.0]
+
+        # Strategic decision matrix:
+        if len(high_profit_models) >= 2 and broad_spread >= 18.0 and broad_roi >= 40.0:
+            strategy_verdict = "RECOMMEND_BROAD_SNIPE"
+            strategy_title = f"Broad Market Arbitrage: '{q_clean}' is High Margin Across Multiple Models"
+            strategy_badge = "💡 BROAD SNIPE RECOMMENDED"
+            strategy_badge_color = "emerald"
+            recommended_action = "snipe_broad"
+            broad_snipe_cap = round(broad_entry * 1.15, 2)
+            strategy_rationale = (
+                f"The overall '{q_clean}' market is highly lucrative with consistent underpriced supply "
+                f"(cheap entry £{broad_entry:.2f} vs median resale £{broad_median_sold:.2f}, yielding +£{broad_spread:.2f} / {broad_roi:.0f}% ROI). "
+                f"You can safely snipe the broad term below £{broad_snipe_cap:.0f} or target top models for even higher margins."
+            )
+        elif high_profit_models:
+            top_names = [m["model_name"] for m in high_profit_models[:2]]
+            strategy_verdict = "RECOMMEND_MODEL_TARGETING"
+            strategy_title = f"Selective Model Arbitrage: Target {len(high_profit_models)} Specific High-Yield Models"
+            strategy_badge = "🎯 TARGET SPECIFIC MODELS ONLY"
+            strategy_badge_color = "amber"
+            recommended_action = "snipe_models"
+            broad_snipe_cap = round(high_profit_models[0]["recommended_snipe_price"], 2)
+            strategy_rationale = (
+                f"Avoid broad sniping on '{q_clean}'! Margins are heavily concentrated in specific models: "
+                f"{', '.join(top_names)} (net spreads up to +£{high_profit_models[0]['net_spread_gbp']:.2f}). "
+                f"Generic or baseline models have flat margins and will drag down your ROI. Focus Deal Sniper strictly on the recommended models below."
+            )
+        else:
+            strategy_verdict = "MARGINAL_MARKET"
+            strategy_title = f"Marginal Market Spread on '{q_clean}'"
+            strategy_badge = "⚠️ LOW SPREAD / EQUILIBRIUM"
+            strategy_badge_color = "slate"
+            recommended_action = "monitor_only"
+            broad_snipe_cap = round(broad_entry * 0.90, 2)
+            strategy_rationale = (
+                f"Current asking prices on '{q_clean}' are closely tracking sold market prices. "
+                f"Arbitrage spreads are currently thin. Recommend monitoring or waiting for fresh uneducated seller influx."
+            )
+
+        return {
+            "search_text": q_clean,
+            "product_family": family_name,
+            "research_notes": research_notes,
+            "total_items_inspected": len(all_pool),
+            "broad_market": {
+                "market_sold_median": broad_median_sold,
+                "cheap_entry_price": broad_entry,
+                "total_landed_cost": broad_landed,
+                "net_spread_gbp": broad_spread,
+                "projected_roi_pct": broad_roi,
+                "recommended_snipe_cap": broad_snipe_cap,
+            },
+            "strategy": {
+                "verdict": strategy_verdict,
+                "title": strategy_title,
+                "badge": strategy_badge,
+                "badge_color": strategy_badge_color,
+                "recommended_action": recommended_action,
+                "rationale": strategy_rationale,
+                "recommended_cap": broad_snipe_cap,
+                "high_profit_models_count": len(high_profit_models),
+            },
+            "models": model_analyses,
+            "analyzed_at": now.isoformat(),
+        }
+
 
 # Singleton instance
 arbitrage_radar = ArbitrageRadarService()

@@ -1223,22 +1223,76 @@ class VintedApp {
     this.currentSearchId = null;
     this.isDbExplorerActive = false;
 
+    // Header tabs
+    const tabSniper = document.getElementById('tab-nav-sniper');
+    const tabArb = document.getElementById('tab-nav-arbitrage');
+    const tabDb = document.getElementById('tab-nav-database');
+    if (tabSniper) tabSniper.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center bg-teal-500/20 text-teal-300 border border-teal-500/30 shadow-sm cursor-pointer';
+    if (tabArb) tabArb.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer';
+    if (tabDb) tabDb.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer';
+
+    // Sidebar buttons
     const sniperBtn = document.getElementById('nav-sniper-btn');
     if (sniperBtn) sniperBtn.classList.add('active');
+    const arbBtn = document.getElementById('nav-arbitrage-btn');
+    if (arbBtn) arbBtn.classList.remove('active');
     const dbBtn = document.getElementById('nav-db-explorer-btn');
     if (dbBtn) dbBtn.classList.remove('active');
     
+    // View containers
     const itemDetail = document.getElementById('item-detail-view');
     if (itemDetail) itemDetail.classList.add('hidden');
     const dbView = document.getElementById('database-explorer-view');
     if (dbView) dbView.classList.add('hidden');
+    const arbView = document.getElementById('arbitrage-view');
+    if (arbView) arbView.classList.add('hidden');
     
     const sniperView = document.getElementById('sniper-view');
     if (sniperView) sniperView.classList.remove('hidden');
 
     this.renderSidebar();
     this.renderSniperTargets();
+    this.loadAutoBuyLedger();
     if (window.lucide) lucide.createIcons();
+  }
+
+  showArbitrageView() {
+    this.currentSearchId = null;
+    this.isDbExplorerActive = false;
+
+    // Header tabs
+    const tabSniper = document.getElementById('tab-nav-sniper');
+    const tabArb = document.getElementById('tab-nav-arbitrage');
+    const tabDb = document.getElementById('tab-nav-database');
+    if (tabSniper) tabSniper.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer';
+    if (tabArb) tabArb.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm cursor-pointer';
+    if (tabDb) tabDb.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer';
+
+    // Sidebar buttons
+    const sniperBtn = document.getElementById('nav-sniper-btn');
+    if (sniperBtn) sniperBtn.classList.remove('active');
+    const arbBtn = document.getElementById('nav-arbitrage-btn');
+    if (arbBtn) arbBtn.classList.add('active');
+    const dbBtn = document.getElementById('nav-db-explorer-btn');
+    if (dbBtn) dbBtn.classList.remove('active');
+
+    // View containers
+    const itemDetail = document.getElementById('item-detail-view');
+    if (itemDetail) itemDetail.classList.add('hidden');
+    const sniperView = document.getElementById('sniper-view');
+    if (sniperView) sniperView.classList.add('hidden');
+    const dbView = document.getElementById('database-explorer-view');
+    if (dbView) dbView.classList.add('hidden');
+
+    const arbView = document.getElementById('arbitrage-view');
+    if (arbView) arbView.classList.remove('hidden');
+
+    this.renderSidebar();
+    if (window.lucide) lucide.createIcons();
+
+    if (!this.lastAnalyzedMarket) {
+      this.runArbitrageMarketAnalysis('Canon IXUS', 'Canon');
+    }
   }
 
   async selectSearch(id) {
@@ -1250,13 +1304,25 @@ class VintedApp {
     this.currentSearchId = id;
     this.isDbExplorerActive = false;
 
+    // Header tabs
+    const tabSniper = document.getElementById('tab-nav-sniper');
+    const tabArb = document.getElementById('tab-nav-arbitrage');
+    const tabDb = document.getElementById('tab-nav-database');
+    if (tabSniper) tabSniper.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer';
+    if (tabArb) tabArb.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer';
+    if (tabDb) tabDb.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer';
+
     const sniperBtn = document.getElementById('nav-sniper-btn');
     if (sniperBtn) sniperBtn.classList.remove('active');
+    const arbBtn = document.getElementById('nav-arbitrage-btn');
+    if (arbBtn) arbBtn.classList.remove('active');
     const dbBtn = document.getElementById('nav-db-explorer-btn');
     if (dbBtn) dbBtn.classList.remove('active');
 
     const sniperView = document.getElementById('sniper-view');
     if (sniperView) sniperView.classList.add('hidden');
+    const arbView = document.getElementById('arbitrage-view');
+    if (arbView) arbView.classList.add('hidden');
     const dbView = document.getElementById('database-explorer-view');
     if (dbView) dbView.classList.add('hidden');
 
@@ -1271,8 +1337,18 @@ class VintedApp {
     this.currentSearchId = null;
     this.isDbExplorerActive = true;
 
+    // Header tabs
+    const tabSniper = document.getElementById('tab-nav-sniper');
+    const tabArb = document.getElementById('tab-nav-arbitrage');
+    const tabDb = document.getElementById('tab-nav-database');
+    if (tabSniper) tabSniper.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer';
+    if (tabArb) tabArb.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer';
+    if (tabDb) tabDb.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shadow-sm cursor-pointer';
+
     const sniperBtn = document.getElementById('nav-sniper-btn');
     if (sniperBtn) sniperBtn.classList.remove('active');
+    const arbBtn = document.getElementById('nav-arbitrage-btn');
+    if (arbBtn) arbBtn.classList.remove('active');
     const dbBtn = document.getElementById('nav-db-explorer-btn');
     if (dbBtn) dbBtn.classList.add('active');
 
@@ -1280,6 +1356,8 @@ class VintedApp {
     if (itemDetail) itemDetail.classList.add('hidden');
     const sniperView = document.getElementById('sniper-view');
     if (sniperView) sniperView.classList.add('hidden');
+    const arbView = document.getElementById('arbitrage-view');
+    if (arbView) arbView.classList.add('hidden');
 
     const dbView = document.getElementById('database-explorer-view');
     if (dbView) dbView.classList.remove('hidden');
@@ -6905,16 +6983,348 @@ class VintedApp {
 
   // ── Market Inefficiency & Arbitrage Radar ──────────────────────────────────
 
-  async openArbitrageModal() {
-    const modal = document.getElementById('arbitrage-modal');
-    if (modal) modal.classList.remove('hidden');
-    if (window.lucide) lucide.createIcons();
-    await this.loadArbitrageRadar(false);
+  openArbitrageModal() {
+    this.showArbitrageView();
   }
 
   closeArbitrageModal() {
     const modal = document.getElementById('arbitrage-modal');
     if (modal) modal.classList.add('hidden');
+  }
+
+  async runArbitrageMarketAnalysis(keyword, brand = null) {
+    if (!keyword) return;
+    this.lastAnalyzedMarket = keyword;
+
+    const input = document.getElementById('arb-market-input');
+    if (input) input.value = keyword;
+
+    const loadingBox = document.getElementById('arb-loading-container');
+    const loadingText = document.getElementById('arb-loading-text');
+    const bannerBox = document.getElementById('arb-strategy-banner-container');
+    const modelsBox = document.getElementById('arb-models-matrix-container');
+    const searchBtn = document.getElementById('arb-market-search-btn');
+    const searchIcon = document.getElementById('arb-search-icon');
+
+    if (loadingBox) loadingBox.classList.remove('hidden');
+    if (loadingText) loadingText.textContent = `Mining product codes & testing model profitability for '${keyword}'...`;
+    if (bannerBox) bannerBox.innerHTML = '';
+    if (modelsBox) modelsBox.innerHTML = '';
+    if (searchBtn) searchBtn.disabled = true;
+    if (searchIcon) searchIcon.classList.add('animate-spin');
+
+    const fetchLive = document.getElementById('arb-market-fetch-live')?.checked ?? false;
+
+    try {
+      const res = await fetch('/api/arbitrage/analyze-market', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword, brand, fetch_live: fetchLive })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Market analysis failed');
+
+      this.renderArbitrageStrategyBanner(data);
+      this.renderArbitrageModelsMatrix(data.models || [], keyword, data.strategy);
+    } catch (err) {
+      this.showToast(err.message, 'error');
+      if (bannerBox) {
+        bannerBox.innerHTML = `
+          <div class="p-4 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs">
+            Failed to analyze market: ${this.escapeHtmlAttr(err.message)}
+          </div>
+        `;
+      }
+    } finally {
+      if (loadingBox) loadingBox.classList.add('hidden');
+      if (searchBtn) searchBtn.disabled = false;
+      if (searchIcon) searchIcon.classList.remove('animate-spin');
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+
+  submitArbitrageMarketSearch(event) {
+    if (event) event.preventDefault();
+    const val = (document.getElementById('arb-market-input')?.value || '').trim();
+    if (!val) {
+      this.showToast('Please enter a broad market or product name.', 'info');
+      return;
+    }
+    this.runArbitrageMarketAnalysis(val);
+  }
+
+  renderArbitrageStrategyBanner(data) {
+    const container = document.getElementById('arb-strategy-banner-container');
+    if (!container) return;
+
+    const strat = data.strategy || {};
+    const broad = data.broad_market || {};
+    const kw = data.search_text || 'Market';
+    const isBroadRec = strat.verdict === 'RECOMMEND_BROAD_SNIPE';
+    const highProfitCount = strat.high_profit_models_count || 0;
+
+    let badgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+    let iconName = 'check-circle';
+    if (strat.badge_color === 'amber') {
+      badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+      iconName = 'target';
+    } else if (strat.badge_color === 'slate') {
+      badgeClass = 'bg-slate-800 text-slate-300 border-slate-700';
+      iconName = 'info';
+    }
+
+    const highProfitNames = (data.models || [])
+      .filter(m => m.net_spread_gbp >= 18.0)
+      .map(m => m.model_name);
+
+    container.innerHTML = `
+      <div class="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border border-slate-800 shadow-xl space-y-4">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div class="space-y-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${badgeClass} flex items-center">
+                <i data-lucide="${iconName}" class="w-3 h-3 mr-1"></i>
+                ${this.escapeHtmlAttr(strat.badge || 'STRATEGY VERDICT')}
+              </span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 font-mono">
+                ${data.total_items_inspected || 0} items analyzed
+              </span>
+            </div>
+            <h3 class="text-base font-bold text-white">${this.escapeHtmlAttr(strat.title || 'Market Arbitrage Strategy')}</h3>
+            <p class="text-xs text-slate-300 leading-relaxed max-w-3xl">${this.escapeHtmlAttr(strat.rationale || '')}</p>
+          </div>
+
+          <div class="shrink-0 pt-2 lg:pt-0">
+            ${isBroadRec ? `
+              <button type="button" 
+                      onclick="app.activateArbitrageStrategy('${this.escapeHtmlAttr(kw)}', 'broad', [], ${strat.recommended_cap || 35})" 
+                      class="btn-primary-glow px-4 py-2.5 rounded-xl text-xs font-bold text-white transition flex items-center cursor-pointer shadow-md">
+                <i data-lucide="zap" class="w-4 h-4 mr-1.5"></i>
+                Snipe Broad Market (Cap ≤ £${Number(strat.recommended_cap || 35).toFixed(0)})
+              </button>
+            ` : (highProfitCount > 0 ? `
+              <button type="button" 
+                      onclick="app.activateArbitrageStrategy('${this.escapeHtmlAttr(kw)}', 'model', ${JSON.stringify(highProfitNames).replace(/"/g, '&quot;')}, ${strat.recommended_cap || 45})" 
+                      class="px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition flex items-center cursor-pointer shadow-md">
+                <i data-lucide="target" class="w-4 h-4 mr-1.5"></i>
+                Snipe Top ${highProfitCount} Profitable Models
+              </button>
+            ` : `
+              <button type="button" 
+                      onclick="app.activateArbitrageStrategy('${this.escapeHtmlAttr(kw)}', 'broad', [], ${strat.recommended_cap || 30})" 
+                      class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center cursor-pointer">
+                <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1.5"></i>
+                Monitor Below £${Number(strat.recommended_cap || 30).toFixed(0)}
+              </button>
+            `)}
+          </div>
+        </div>
+
+        <!-- Broad Market Financial Strip -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3 border-t border-slate-800/80 text-xs">
+          <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+            <span class="text-[10px] text-slate-400 uppercase tracking-wider block">Cheap Entry Inflow</span>
+            <span class="text-base font-bold font-mono text-white">£${Number(broad.cheap_entry_price || 0).toFixed(2)}</span>
+          </div>
+          <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+            <span class="text-[10px] text-slate-400 uppercase tracking-wider block">Median Market Resale</span>
+            <span class="text-base font-bold font-mono text-emerald-400">£${Number(broad.market_sold_median || 0).toFixed(2)}</span>
+          </div>
+          <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+            <span class="text-[10px] text-slate-400 uppercase tracking-wider block">Net Profit Spread</span>
+            <span class="text-base font-bold font-mono text-teal-300">+£${Number(broad.net_spread_gbp || 0).toFixed(2)}</span>
+          </div>
+          <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+            <span class="text-[10px] text-slate-400 uppercase tracking-wider block">Flipping ROI</span>
+            <span class="text-base font-bold font-mono text-cyan-300">${Number(broad.projected_roi_pct || 0).toFixed(0)}% ROI</span>
+          </div>
+        </div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+  }
+
+  renderArbitrageModelsMatrix(models, keyword, strategy = {}) {
+    const container = document.getElementById('arb-models-matrix-container');
+    if (!container) return;
+
+    if (!models || models.length === 0) {
+      container.innerHTML = `
+        <div class="py-8 text-center text-slate-500 text-xs">
+          No distinct product models recognized for this query.
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="flex items-center justify-between pb-1">
+        <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center">
+          <i data-lucide="layers" class="w-3.5 h-3.5 mr-1.5 text-cyan-400"></i>
+          Discovered Product Models & Individual Profitability (${models.length}):
+        </h4>
+        <span class="text-[11px] text-slate-500">Sorted by highest net spread</span>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        ${models.map(m => {
+          let badgeClass = 'bg-slate-800 text-slate-300 border-slate-700';
+          if (m.badge_type === 'grail') badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+          else if (m.badge_type === 'high') badgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+          else if (m.badge_type === 'standard') badgeClass = 'bg-teal-500/20 text-teal-300 border-teal-500/40';
+
+          const previews = Array.isArray(m.preview_deals) ? m.preview_deals : [];
+
+          return `
+            <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between space-y-3.5">
+              <div class="space-y-2">
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <div class="flex items-center gap-1.5 mb-1">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${badgeClass}">
+                        ${this.escapeHtmlAttr(m.status)}
+                      </span>
+                      <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-400">
+                        ${this.escapeHtmlAttr(m.resale_tier || 'STANDARD')}
+                      </span>
+                    </div>
+                    <h5 class="text-sm font-bold text-white">${this.escapeHtmlAttr(m.model_name)}</h5>
+                    ${m.short_description ? `<p class="text-[11px] text-slate-400 mt-0.5 line-clamp-2">${this.escapeHtmlAttr(m.short_description)}</p>` : ''}
+                  </div>
+                  <div class="text-right shrink-0 font-mono">
+                    <div class="text-base font-black text-emerald-400">+£${Number(m.net_spread_gbp || 0).toFixed(2)}</div>
+                    <div class="text-[10px] text-teal-300 font-bold">${Number(m.roi_pct || 0).toFixed(0)}% ROI</div>
+                  </div>
+                </div>
+
+                <!-- 4 Metrics row -->
+                <div class="grid grid-cols-4 gap-1.5 p-2 rounded-xl bg-slate-900/90 text-center text-[10px] font-mono border border-slate-800">
+                  <div>
+                    <span class="text-slate-500 block">Cheap Buy</span>
+                    <strong class="text-white">£${Number(m.cheap_entry_price || 0).toFixed(0)}</strong>
+                  </div>
+                  <div>
+                    <span class="text-slate-500 block">Landed Cost</span>
+                    <strong class="text-slate-300">£${Number(m.total_landed_cost || 0).toFixed(0)}</strong>
+                  </div>
+                  <div>
+                    <span class="text-slate-500 block">Sold Resale</span>
+                    <strong class="text-emerald-400">£${Number(m.market_sold_median || 0).toFixed(0)}</strong>
+                  </div>
+                  <div>
+                    <span class="text-slate-500 block">Snipe Cap</span>
+                    <strong class="text-amber-300">≤£${Number(m.recommended_snipe_price || 35).toFixed(0)}</strong>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                  <span class="flex items-center text-cyan-300">
+                    <i data-lucide="zap" class="w-3 h-3 mr-1"></i>
+                    ${this.escapeHtmlAttr(m.velocity_tag || 'Active Pace')}
+                  </span>
+                  <span>${m.cheap_inflow_count || 0} cheap listings observed</span>
+                </div>
+
+                <!-- Preview bargains -->
+                ${previews.length > 0 ? `
+                  <div class="pt-2 border-t border-slate-800/80">
+                    <span class="text-[10px] font-semibold text-slate-400 block mb-1.5">Live Underpriced Listings:</span>
+                    <div class="space-y-1.5">
+                      ${previews.map(p => `
+                        <a href="${p.url || ('https://www.vinted.co.uk/items/' + p.id)}" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between p-1.5 rounded-lg bg-slate-900/70 hover:bg-slate-800 border border-slate-800/60 transition group text-[11px]">
+                          <div class="flex items-center space-x-2 min-w-0 pr-2">
+                            ${p.photo_url ? `<img src="${p.photo_url}" class="w-6 h-6 object-cover rounded shrink-0">` : ''}
+                            <span class="text-slate-300 truncate group-hover:text-white">${this.escapeHtmlAttr(p.title || 'Listing')}</span>
+                          </div>
+                          <span class="font-mono font-bold text-emerald-400 shrink-0">£${Number(p.price || 0).toFixed(2)}</span>
+                        </a>
+                      `).join('')}
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
+
+              <div class="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+                <span class="text-[10px] text-slate-500 font-mono">Model: ${this.escapeHtmlAttr(m.model_name.slice(0, 18))}</span>
+                <button type="button" 
+                        onclick="app.activateArbitrageStrategy('${this.escapeHtmlAttr(keyword)}', 'model', ['${this.escapeHtmlAttr(m.model_name)}'], ${m.recommended_snipe_price || 35})" 
+                        class="px-3 py-1.5 rounded-xl text-xs font-bold bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/30 transition flex items-center cursor-pointer shadow-sm">
+                  <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1 text-vinted"></i>
+                  Snipe This Model (≤ £${Number(m.recommended_snipe_price || 35).toFixed(0)})
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+  }
+
+  async activateArbitrageStrategy(keyword, mode, targetModelNames = [], recPrice = null) {
+    if (!keyword) return;
+
+    try {
+      this.showToast('Configuring Deal Sniper & locking onto target strategy...', 'info');
+
+      const res = await fetch('/api/arbitrage/activate-strategy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          search_text: keyword,
+          mode: mode || 'broad',
+          target_model_names: targetModelNames,
+          recommended_max_price: recPrice
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to activate strategy');
+
+      await this.loadSearches();
+      await this.loadSniperTargetsInfo();
+
+      this.showToast(
+        mode === 'model'
+          ? `🎯 Deal Sniper locked onto model(s): ${targetModelNames.join(', ')}!`
+          : `🎯 Deal Sniper locked onto broad market '${keyword}'!`,
+        'success'
+      );
+
+      this.showSniperView();
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    }
+  }
+
+  openSettingsModal(tab = 'autobuy') {
+    if (tab === 'autobuy') {
+      this.openAutoBuyModal();
+    } else if (tab === 'antiban') {
+      this.openAntiBanModal();
+    } else if (tab === 'ai') {
+      this.openAIModal();
+    } else if (tab === 'scraper') {
+      this.openScraperModal();
+    }
+  }
+
+  closeSettingsModal() {
+    this.closeAutoBuyModal();
+    this.closeAntiBanModal();
+    this.closeAIModal();
+    this.closeScraperModal();
+  }
+
+  toggleInlineLedger() {
+    const el = document.getElementById('sniper-inline-ledger');
+    if (!el) return;
+    const isHidden = el.classList.contains('hidden');
+    if (isHidden) {
+      el.classList.remove('hidden');
+      this.loadAutoBuyLedger();
+    } else {
+      el.classList.add('hidden');
+    }
   }
 
   async loadArbitrageRadar(forceRefresh = false) {
@@ -7329,6 +7739,55 @@ class VintedApp {
 
       const elRoi = document.getElementById('ledger-stat-roi');
       if (elRoi) elRoi.textContent = `${Number(metrics.overall_roi_pct || 0).toFixed(0)}%`;
+
+      // Update Deal Sniper Top Real-Time Ticker
+      const tickCap = document.getElementById('ticker-capital');
+      if (tickCap) tickCap.textContent = `£${Number(metrics.total_capital_deployed || 0).toFixed(2)}`;
+
+      const tickRes = document.getElementById('ticker-resale');
+      if (tickRes) tickRes.textContent = `£${Number(metrics.total_projected_resale || 0).toFixed(2)}`;
+
+      const tickProf = document.getElementById('ticker-profit');
+      if (tickProf) {
+        const p = Number(metrics.total_paper_profit || 0);
+        tickProf.textContent = `${p >= 0 ? '+' : ''}£${p.toFixed(2)}`;
+        tickProf.className = p >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold';
+      }
+
+      const tickRoi = document.getElementById('ticker-roi');
+      if (tickRoi) tickRoi.textContent = `${Number(metrics.overall_roi_pct || 0).toFixed(0)}%`;
+
+      const tickCnt = document.getElementById('ticker-order-count');
+      if (tickCnt) tickCnt.textContent = orders.length;
+
+      // Populate inline ledger container inside Deal Sniper
+      const inlineContainer = document.getElementById('sniper-inline-ledger-container');
+      if (inlineContainer) {
+        if (orders.length === 0) {
+          inlineContainer.innerHTML = '<div class="py-4 text-center text-slate-500 text-xs">No simulated orders recorded yet. Click "Sim Pick" on any sniped deal to simulate.</div>';
+        } else {
+          inlineContainer.innerHTML = orders.slice(0, 10).map(ord => {
+            const profit = Number(ord.projected_net_profit || 0);
+            return `
+              <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between text-xs">
+                <div class="min-w-0 flex-1 pr-3">
+                  <div class="flex items-center gap-1.5 font-mono text-[10px] mb-0.5">
+                    <span class="text-cyan-400 font-bold">${ord.is_simulation ? 'SIM' : 'LIVE'} #${this.escapeHtmlAttr(ord.order_id)}</span>
+                    <span class="text-slate-500">•</span>
+                    <span class="text-teal-300">Score ${ord.ai_score || 0}/100</span>
+                  </div>
+                  <div class="text-white font-bold truncate">${this.escapeHtmlAttr(ord.title || ord.item_title || '')}</div>
+                  <div class="text-[10px] text-slate-400 font-mono">Landed: £${Number(ord.total_landed_cost || 0).toFixed(2)} → Resale: £${Number(ord.projected_resale_price || 0).toFixed(2)}</div>
+                </div>
+                <div class="text-right shrink-0 font-mono">
+                  <div class="${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'} font-bold">${profit >= 0 ? '+' : ''}£${profit.toFixed(2)}</div>
+                  <div class="text-[10px] text-cyan-300 font-semibold">${Number(ord.projected_roi_pct || 0).toFixed(0)}% ROI</div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
 
       // Render orders list
       const container = document.getElementById('autobuy-orders-container');

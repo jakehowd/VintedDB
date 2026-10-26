@@ -37,68 +37,73 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <!-- Custom Styles -->
-  <link rel="stylesheet" href="/static/style.css?v=3.2">
+  <link rel="stylesheet" href="/static/style.css?v=3.3">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-vinted selection:text-white">
 
   <!-- Top Navigation Header -->
-  <header class="border-b border-slate-800/80 bg-slate-900/90 backdrop-blur-xl sticky top-0 z-40 px-6 py-3 flex items-center justify-between shadow-lg shadow-black/30">
-    <div class="flex items-center space-x-4">
-      <div class="relative group">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-500 via-vinted to-cyan-400 flex items-center justify-center shadow-lg shadow-vinted/30 transition-transform duration-300 group-hover:scale-105">
+  <header class="border-b border-slate-800/80 bg-slate-900/90 backdrop-blur-xl sticky top-0 z-40 px-4 sm:px-6 py-2.5 flex items-center justify-between shadow-lg shadow-black/30">
+    <div class="flex items-center space-x-3.5">
+      <div class="relative group cursor-pointer" onclick="app.showSniperView()">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-teal-500 via-vinted to-cyan-400 flex items-center justify-center shadow-lg shadow-vinted/30 transition-transform duration-300 group-hover:scale-105">
           <i data-lucide="trending-up" class="w-5 h-5 text-white drop-shadow"></i>
         </div>
-        <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-slate-900 pulse-live"></span>
+        <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-slate-900 pulse-live"></span>
       </div>
       <div>
-        <div class="flex items-center space-x-2.5">
-          <h1 class="text-lg font-black tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">Vinted Tracker</h1>
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/10 text-teal-300 border border-teal-500/30 uppercase tracking-wider">
+        <div class="flex items-center space-x-2">
+          <h1 class="text-base sm:text-lg font-black tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">Vinted Tracker</h1>
+          <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-teal-500/10 text-teal-300 border border-teal-500/30 uppercase tracking-wider">
             <span class="w-1.5 h-1.5 rounded-full bg-teal-400 mr-1.5 pulse-live"></span>
-            UK MARKETPLACE
+            UK LIVE
           </span>
         </div>
-        <p class="text-xs text-slate-400 hidden md:block">Historical price analytics, verified sold values & live bargain radar</p>
+        <p class="text-[11px] text-slate-400 hidden xl:block">AI Model Decomposition, Fast Arbitrage Radar & Automated Deal Sniping</p>
       </div>
     </div>
 
-    <div class="flex items-center space-x-1.5 sm:space-x-2.5">
-      <!-- Deal Sniper Quick Controller & Live Indicator -->
-      <div id="btn-header-sniper-status" onclick="app.handleHeaderSniperClick()" class="inline-flex items-center px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-semibold bg-slate-950/80 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-teal-500/40 transition shadow-sm cursor-pointer select-none" title="Deal Sniper (Click to view or toggle)">
-        <span class="w-2 h-2 rounded-full bg-slate-500 mr-1.5 sm:mr-2 shrink-0" id="header-sniper-dot"></span>
-        <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1.5 text-vinted shrink-0"></i>
-        <span class="truncate"><span class="hidden sm:inline">Deal </span>Sniper: <strong class="text-slate-400 font-medium" id="header-sniper-text">Idle</strong></span>
-      </div>
-
-      <!-- Auto-Poll Scheduler Hub & Next Poll Countdown -->
-      <button id="btn-header-scraper-modal" onclick="app.openScraperModal()" class="inline-flex items-center text-xs text-slate-300 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/40 rounded-xl px-2.5 sm:px-3 py-1.5 sm:py-2 transition shadow-sm cursor-pointer select-none" title="Auto-Poll Background Sync (Click to configure or change interval)">
-        <i data-lucide="clock" class="w-3.5 h-3.5 mr-1.5 text-cyan-400 shrink-0"></i>
-        <span><span class="hidden sm:inline">Auto-Poll: </span><strong id="header-poll-interval-text" class="text-white">Every 30m</strong></span>
-        <span id="header-next-poll-timer" class="ml-1.5 sm:ml-2 px-1.5 sm:px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-900 text-teal-300 border border-slate-700" title="Countdown until next auto-poll scrape">--:--</span>
-        <span id="header-constant-badge" class="hidden ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 pulse-live">24/7</span>
+    <!-- Central Master Workspace Switcher -->
+    <nav class="hidden md:flex items-center p-1 bg-slate-950/80 rounded-2xl border border-slate-800/90 shadow-inner">
+      <button id="tab-nav-sniper" onclick="app.showSniperView()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center bg-teal-500/20 text-teal-300 border border-teal-500/30 shadow-sm cursor-pointer">
+        <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1.5 text-vinted"></i>
+        <span>Deal Sniper</span>
+        <span id="header-sniper-badge" class="ml-1.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-slate-800 text-emerald-400 border border-slate-700">0</span>
       </button>
 
+      <button id="tab-nav-arbitrage" onclick="app.showArbitrageView()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer">
+        <i data-lucide="flame" class="w-3.5 h-3.5 mr-1.5 text-amber-400"></i>
+        <span>Arbitrage Radar</span>
+        <span class="ml-1.5 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">HOT</span>
+      </button>
+
+      <button id="tab-nav-database" onclick="app.showDatabaseExplorerView()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer">
+        <i data-lucide="database" class="w-3.5 h-3.5 mr-1.5 text-indigo-400"></i>
+        <span>Database Explorer</span>
+      </button>
+    </nav>
+
+    <div class="flex items-center space-x-2">
       <!-- Live Scraper Terminal Toggle -->
-      <button id="btn-toggle-scraper-terminal" onclick="app.toggleScraperTerminal()" class="hidden md:inline-flex items-center text-xs font-semibold text-emerald-400 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 rounded-xl px-3 py-2 transition shadow-sm cursor-pointer" title="Toggle Live Scraper Activity Terminal (Key: T)">
-        <span class="w-2 h-2 rounded-full bg-emerald-400 mr-2 pulse-live" id="header-terminal-pulse"></span>
-        <i data-lucide="terminal" class="w-3.5 h-3.5 mr-1.5 text-emerald-400"></i>
-        <span>Live Terminal</span>
-        <span id="header-terminal-db-badge" class="ml-2 px-1.5 py-0.2 rounded font-mono text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">0</span>
+      <button id="btn-toggle-scraper-terminal" onclick="app.toggleScraperTerminal()" class="hidden sm:inline-flex items-center text-xs font-semibold text-emerald-400 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 rounded-xl px-2.5 sm:px-3 py-1.5 transition shadow-sm cursor-pointer" title="Toggle Live Scraper Terminal (Key: T)">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 pulse-live" id="header-terminal-pulse"></span>
+        <i data-lucide="terminal" class="w-3.5 h-3.5 mr-1 text-emerald-400"></i>
+        <span class="hidden lg:inline">Terminal</span>
       </button>
 
-      <!-- Anti-Ban Connection Shield -->
-      <button id="btn-open-antiban-modal" onclick="app.openAntiBanModal()" class="hidden sm:inline-flex items-center px-3 py-2 rounded-xl text-xs font-semibold bg-slate-950/80 hover:bg-slate-800 text-cyan-300 border border-slate-800 transition cursor-pointer" title="Cloudflare Connection Shield & Proxy Status">
-        <i data-lucide="shield-check" class="w-3.5 h-3.5 mr-1.5 text-cyan-400"></i>
-        <span id="header-antiban-badge" class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Shield OK</span>
+      <!-- Consolidated Settings & Security Hub Button -->
+      <button id="btn-open-settings-hub" onclick="app.openSettingsModal()" class="inline-flex items-center px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-950/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-cyan-500/40 transition shadow-sm cursor-pointer" title="System Settings Hub (Auto-Buy, Anti-Ban Proxies, AI Keys, Scheduler)">
+        <i data-lucide="settings" class="w-3.5 h-3.5 mr-1 sm:mr-1.5 text-cyan-400"></i>
+        <span class="hidden sm:inline">Settings</span>
+        <span id="header-settings-dot" class="ml-1 w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
       </button>
 
       <!-- Keyboard Shortcuts Help Pill -->
-      <button onclick="app.showKeyboardShortcutsModal()" class="hidden lg:inline-flex items-center p-2 rounded-xl text-xs text-slate-400 hover:text-white bg-slate-950/80 hover:bg-slate-800 border border-slate-800 transition cursor-pointer" title="Keyboard Shortcuts (Press ?)">
+      <button onclick="app.showKeyboardShortcutsModal()" class="hidden xl:inline-flex items-center p-2 rounded-xl text-xs text-slate-400 hover:text-white bg-slate-950/80 hover:bg-slate-800 border border-slate-800 transition cursor-pointer" title="Keyboard Shortcuts (Press ?)">
         <i data-lucide="keyboard" class="w-4 h-4"></i>
       </button>
 
       <!-- Primary Action: Track New Item -->
-      <button id="btn-open-add-modal" onclick="app.openAddModal()" class="btn-primary-glow inline-flex items-center px-3 sm:px-4 py-2 rounded-xl text-xs font-bold text-white transition cursor-pointer">
+      <button id="btn-open-add-modal" onclick="app.openAddModal()" class="btn-primary-glow inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold text-white transition cursor-pointer">
         <i data-lucide="plus" class="w-4 h-4 mr-1 sm:mr-1.5"></i>
         <span class="hidden sm:inline">Track New Item</span>
         <span class="sm:hidden">Track</span>
@@ -109,13 +114,13 @@
   <!-- Main App Layout -->
   <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
 
-    <!-- Left Sidebar: Tracked Items Navigation (Hidden on mobile to prevent content-push; accessible via bottom bar) -->
-    <aside id="app-sidebar" class="hidden md:flex md:w-72 bg-slate-900/90 border-r border-slate-800/80 flex-col shrink-0 shadow-lg shadow-black/20">
+    <!-- Left Sidebar: Tracked Items & Navigation -->
+    <aside id="app-sidebar" class="hidden md:flex md:w-64 bg-slate-900/90 border-r border-slate-800/80 flex-col shrink-0 shadow-lg shadow-black/20">
       
       <div class="p-3.5 border-b border-slate-800/60 flex items-center justify-between">
         <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center">
           <i data-lucide="layout-grid" class="w-3.5 h-3.5 mr-1.5 text-teal-400"></i>
-          Command Center
+          Command Hub
         </span>
         <span id="search-count-badge" class="px-2 py-0.5 text-xs font-mono font-bold rounded-full bg-slate-800 text-slate-300 border border-slate-700">0</span>
       </div>
@@ -123,121 +128,52 @@
       <!-- Navigation items list -->
       <nav class="flex-1 overflow-y-auto p-3 space-y-1.5" id="sidebar-nav">
         <!-- Deal Sniper Live Radar Button -->
-        <button id="nav-sniper-btn" onclick="app.showSniperView()" class="sidebar-item w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-200 hover:bg-slate-800 hover:text-white transition group active">
-          <div class="flex items-center space-x-2.5">
-            <div class="w-7 h-7 rounded-lg bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400 group-hover:scale-105 transition-transform">
-              <i data-lucide="crosshair" class="w-4 h-4 text-vinted"></i>
+        <button id="nav-sniper-btn" onclick="app.showSniperView()" class="sidebar-item w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:bg-slate-800 hover:text-white transition group active">
+          <div class="flex items-center space-x-2">
+            <div class="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400 group-hover:scale-105 transition-transform">
+              <i data-lucide="crosshair" class="w-3.5 h-3.5 text-vinted"></i>
             </div>
-            <span>Deal Sniper</span>
+            <span>Deal Sniper & Auto-Buy</span>
           </div>
           <span id="sniper-deals-badge" class="px-2 py-0.5 text-[11px] font-mono font-bold rounded-full bg-slate-800 text-emerald-400 border border-slate-700">0</span>
         </button>
 
         <!-- Fast-Flip Arbitrage & Market Inefficiency Radar Button -->
-        <button id="nav-arbitrage-btn" onclick="app.openArbitrageModal()" class="sidebar-item w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition group">
-          <div class="flex items-center space-x-2.5">
-            <div class="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform">
-              <i data-lucide="flame" class="w-4 h-4 text-amber-400"></i>
+        <button id="nav-arbitrage-btn" onclick="app.showArbitrageView()" class="sidebar-item w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition group">
+          <div class="flex items-center space-x-2">
+            <div class="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform">
+              <i data-lucide="flame" class="w-3.5 h-3.5 text-amber-400"></i>
             </div>
             <span>Arbitrage Radar</span>
           </div>
           <span id="sidebar-arbitrage-badge" class="px-2 py-0.5 text-[10px] font-mono font-bold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">HOT</span>
         </button>
 
-        <!-- Auto-Checkout & Paper Trading Simulation Profile Button -->
-        <button id="nav-autobuy-btn" onclick="app.openAutoBuyModal()" class="sidebar-item w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition group">
-          <div class="flex items-center space-x-2.5">
-            <div class="w-7 h-7 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-105 transition-transform">
-              <i data-lucide="zap" class="w-4 h-4 text-cyan-400"></i>
-            </div>
-            <span>Auto-Buy & Sim</span>
-          </div>
-          <span id="sidebar-autobuy-badge" class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">TEST-SIM</span>
-        </button>
-
         <!-- Advanced Database Explorer Page Button -->
-        <button id="nav-db-explorer-btn" onclick="app.showDatabaseExplorerView()" class="sidebar-item w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition group">
-          <div class="flex items-center space-x-2.5">
-            <div class="w-7 h-7 rounded-lg bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 group-hover:scale-105 transition-transform">
-              <i data-lucide="database" class="w-4 h-4 text-indigo-400"></i>
+        <button id="nav-db-explorer-btn" onclick="app.showDatabaseExplorerView()" class="sidebar-item w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition group">
+          <div class="flex items-center space-x-2">
+            <div class="w-6 h-6 rounded-lg bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 group-hover:scale-105 transition-transform">
+              <i data-lucide="database" class="w-3.5 h-3.5 text-indigo-400"></i>
             </div>
             <span>Database Explorer</span>
           </div>
-          <div class="flex items-center space-x-1.5">
-            <span id="sidebar-db-replica-badge" class="hidden px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">0 REP</span>
-            <span id="sidebar-db-count-badge" class="px-2 py-0.5 text-[11px] font-mono font-bold rounded-full bg-slate-800 text-slate-300 border border-slate-700">0</span>
-          </div>
-        </button>
-
-        <!-- Live Scraper Activity Terminal Button -->
-        <button id="nav-scraper-terminal-btn" onclick="app.toggleScraperTerminal()" class="sidebar-item w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition group">
-          <div class="flex items-center space-x-2.5">
-            <div class="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
-              <i data-lucide="terminal" class="w-4 h-4 text-emerald-400"></i>
-            </div>
-            <span>Scraper Terminal</span>
-          </div>
-          <div class="flex items-center space-x-1.5">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-live"></span>
-            <span id="sidebar-terminal-db-badge" class="px-2 py-0.5 text-[11px] font-mono font-bold rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">0</span>
-          </div>
-        </button>
-
-        <!-- Scraper & Scheduling Hub Button -->
-        <button id="nav-scraper-btn" onclick="app.openScraperModal()" class="sidebar-item w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition group">
-          <div class="flex items-center space-x-2.5">
-            <div class="w-6 h-6 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-              <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
-            </div>
-            <span>Batch & Scheduler Hub</span>
-          </div>
-          <span id="sidebar-next-poll-timer" class="text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold bg-slate-800 text-teal-400 border border-slate-700">--:--</span>
-        </button>
-
-        <!-- Storage & Pruning Hub Button -->
-        <button id="nav-database-btn" onclick="app.openDatabaseModal()" class="sidebar-item w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition group">
-          <div class="flex items-center space-x-2.5">
-            <div class="w-6 h-6 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
-              <i data-lucide="hard-drive" class="w-3.5 h-3.5"></i>
-            </div>
-            <span>Storage & Pruning</span>
-          </div>
-          <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300 transition"></i>
-        </button>
-
-        <!-- AI Models & Research Keys Hub Button -->
-        <button id="nav-ai-engine-btn" onclick="app.openAIModal()" class="sidebar-item w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition group">
-          <div class="flex items-center space-x-2.5">
-            <div class="w-6 h-6 rounded-md bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400">
-              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-            </div>
-            <span>AI & Research Keys</span>
-          </div>
-          <span id="sidebar-ai-pill" class="text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold bg-slate-800 text-teal-400 border border-slate-700">Ready</span>
-        </button>
-
-        <!-- Anti-Ban & Proxies Hub Button -->
-        <button id="nav-antiban-btn" onclick="app.openAntiBanModal()" class="sidebar-item w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition group">
-          <div class="flex items-center space-x-2.5">
-            <div class="w-6 h-6 rounded-md bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-              <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
-            </div>
-            <span>Anti-Ban & Proxies</span>
-          </div>
-          <span id="sidebar-antiban-pill" class="text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold bg-slate-800 text-cyan-400 border border-slate-700">SHIELD</span>
+          <span id="sidebar-db-count-badge" class="px-2 py-0.5 text-[11px] font-mono font-bold rounded-full bg-slate-800 text-slate-300 border border-slate-700">0</span>
         </button>
 
         <!-- Tracked Items Section -->
-        <div class="pt-4 pb-1 px-1 flex items-center justify-between">
-          <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Tracked Searches</span>
-          <span class="text-[10px] text-slate-500">Live Sync</span>
+        <div class="pt-3 pb-1 px-1 flex items-center justify-between border-t border-slate-800/70">
+          <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Tracked Products</span>
+          <button type="button" onclick="app.openSettingsModal('scraper')" class="text-[10px] font-mono text-cyan-400 hover:underline flex items-center cursor-pointer">
+            <i data-lucide="clock" class="w-3 h-3 mr-1"></i>
+            <span id="sidebar-next-poll-timer">--:--</span>
+          </button>
         </div>
 
         <!-- Quick Search Filter Input for Tracked Items -->
-        <div class="pt-1 pb-2">
+        <div class="pt-0.5 pb-1.5">
           <div class="relative">
-            <i data-lucide="search" class="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-500"></i>
-            <input type="text" id="sidebar-search-filter" placeholder="Filter tracked items..." oninput="app.filterSidebarItems(this.value)" class="w-full bg-slate-950/80 border border-slate-800 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-vinted focus:ring-1 focus:ring-vinted/30 transition">
+            <i data-lucide="search" class="w-3 h-3 absolute left-2.5 top-2.5 text-slate-500"></i>
+            <input type="text" id="sidebar-search-filter" placeholder="Filter tracked items..." oninput="app.filterSidebarItems(this.value)" class="w-full bg-slate-950/80 border border-slate-800 rounded-lg pl-7 pr-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-vinted transition">
           </div>
         </div>
 
@@ -248,18 +184,14 @@
       </nav>
 
       <!-- Sidebar footer / Quick Status & System Health -->
-      <div class="p-3.5 border-t border-slate-800/80 bg-slate-950/60">
-        <div class="flex items-center justify-between text-[11px] text-slate-400">
-          <span class="flex items-center">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 pulse-live"></span>
-            System Engine
-          </span>
-          <span class="font-mono text-emerald-400 font-semibold">Active</span>
+      <div class="p-3 border-t border-slate-800/80 bg-slate-950/60 flex items-center justify-between text-[11px]">
+        <div class="flex items-center space-x-1.5 text-slate-400">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-live"></span>
+          <span class="font-semibold text-slate-300">Proxy Shield</span>
         </div>
-        <div class="text-[10px] text-slate-500 mt-1 flex items-center justify-between font-mono">
-          <span>Engine: Uvicorn / SQLite</span>
-          <span>v2.4 PRO</span>
-        </div>
+        <button type="button" onclick="app.openSettingsModal('antiban')" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/20 transition cursor-pointer">
+          ONLINE
+        </button>
       </div>
     </aside>
 
@@ -511,7 +443,7 @@
                 <span class="w-2 h-2 rounded-full bg-slate-500 mr-1.5" id="sniper-status-dot"></span>
                 <span id="sniper-status-text">SCANNER IDLE</span>
               </span>
-              <button id="sniper-antiban-badge" onclick="app.openAntiBanModal()" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 cursor-pointer hover:bg-cyan-500/20 transition" title="Connection Shield Status (Click to configure)">
+              <button id="sniper-antiban-badge" onclick="app.openSettingsModal('antiban')" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 cursor-pointer hover:bg-cyan-500/20 transition" title="Connection Shield Status (Click to configure)">
                 <i data-lucide="shield-check" class="w-3.5 h-3.5 mr-1 text-cyan-400" id="sniper-shield-icon"></i>
                 <span id="sniper-antiban-text">Shield OK</span>
               </button>
@@ -523,17 +455,17 @@
           </div>
 
           <div class="flex items-center space-x-2.5 shrink-0">
-            <button id="btn-sniper-arbitrage" onclick="app.openArbitrageModal()" class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition cursor-pointer" title="Scan for high-spread fast-turnover market inefficiencies">
+            <button id="btn-sniper-arbitrage" onclick="app.showArbitrageView()" class="inline-flex items-center px-3 py-2 rounded-xl text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition cursor-pointer" title="Switch to Market Inefficiency & Arbitrage Radar">
               <i data-lucide="flame" class="w-3.5 h-3.5 mr-1.5 text-amber-400"></i>
               Arbitrage Radar
             </button>
 
-            <button id="btn-sniper-autobuy" onclick="app.openAutoBuyModal()" class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition cursor-pointer" title="Configure Card/Shipping or Paper Trading Simulation">
+            <button id="btn-sniper-autobuy" onclick="app.openSettingsModal('autobuy')" class="inline-flex items-center px-3 py-2 rounded-xl text-xs font-semibold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition cursor-pointer" title="Configure Card/Shipping or Paper Trading Simulation Profile">
               <i data-lucide="zap" class="w-3.5 h-3.5 mr-1.5 text-cyan-400"></i>
               Auto-Buy & Sim
             </button>
 
-            <button id="btn-sniper-clear" onclick="app.clearSniperDeals()" class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer">
+            <button id="btn-sniper-clear" onclick="app.clearSniperDeals()" class="inline-flex items-center px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer">
               <i data-lucide="trash-2" class="w-3.5 h-3.5 mr-1.5 text-slate-400"></i>
               Clear Stream
             </button>
@@ -542,6 +474,58 @@
               <i data-lucide="play" class="w-4 h-4 mr-1.5 fill-current" id="sniper-toggle-icon"></i>
               <span id="sniper-toggle-text">Start Sniping</span>
             </button>
+          </div>
+        </div>
+
+        <!-- Unified Paper Trading & AI Quality Gate Performance Bar -->
+        <div class="p-3.5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border border-slate-800 shadow-lg flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div class="flex flex-wrap items-center gap-3">
+            <button type="button" onclick="app.openSettingsModal('autobuy')" id="sniper-execution-pill" class="px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 transition flex items-center cursor-pointer shadow-sm" title="Click to edit shipping address, card details, or toggle paper trading">
+              <span class="w-2 h-2 rounded-full bg-cyan-400 mr-2 pulse-live"></span>
+              <span id="sniper-execution-mode-text">🧪 PAPER TRADING (SIMULATION)</span>
+              <i data-lucide="chevron-right" class="w-3.5 h-3.5 ml-1 opacity-70"></i>
+            </button>
+
+            <div class="flex items-center space-x-3 text-[11px] font-mono border-l border-slate-800 pl-3">
+              <span class="text-slate-400">Capital: <strong id="ticker-capital" class="text-white">£0.00</strong></span>
+              <span class="text-slate-600">•</span>
+              <span class="text-slate-400">Resale: <strong id="ticker-resale" class="text-cyan-300">£0.00</strong></span>
+              <span class="text-slate-600">•</span>
+              <span class="text-slate-400">Paper Profit: <strong id="ticker-profit" class="text-emerald-400 font-bold">+£0.00</strong></span>
+              <span class="text-slate-600">•</span>
+              <span class="text-slate-400">ROI: <strong id="ticker-roi" class="text-teal-300">0%</strong></span>
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <label class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-emerald-500/30 text-[11px] font-semibold text-emerald-300 cursor-pointer select-none" title="Filter out unprofitable or high-risk listings">
+              <input type="checkbox" id="sniper-ai-gate-toggle" checked class="custom-checkbox">
+              <span>AI Profit Gate (Min £12, 30% ROI)</span>
+            </label>
+
+            <button type="button" onclick="app.toggleInlineLedger()" id="btn-toggle-inline-ledger" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer flex items-center" title="Toggle Simulated Orders Ledger">
+              <i data-lucide="history" class="w-3.5 h-3.5 mr-1 text-cyan-400"></i>
+              <span>Ledger (<span id="ticker-order-count">0</span>)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Collapsible Inline Simulated Orders Ledger -->
+        <div id="sniper-inline-ledger" class="glass-panel p-4 rounded-2xl border border-cyan-500/20 space-y-3 hidden animate-fade-in">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="history" class="w-4 h-4 text-cyan-400"></i>
+              <h4 class="text-xs font-bold text-white uppercase tracking-wider">Simulated Paper Orders Ledger</h4>
+            </div>
+            <div class="flex items-center space-x-2 text-xs">
+              <button type="button" onclick="app.clearAutoBuyLedger()" class="text-rose-400 hover:text-rose-300 hover:underline cursor-pointer text-[11px] font-medium">Clear History</button>
+              <button type="button" onclick="app.toggleInlineLedger()" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 cursor-pointer">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+          <div id="sniper-inline-ledger-container" class="max-h-64 overflow-y-auto space-y-2">
+            <!-- Simulated orders populated dynamically -->
           </div>
         </div>
 
@@ -1119,6 +1103,115 @@
           </div>
         </div>
 
+      </div>
+
+      <!-- View Container 4: High-Yield Market Inefficiency & Arbitrage Radar -->
+      <div id="arbitrage-view" class="space-y-6 hidden animate-fade-in">
+        
+        <!-- Header Bar -->
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+          <div>
+            <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
+              <span class="text-amber-400 font-semibold uppercase tracking-wider flex items-center">
+                <i data-lucide="flame" class="w-3.5 h-3.5 mr-1 text-amber-400"></i>
+                Market Inefficiency Engine
+              </span>
+              <span>/</span>
+              <span class="text-slate-300">Broad Market Discovery & Model Decomposition</span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <h2 class="text-2xl font-bold text-white tracking-tight">Arbitrage & Market Radar</h2>
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                <span class="w-2 h-2 rounded-full bg-amber-400 mr-1.5 pulse-live"></span>
+                AI MODEL ARBITRAGE
+              </span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1 max-w-2xl">
+              Inspects broad profitable markets, decomposes items into individual models using local Vision/OCR models, tests each model for profit spread and cheap supply inflow, then synthesizes a strategic recommendation.
+            </p>
+          </div>
+
+          <div class="flex items-center space-x-2.5 shrink-0">
+            <button type="button" onclick="app.showSniperView()" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-teal-300 border border-slate-800 transition cursor-pointer">
+              <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1.5 text-vinted"></i>
+              Open Deal Sniper
+            </button>
+          </div>
+        </div>
+
+        <!-- Curated Sector Quick-Picks Strip -->
+        <div class="glass-panel p-4 rounded-2xl border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5 mr-1.5 text-amber-400"></i>
+              High-Yield Sector Quick-Picks:
+            </span>
+            <span class="text-[11px] text-slate-500 hidden sm:inline">Click any sector to run instant model decomposition</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" onclick="app.runArbitrageMarketAnalysis('Canon IXUS', 'Canon')" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700/80 hover:border-cyan-500/40 transition cursor-pointer flex items-center">
+              <i data-lucide="camera" class="w-3.5 h-3.5 mr-1.5 text-cyan-400"></i>
+              Canon IXUS (Digicams)
+            </button>
+            <button type="button" onclick="app.runArbitrageMarketAnalysis('North Face Nuptse', 'The North Face')" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-teal-300 border border-slate-700/80 hover:border-teal-500/40 transition cursor-pointer flex items-center">
+              <i data-lucide="cloud-rain" class="w-3.5 h-3.5 mr-1.5 text-teal-400"></i>
+              North Face Nuptse (Puffers)
+            </button>
+            <button type="button" onclick="app.runArbitrageMarketAnalysis('Carhartt Detroit jacket', 'Carhartt')" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-700/80 hover:border-amber-500/40 transition cursor-pointer flex items-center">
+              <i data-lucide="hammer" class="w-3.5 h-3.5 mr-1.5 text-amber-400"></i>
+              Carhartt Detroit (Workwear)
+            </button>
+            <button type="button" onclick="app.runArbitrageMarketAnalysis('Ralph Lauren cable knit', 'Polo Ralph Lauren')" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-indigo-300 border border-slate-700/80 hover:border-indigo-500/40 transition cursor-pointer flex items-center">
+              <i data-lucide="shirt" class="w-3.5 h-3.5 mr-1.5 text-indigo-400"></i>
+              Ralph Lauren Cable Knit
+            </button>
+            <button type="button" onclick="app.runArbitrageMarketAnalysis('Sony Cyber-shot', 'Sony')" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-slate-700/80 hover:border-emerald-500/40 transition cursor-pointer flex items-center">
+              <i data-lucide="camera" class="w-3.5 h-3.5 mr-1.5 text-emerald-400"></i>
+              Sony Cyber-shot (CCD)
+            </button>
+            <button type="button" onclick="app.runArbitrageMarketAnalysis('Patagonia Synchilla', 'Patagonia')" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-purple-300 border border-slate-700/80 hover:border-purple-500/40 transition cursor-pointer flex items-center">
+              <i data-lucide="feather" class="w-3.5 h-3.5 mr-1.5 text-purple-400"></i>
+              Patagonia Synchilla
+            </button>
+          </div>
+        </div>
+
+        <!-- Broad Market Search Input & Trigger Bar -->
+        <div class="glass-panel p-4 rounded-2xl border border-slate-800 space-y-3">
+          <form onsubmit="app.submitArbitrageMarketSearch(event)" class="flex flex-col sm:flex-row items-center gap-3">
+            <div class="relative flex-1 w-full">
+              <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400"></i>
+              <input type="text" id="arb-market-input" placeholder="Search any broad market or product (e.g. Nintendo 3DS, Barbour jacket, Bape hoodie, Olympus mju)..." class="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition shadow-inner">
+            </div>
+            <div class="flex items-center space-x-2 w-full sm:w-auto shrink-0">
+              <label class="flex items-center space-x-1.5 text-xs text-slate-400 cursor-pointer select-none">
+                <input type="checkbox" id="arb-market-fetch-live" class="custom-checkbox">
+                <span>Fetch Live UK Listings</span>
+              </label>
+              <button type="submit" id="arb-market-search-btn" class="btn-primary-glow flex-1 sm:flex-none inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-xs font-bold text-white transition shadow-sm cursor-pointer">
+                <i data-lucide="cpu" class="w-4 h-4 mr-1.5" id="arb-search-icon"></i>
+                <span>Analyze Market & Models</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Loading State -->
+        <div id="arb-loading-container" class="hidden py-16 text-center space-y-3">
+          <div class="w-12 h-12 mx-auto rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+            <i data-lucide="radar" class="w-6 h-6 animate-spin"></i>
+          </div>
+          <h4 class="text-sm font-bold text-white">Decomposing Market Silhouette Into Discrete Models...</h4>
+          <p class="text-xs text-slate-400 max-w-md mx-auto" id="arb-loading-text">
+            Mining product codes, estimating market realization prices, calculating buyer fees, and testing individual models for cheap inflow arbitrage.
+          </p>
+        </div>
+
+        <!-- Strategy Recommendation Banner (Populated by JS) -->
+        <div id="arb-strategy-banner-container"></div>
+
+        <!-- Model Profitability Cards Grid (Populated by JS) -->
+        <div id="arb-models-matrix-container" class="space-y-4"></div>
       </div>
 
     </main>
@@ -2550,7 +2643,7 @@
   </div>
 
   <!-- Application Logic -->
-  <script src="/static/app.js?v=3.2"></script>
+  <script src="/static/app.js?v=3.3"></script>
 </body>
 </html>
 
