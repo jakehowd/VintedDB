@@ -7171,6 +7171,7 @@ class VintedApp {
       const rawPrice = Number(p.price != null ? p.price : (p.vinted_asking_price || 0));
       const landedCost = Number(p.vinted_landed_cost || (rawPrice + 0.70 + (rawPrice * 0.05) + 2.95 + 0.60));
       const ebaySold = Number(p.ebay_sold_median || 0);
+      const baseEbaySold = Number(p.base_ebay_sold_median || ebaySold);
       const netSpread = Number(p.net_flip_profit != null ? p.net_flip_profit : (p.spread_gbp || 0));
       const roiPct = Number(p.roi_pct != null ? p.roi_pct : (p.projected_roi_pct || 0));
       const soldRange = p.ebay_sold_range_str || (p.ebay_sold_low ? `£${Number(p.ebay_sold_low).toFixed(0)} - £${Number(p.ebay_sold_high).toFixed(0)}` : 'Market Comp');
@@ -7179,7 +7180,8 @@ class VintedApp {
         : `<div class="w-full h-full flex items-center justify-center text-slate-600"><i data-lucide="image" class="w-6 h-6"></i></div>`;
 
       const vintedUrl = p.url || `https://www.vinted.co.uk/items/${p.id}`;
-      const ebayUrl = p.ebay_verification_url || `https://www.ebay.co.uk/sch/i.html?_nkw=${encodeURIComponent(p.ebay_query || p.ebay_verified_model || p.brand || p.title)}&LH_Sold=1&LH_Complete=1&_sop=13`;
+      const exactEbayUrl = p.exact_ebay_sold_url || p.ebay_verification_url || `https://www.ebay.co.uk/sch/i.html?_nkw=${encodeURIComponent(p.ebay_query || p.ebay_verified_model || p.brand || p.title)}&LH_Sold=1&LH_Complete=1&_sop=13`;
+      const generalEbayUrl = p.ebay_verification_url || exactEbayUrl;
 
       // AI Alpha & Casual Seller Signals
       const alpha = p.ai_alpha || {};
@@ -7194,8 +7196,40 @@ class VintedApp {
            </span>`
         : '';
 
+      // Unmarked Asymmetry Badge (Extreme Information Asymmetry)
+      const isUnmarked = p.is_unmarked_asymmetry;
+      const unmarkedInfo = p.unmarked_asymmetry || {};
+      const unmarkedBadge = isUnmarked
+        ? `<div class="flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm" title="${this.escapeHtmlAttr(unmarkedInfo.asymmetry_reason || 'Generic title recognized via Product Recognition AI')}">
+             <i data-lucide="target" class="w-3 h-3 mr-1 text-amber-400 animate-pulse"></i>
+             <span>UNMARKED ASYMMETRY</span>
+           </div>`
+        : '';
+
+      // Condition Badge Styling
+      const condBadge = p.condition_badge || p.condition || 'Very Good (1.0x)';
+      let condStyle = 'bg-slate-900 text-slate-300 border-slate-800';
+      if ((p.condition_multiplier || 1.0) >= 1.15) {
+        condStyle = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+      } else if ((p.condition_multiplier || 1.0) < 0.85) {
+        condStyle = 'bg-rose-500/20 text-rose-300 border-rose-500/40';
+      } else if ((p.condition_multiplier || 1.0) < 1.0) {
+        condStyle = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+      }
+
+      // Size Badge Styling
+      const sizeBadge = p.size_badge || p.size || 'M/L (1.0x)';
+      let sizeStyle = 'bg-slate-900 text-slate-300 border-slate-800';
+      if ((p.size_multiplier || 1.0) >= 1.0) {
+        sizeStyle = 'bg-teal-500/20 text-teal-300 border-teal-500/40';
+      } else if ((p.size_multiplier || 1.0) < 0.70) {
+        sizeStyle = 'bg-rose-500/20 text-rose-300 border-rose-500/40';
+      } else if ((p.size_multiplier || 1.0) < 1.0) {
+        sizeStyle = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+      }
+
       return `
-        <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-amber-500/40 transition flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div class="p-4 rounded-2xl bg-slate-950/80 border ${isUnmarked ? 'border-amber-500/50 ring-1 ring-amber-500/30' : 'border-slate-800'} hover:border-amber-500/60 transition flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <!-- Left Thumbnail + Meta -->
           <div class="flex items-start space-x-3.5 flex-1 min-w-0">
             <div class="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 shrink-0">
@@ -7217,33 +7251,73 @@ class VintedApp {
                 <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
                   ${this.escapeHtmlAttr(alphaTier)} (${alphaScore}/100)
                 </span>
+                ${unmarkedBadge}
                 ${casualBadge}
-                <span class="px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-400 bg-slate-900 border border-slate-800">
-                  ${this.escapeHtmlAttr(p.size || 'Regular')} • ${this.escapeHtmlAttr(p.condition || 'Good')}
+                
+                <!-- Condition Multiplier Badge -->
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold ${condStyle} border" title="${this.escapeHtmlAttr(p.condition_reason || '')}">
+                  ${this.escapeHtmlAttr(condBadge)}
+                </span>
+
+                <!-- Size Liquidity Multiplier Badge -->
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold ${sizeStyle} border" title="${this.escapeHtmlAttr(p.size_reason || '')}">
+                  ${this.escapeHtmlAttr(sizeBadge)}
                 </span>
               </div>
 
-              <h4 class="text-sm font-bold text-white truncate hover:text-amber-300 transition">
-                <a href="${this.escapeHtmlAttr(vintedUrl)}" target="_blank" rel="noopener noreferrer">
-                  ${this.escapeHtmlAttr(p.title)}
-                </a>
-              </h4>
+              <!-- Title & Model Recognition -->
+              <div>
+                <h4 class="text-sm font-bold text-white truncate hover:text-amber-300 transition">
+                  <a href="${this.escapeHtmlAttr(vintedUrl)}" target="_blank" rel="noopener noreferrer">
+                    ${this.escapeHtmlAttr(p.title)}
+                  </a>
+                </h4>
+                ${isUnmarked ? `
+                  <p class="text-[11px] text-amber-300/90 font-medium pt-0.5 flex items-center">
+                    <i data-lucide="scan" class="w-3 h-3 mr-1 text-amber-400"></i>
+                    <span>Product Recognition AI: <strong>${this.escapeHtmlAttr(p.ebay_verified_model || '')}</strong></span>
+                    <span class="text-slate-400 text-[10px] ml-1.5">(${this.escapeHtmlAttr(unmarkedInfo.asymmetry_reason || '')})</span>
+                  </p>
+                ` : ''}
+              </div>
 
-              <!-- eBay Verified Comps Box -->
+              <!-- Exact Colorway & Style Pill Row -->
+              <div class="flex flex-wrap items-center gap-1.5 pt-0.5 text-xs">
+                <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-950/60 text-indigo-300 border border-indigo-500/30 flex items-center">
+                  <i data-lucide="palette" class="w-3 h-3 mr-1 text-indigo-400"></i>
+                  Colorway: <strong class="ml-1 text-white">${this.escapeHtmlAttr(p.exact_colorway || 'Standard')}</strong>
+                  ${p.colorway_premium_label ? `<span class="ml-1.5 px-1 py-0.2 rounded text-[9px] font-bold bg-amber-500/30 text-amber-200 border border-amber-500/40">${this.escapeHtmlAttr(p.colorway_premium_label)}</span>` : ''}
+                </span>
+
+                <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-900 text-slate-300 border border-slate-800 flex items-center">
+                  <i data-lucide="tag" class="w-3 h-3 mr-1 text-slate-400"></i>
+                  Style: <strong class="ml-1 text-slate-200">${this.escapeHtmlAttr(p.exact_style || 'Standard')}</strong>
+                </span>
+
+                ${p.combined_realization_multiplier ? `
+                  <span class="px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-400 bg-slate-900 border border-slate-800" title="Multiplier applied to base comp (£${baseEbaySold.toFixed(2)}) based on condition, size and colorway: ${Number(p.combined_realization_multiplier).toFixed(2)}x">
+                    Realization: <strong class="text-teal-300 font-bold">${Number(p.combined_realization_multiplier).toFixed(2)}x</strong>
+                  </span>
+                ` : ''}
+              </div>
+
+              <!-- eBay Verified Comps & Exact Colorway Verification Link -->
               <div class="flex flex-wrap items-center gap-2 pt-1 text-xs">
                 <div class="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-950/50 border border-emerald-500/30 text-emerald-300">
                   <i data-lucide="check-circle-2" class="w-3.5 h-3.5 mr-1.5 text-emerald-400"></i>
-                  <span class="font-bold font-mono">eBay Sold: £${ebaySold.toFixed(2)}</span>
+                  <span class="font-bold font-mono">Realized eBay Sold: £${ebaySold.toFixed(2)}</span>
                   ${p.recent_sales_count ? `<span class="text-[10px] text-emerald-400/80 ml-1.5 font-mono">(${p.recent_sales_count} sold)</span>` : ''}
                 </div>
 
-                <a href="${this.escapeHtmlAttr(ebayUrl)}" 
+                <!-- Exact Colorway & Style Verified Link -->
+                <a href="${this.escapeHtmlAttr(exactEbayUrl)}" 
                    target="_blank" 
                    rel="noopener noreferrer" 
-                   class="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-300 hover:text-amber-200 border border-slate-700/80 hover:border-amber-400/50 text-xs font-semibold transition cursor-pointer shadow-sm">
-                  <i data-lucide="search" class="w-3 h-3 mr-1 text-amber-400"></i>
-                  <span>Verify on eBay UK Solds</span>
-                  <i data-lucide="external-link" class="w-3 h-3 ml-1 text-slate-400"></i>
+                   class="inline-flex items-center px-2.5 py-1 rounded-lg bg-gradient-to-r from-emerald-950/70 to-slate-900 hover:from-emerald-900/80 text-emerald-300 hover:text-emerald-100 border border-emerald-500/40 hover:border-emerald-400 text-xs font-semibold transition cursor-pointer shadow-sm"
+                   title="View real sold completed listings on eBay UK matching this exact colorway and style">
+                  <i data-lucide="sparkles" class="w-3 h-3 mr-1 text-emerald-400"></i>
+                  <span>Exact Colorway eBay Solds</span>
+                  <i data-lucide="external-link" class="w-3 h-3 ml-1 text-emerald-400/80"></i>
                 </a>
               </div>
 
@@ -7252,7 +7326,7 @@ class VintedApp {
                 <span class="text-slate-600">•</span>
                 <span>Landed Cost: <strong class="text-slate-300 font-mono">£${landedCost.toFixed(2)}</strong></span>
                 <span class="text-slate-600">•</span>
-                <span>Est. Range: <strong class="text-slate-300 font-mono">${this.escapeHtmlAttr(soldRange)}</strong></span>
+                <span>Adjusted Sold Range: <strong class="text-slate-300 font-mono">${this.escapeHtmlAttr(soldRange)}</strong></span>
               </div>
             </div>
           </div>

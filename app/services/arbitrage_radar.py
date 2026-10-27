@@ -66,8 +66,8 @@ SECTORS_CATALOG = {
         "label": "High-Demand Footwear",
         "icon": "footprints",
         "queries": [
-            ("Nike Dunk Low Retro", "Nike"),
             ("New Balance 990v3", "New Balance"),
+            ("Nike Dunk Low Retro", "Nike"),
             ("Adidas Samba OG", "Adidas"),
             ("Salomon XT-6", "Salomon"),
         ],
@@ -81,6 +81,16 @@ SECTORS_CATALOG = {
         ],
     },
 }
+
+# Generic / Unmarked Vinted queries to uncover mislabeled casual seller grails
+UNMARKED_ASYMMETRY_QUERIES = [
+    ("vintage canvas work jacket", "Vintage"),
+    ("corduroy collar work jacket", "Vintage"),
+    ("waterproof technical jacket hood", "Other"),
+    ("fleece snap pullover", "Vintage"),
+    ("grey running trainers retro", "Other"),
+    ("shark camo hoodie", "Streetwear"),
+]
 
 
 class ArbitrageRadarService:
@@ -201,11 +211,26 @@ class ArbitrageRadarService:
             if price <= 0 or price > 160.0:
                 continue
 
+            # Product Recognition AI check for unmarked / vaguely listed grails
+            desc_text = getattr(s, "description", "") or ""
+            unmarked_info = ai_arbitrage.recognize_unmarked_product({
+                "title": s.title,
+                "description": desc_text,
+                "brand": s.brand,
+                "photo_url": s.photo_url or "",
+            })
+
+            override_model = unmarked_info["identified_model"] if unmarked_info else None
+            effective_brand = unmarked_info["identified_brand"] if unmarked_info else s.brand
+
             verified_comp = ebay_verifier.verify_item(
                 title=s.title,
                 price=price,
-                brand=s.brand,
+                brand=effective_brand,
                 condition=s.condition,
+                size=s.size,
+                description=desc_text,
+                override_benchmark_model=override_model,
             )
 
             if verified_comp and verified_comp["net_flip_profit"] >= min_profit and verified_comp["roi_pct"] >= min_roi:
@@ -213,7 +238,7 @@ class ArbitrageRadarService:
                 casual_info = ai_arbitrage.calculate_casual_seller_index(
                     title=s.title,
                     price=price,
-                    description=getattr(s, "description", "") or "",
+                    description=desc_text,
                 )
                 ai_alpha = ai_arbitrage.compute_ai_alpha_score(
                     net_spread_gbp=verified_comp["net_flip_profit"],
@@ -222,6 +247,7 @@ class ArbitrageRadarService:
                     vinted_asking_price=price,
                     recent_sales_count=verified_comp["recent_sales_count"],
                     casual_seller_score=casual_info["casual_seller_score"],
+                    is_unmarked_asymmetry=bool(unmarked_info),
                 )
                 candidates.append({
                     "id": raw_id,
@@ -237,6 +263,7 @@ class ArbitrageRadarService:
                     "sector_label": verified_comp["sector_label"],
                     "ebay_verified_model": verified_comp["model_name"],
                     "ebay_query": verified_comp["ebay_query"],
+                    "base_ebay_sold_median": verified_comp["base_ebay_sold_median"],
                     "ebay_sold_median": verified_comp["ebay_sold_median"],
                     "ebay_sold_low": verified_comp["ebay_sold_low"],
                     "ebay_sold_high": verified_comp["ebay_sold_high"],
@@ -244,6 +271,23 @@ class ArbitrageRadarService:
                     "recent_sales_count": verified_comp["recent_sales_count"],
                     "velocity_rating": verified_comp["velocity_rating"],
                     "ebay_verification_url": verified_comp["ebay_verification_url"],
+                    "condition_info": verified_comp["condition_info"],
+                    "condition_badge": verified_comp["condition_badge"],
+                    "condition_multiplier": verified_comp["condition_multiplier"],
+                    "size_info": verified_comp["size_info"],
+                    "size_badge": verified_comp["size_badge"],
+                    "size_multiplier": verified_comp["size_multiplier"],
+                    "colorway_info": verified_comp["colorway_info"],
+                    "exact_colorway": verified_comp["exact_colorway"],
+                    "exact_style": verified_comp["exact_style"],
+                    "colorway_multiplier": verified_comp["colorway_multiplier"],
+                    "colorway_premium_label": verified_comp["colorway_premium_label"],
+                    "exact_ebay_query": verified_comp["exact_ebay_query"],
+                    "exact_ebay_sold_url": verified_comp["exact_ebay_sold_url"],
+                    "confirmed_profitable_sale": verified_comp["confirmed_profitable_sale"],
+                    "combined_realization_multiplier": verified_comp["combined_realization_multiplier"],
+                    "is_unmarked_asymmetry": bool(unmarked_info),
+                    "unmarked_asymmetry": unmarked_info,
                     "vinted_asking_price": verified_comp["vinted_asking_price"],
                     "vinted_landed_cost": verified_comp["vinted_landed_cost"],
                     "vinted_cost_breakdown": verified_comp["vinted_cost_breakdown"],
@@ -258,88 +302,136 @@ class ArbitrageRadarService:
                     "recommended_snipe_cap": verified_comp["recommended_snipe_cap"],
                 })
 
-        # 2. Fresh live scan across profitable sector feeds on Vinted UK
+        # 2. Fresh live scan across profitable sector feeds + generic unmarked queries
         from ..scraper import _extract_item, _search_vinted
 
+        queries_pool = []
         for sector_id, sector_info in SECTORS_CATALOG.items():
             for query_tuple in sector_info["queries"][:3]:  # Top 3 queries per sector
-                query_str, expected_brand = query_tuple
-                try:
-                    raw_items = _search_vinted(query_str, page=1, per_page=25)
-                    if not raw_items:
+                queries_pool.append((query_tuple[0], query_tuple[1], sector_id))
+
+        # Include unmarked / generic queries for extreme hidden grail discovery
+        for unmark_q, unmark_brand in UNMARKED_ASYMMETRY_QUERIES[:3]:
+            queries_pool.append((unmark_q, unmark_brand, "unmarked"))
+
+        for query_tuple in queries_pool:
+            query_str, expected_brand, query_cat = query_tuple
+            try:
+                raw_items = _search_vinted(query_str, page=1, per_page=25)
+                if not raw_items:
+                    continue
+
+                for raw in raw_items:
+                    extracted = _extract_item(raw)
+                    if not extracted:
                         continue
 
-                    for raw in raw_items:
-                        extracted = _extract_item(raw)
-                        if not extracted:
-                            continue
+                    str_id = str(extracted.get("id") or "")
+                    if not str_id or str_id in seen_item_ids:
+                        continue
 
-                        str_id = str(extracted.get("id") or "")
-                        if not str_id or str_id in seen_item_ids:
-                            continue
+                    price_val = float(extracted.get("price") or 0.0)
+                    if price_val <= 0 or price_val > 160.0:
+                        continue
 
-                        price_val = float(extracted.get("price") or 0.0)
-                        if price_val <= 0 or price_val > 160.0:
-                            continue
+                    raw_title = str(extracted.get("title") or "")
+                    raw_desc = str(extracted.get("description") or "")
+                    raw_brand = str(extracted.get("brand") or expected_brand)
+                    raw_cond = str(extracted.get("condition") or "")
+                    raw_size = str(extracted.get("size") or "Regular")
+                    raw_photo = extracted.get("photo_url") or ""
 
-                        comp = ebay_verifier.verify_item(
-                            title=str(extracted.get("title") or ""),
+                    # Run Product Recognition AI for unmarked grails
+                    unmarked_info = ai_arbitrage.recognize_unmarked_product({
+                        "title": raw_title,
+                        "description": raw_desc,
+                        "brand": raw_brand,
+                        "photo_url": raw_photo,
+                    })
+
+                    override_model = unmarked_info["identified_model"] if unmarked_info else None
+                    effective_brand = unmarked_info["identified_brand"] if unmarked_info else raw_brand
+
+                    comp = ebay_verifier.verify_item(
+                        title=raw_title,
+                        price=price_val,
+                        brand=effective_brand,
+                        condition=raw_cond,
+                        size=raw_size,
+                        description=raw_desc,
+                        override_benchmark_model=override_model,
+                    )
+
+                    if comp and comp["net_flip_profit"] >= min_profit and comp["roi_pct"] >= min_roi:
+                        seen_item_ids.add(str_id)
+                        casual_info = ai_arbitrage.calculate_casual_seller_index(
+                            title=raw_title,
                             price=price_val,
-                            brand=str(extracted.get("brand") or expected_brand),
-                            condition=str(extracted.get("condition") or ""),
+                            description=raw_desc,
                         )
-
-                        if comp and comp["net_flip_profit"] >= min_profit and comp["roi_pct"] >= min_roi:
-                            seen_item_ids.add(str_id)
-                            casual_info = ai_arbitrage.calculate_casual_seller_index(
-                                title=str(extracted.get("title") or ""),
-                                price=price_val,
-                                description=str(extracted.get("description") or ""),
-                            )
-                            ai_alpha = ai_arbitrage.compute_ai_alpha_score(
-                                net_spread_gbp=comp["net_flip_profit"],
-                                roi_pct=comp["roi_pct"],
-                                ebay_sold_median=comp["ebay_sold_median"],
-                                vinted_asking_price=price_val,
-                                recent_sales_count=comp["recent_sales_count"],
-                                casual_seller_score=casual_info["casual_seller_score"],
-                            )
-                            candidates.append({
-                                "id": str_id,
-                                "title": str(extracted.get("title") or ""),
-                                "brand": comp["brand"],
-                                "price": price_val,
-                                "size": str(extracted.get("size") or "Regular"),
-                                "condition": str(extracted.get("condition") or "Good condition"),
-                                "photo_url": extracted.get("photo_url") or "",
-                                "url": str(extracted.get("url") or f"{VINTED_BASE_URL}/items/{str_id}"),
-                                "source": "live_discovery",
-                                "sector": comp["sector"],
-                                "sector_label": comp["sector_label"],
-                                "ebay_verified_model": comp["model_name"],
-                                "ebay_query": comp["ebay_query"],
-                                "ebay_sold_median": comp["ebay_sold_median"],
-                                "ebay_sold_low": comp["ebay_sold_low"],
-                                "ebay_sold_high": comp["ebay_sold_high"],
-                                "ebay_sold_range_str": comp["ebay_sold_range_str"],
-                                "recent_sales_count": comp["recent_sales_count"],
-                                "velocity_rating": comp["velocity_rating"],
-                                "ebay_verification_url": comp["ebay_verification_url"],
-                                "vinted_asking_price": comp["vinted_asking_price"],
-                                "vinted_landed_cost": comp["vinted_landed_cost"],
-                                "vinted_cost_breakdown": comp["vinted_cost_breakdown"],
-                                "ebay_net_payout": comp["ebay_net_payout"],
-                                "ebay_fees_breakdown": comp["ebay_fees_breakdown"],
-                                "net_flip_profit": comp["net_flip_profit"],
-                                "roi_pct": comp["roi_pct"],
-                                "discount_pct": comp["discount_pct"],
-                                "opportunity_index": ai_alpha["alpha_score"],
-                                "ai_alpha": ai_alpha,
-                                "casual_seller_info": casual_info,
-                                "recommended_snipe_cap": comp["recommended_snipe_cap"],
-                            })
-                except Exception as exc:
-                    logger.debug("Live sector query '%s' skipped: %s", query_str, exc)
+                        ai_alpha = ai_arbitrage.compute_ai_alpha_score(
+                            net_spread_gbp=comp["net_flip_profit"],
+                            roi_pct=comp["roi_pct"],
+                            ebay_sold_median=comp["ebay_sold_median"],
+                            vinted_asking_price=price_val,
+                            recent_sales_count=comp["recent_sales_count"],
+                            casual_seller_score=casual_info["casual_seller_score"],
+                            is_unmarked_asymmetry=bool(unmarked_info),
+                        )
+                        candidates.append({
+                            "id": str_id,
+                            "title": raw_title,
+                            "brand": comp["brand"],
+                            "price": price_val,
+                            "size": raw_size,
+                            "condition": raw_cond or "Good condition",
+                            "photo_url": raw_photo,
+                            "url": str(extracted.get("url") or f"{VINTED_BASE_URL}/items/{str_id}"),
+                            "source": "live_discovery",
+                            "sector": comp["sector"],
+                            "sector_label": comp["sector_label"],
+                            "ebay_verified_model": comp["model_name"],
+                            "ebay_query": comp["ebay_query"],
+                            "base_ebay_sold_median": comp["base_ebay_sold_median"],
+                            "ebay_sold_median": comp["ebay_sold_median"],
+                            "ebay_sold_low": comp["ebay_sold_low"],
+                            "ebay_sold_high": comp["ebay_sold_high"],
+                            "ebay_sold_range_str": comp["ebay_sold_range_str"],
+                            "recent_sales_count": comp["recent_sales_count"],
+                            "velocity_rating": comp["velocity_rating"],
+                            "ebay_verification_url": comp["ebay_verification_url"],
+                            "condition_info": comp["condition_info"],
+                            "condition_badge": comp["condition_badge"],
+                            "condition_multiplier": comp["condition_multiplier"],
+                            "size_info": comp["size_info"],
+                            "size_badge": comp["size_badge"],
+                            "size_multiplier": comp["size_multiplier"],
+                            "colorway_info": comp["colorway_info"],
+                            "exact_colorway": comp["exact_colorway"],
+                            "exact_style": comp["exact_style"],
+                            "colorway_multiplier": comp["colorway_multiplier"],
+                            "colorway_premium_label": comp["colorway_premium_label"],
+                            "exact_ebay_query": comp["exact_ebay_query"],
+                            "exact_ebay_sold_url": comp["exact_ebay_sold_url"],
+                            "confirmed_profitable_sale": comp["confirmed_profitable_sale"],
+                            "combined_realization_multiplier": comp["combined_realization_multiplier"],
+                            "is_unmarked_asymmetry": bool(unmarked_info),
+                            "unmarked_asymmetry": unmarked_info,
+                            "vinted_asking_price": comp["vinted_asking_price"],
+                            "vinted_landed_cost": comp["vinted_landed_cost"],
+                            "vinted_cost_breakdown": comp["vinted_cost_breakdown"],
+                            "ebay_net_payout": comp["ebay_net_payout"],
+                            "ebay_fees_breakdown": comp["ebay_fees_breakdown"],
+                            "net_flip_profit": comp["net_flip_profit"],
+                            "roi_pct": comp["roi_pct"],
+                            "discount_pct": comp["discount_pct"],
+                            "opportunity_index": ai_alpha["alpha_score"],
+                            "ai_alpha": ai_alpha,
+                            "casual_seller_info": casual_info,
+                            "recommended_snipe_cap": comp["recommended_snipe_cap"],
+                        })
+            except Exception as exc:
+                logger.debug("Live query '%s' skipped: %s", query_str, exc)
 
         # 3. Sort candidates by AI Alpha Score descending
         candidates.sort(key=lambda x: x.get("ai_alpha", {}).get("alpha_score", 0), reverse=True)
