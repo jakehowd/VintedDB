@@ -1,9 +1,10 @@
-"""Autonomous High-Yield Cross-Market Arbitrage Radar & Top Picks Engine.
+"""Autonomous High-Yield Cross-Market Arbitrage Radar & AI Top Picks Engine.
 
-Completely rebuilt from scratch for real-world e-commerce & reselling arbitrage.
+Completely rebuilt for real-world e-commerce & reselling arbitrage:
 - Autonomous multi-sector market scanner across high-demand UK resale categories.
-- No manual search query input needed.
-- No camera biases.
+- Zero already-sold items guarantee via parallel live availability verification.
+- AI Alpha Anomaly Score (0–100) detecting casual/uneducated seller mispricings.
+- Potentially good product targets & blueprints calculated by AI for predictive sniping.
 - Cross-market verification against eBay UK Sold & Completed realization benchmarks.
 - Transparent net profit calculation factoring Vinted buyer protection + postage vs
   eBay seller final value fees (12.8%), regulatory fee, fixed fees, and outbound postage.
@@ -13,13 +14,14 @@ Completely rebuilt from scratch for real-world e-commerce & reselling arbitrage.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
 from ..config import VINTED_BASE_URL
 from ..models import ProductVariant, SoldItem, TrackedSearch
+from .ai_arbitrage import ai_arbitrage
 from .ebay_verifier import ebay_verifier
 
 logger = logging.getLogger(__name__)
@@ -96,12 +98,12 @@ class ArbitrageRadarService:
         min_profit_gbp: float = 15.0,
         min_roi_pct: float = 35.0,
     ) -> Dict[str, Any]:
-        """Retrieve today's verified cross-market arbitrage picks."""
+        """Retrieve today's verified cross-market arbitrage picks and AI predictive product targets."""
         now = datetime.now(timezone.utc)
 
         # Run fresh scan if forced or if no cached data exists
         if force_refresh or not self._cached_picks:
-            logger.info("Executing autonomous market scan for Today's Arbitrage Top Picks...")
+            logger.info("Executing autonomous AI market scan for Today's Arbitrage Top Picks...")
             self._cached_picks = self._run_market_analysis(
                 db=db,
                 min_profit=min_profit_gbp,
@@ -109,15 +111,18 @@ class ArbitrageRadarService:
             )
             self._last_scan_at = now
 
-        # Filter by sector if specified and not "all"
+        # Filter active picks by sector if specified and not "all"
         all_picks = list(self._cached_picks)
         if sector and sector.lower() != "all":
             filtered_picks = [p for p in all_picks if p.get("sector") == sector.lower()]
         else:
             filtered_picks = all_picks
 
-        # Sort strictly by Opportunity Index descending (highest composite margin first)
-        filtered_picks.sort(key=lambda x: x.get("opportunity_index", 0), reverse=True)
+        # Sort strictly by AI Alpha Score descending (highest composite anomaly first)
+        filtered_picks.sort(key=lambda x: x.get("ai_alpha", {}).get("alpha_score", x.get("opportunity_index", 0)), reverse=True)
+
+        # Retrieve AI-forecasted product targets for this sector
+        predicted_targets = ai_arbitrage.get_predicted_product_targets(sector=sector)
 
         # Aggregate Market Pulse statistics
         sector_counts: Dict[str, int] = {k: 0 for k in SECTORS_CATALOG}
@@ -134,10 +139,10 @@ class ArbitrageRadarService:
             else 0.0
         )
         rapid_count = sum(1 for p in all_picks if "Rapid" in p.get("velocity_rating", ""))
+        casual_seller_count = sum(1 for p in all_picks if p.get("casual_seller_info", {}).get("is_casual_seller"))
 
         top_sector_name = "Gorpcore & Outerwear"
         if all_picks:
-            # Sector with highest count or profit
             counts = {sec: sum(1 for p in all_picks if p.get("sector") == sec) for sec in SECTORS_CATALOG}
             top_key = max(counts, key=counts.get)
             top_sector_name = SECTORS_CATALOG.get(top_key, {}).get("label", "Outerwear")
@@ -152,10 +157,13 @@ class ArbitrageRadarService:
                 "highest_net_profit_gbp": round(max_profit, 2),
                 "average_roi_pct": round(avg_roi, 1),
                 "rapid_flips_count": rapid_count,
+                "casual_seller_picks_count": casual_seller_count,
                 "top_sector": top_sector_name,
                 "sector_counts": sector_counts,
+                "predicted_products_count": len(predicted_targets),
             },
             "picks": filtered_picks,
+            "predicted_products": predicted_targets,
         }
 
     def _run_market_analysis(
@@ -164,24 +172,27 @@ class ArbitrageRadarService:
         min_profit: float = 15.0,
         min_roi: float = 35.0,
     ) -> List[Dict[str, Any]]:
-        """Scans database items and executes curated live sector queries to identify verified bargains."""
-        discovered: List[Dict[str, Any]] = []
+        """Scans live Vinted feeds & recent database items, then passes candidates through the Live Availability Shield."""
+        now = datetime.now(timezone.utc)
+        recent_cutoff = now - timedelta(hours=48)
+        candidates: List[Dict[str, Any]] = []
         seen_item_ids = set()
 
-        # 1. Harvest & verify active listings from database
-        db_active = (
+        # 1. Harvest candidates from recent database items (captured in last 48 hours only)
+        db_recent = (
             db.query(SoldItem)
             .filter(
                 SoldItem.is_sold == False,
                 SoldItem.is_replica.isnot(True),
                 SoldItem.price > 0,
+                SoldItem.captured_at >= recent_cutoff,
             )
             .order_by(SoldItem.captured_at.desc())
-            .limit(1200)
+            .limit(300)
             .all()
         )
 
-        for s in db_active:
+        for s in db_recent:
             raw_id = str(s.vinted_item_id or s.id)
             if raw_id in seen_item_ids:
                 continue
@@ -199,7 +210,20 @@ class ArbitrageRadarService:
 
             if verified_comp and verified_comp["net_flip_profit"] >= min_profit and verified_comp["roi_pct"] >= min_roi:
                 seen_item_ids.add(raw_id)
-                discovered.append({
+                casual_info = ai_arbitrage.calculate_casual_seller_index(
+                    title=s.title,
+                    price=price,
+                    description=getattr(s, "description", "") or "",
+                )
+                ai_alpha = ai_arbitrage.compute_ai_alpha_score(
+                    net_spread_gbp=verified_comp["net_flip_profit"],
+                    roi_pct=verified_comp["roi_pct"],
+                    ebay_sold_median=verified_comp["ebay_sold_median"],
+                    vinted_asking_price=price,
+                    recent_sales_count=verified_comp["recent_sales_count"],
+                    casual_seller_score=casual_info["casual_seller_score"],
+                )
+                candidates.append({
                     "id": raw_id,
                     "title": s.title,
                     "brand": verified_comp["brand"],
@@ -228,15 +252,17 @@ class ArbitrageRadarService:
                     "net_flip_profit": verified_comp["net_flip_profit"],
                     "roi_pct": verified_comp["roi_pct"],
                     "discount_pct": verified_comp["discount_pct"],
-                    "opportunity_index": verified_comp["opportunity_index"],
+                    "opportunity_index": ai_alpha["alpha_score"],
+                    "ai_alpha": ai_alpha,
+                    "casual_seller_info": casual_info,
                     "recommended_snipe_cap": verified_comp["recommended_snipe_cap"],
                 })
 
-        # 2. Curated live scan across sectors to bring fresh daily bargains
+        # 2. Fresh live scan across profitable sector feeds on Vinted UK
         from ..scraper import _extract_item, _search_vinted
 
         for sector_id, sector_info in SECTORS_CATALOG.items():
-            for query_tuple in sector_info["queries"][:2]:  # Sample top queries per sector
+            for query_tuple in sector_info["queries"][:3]:  # Top 3 queries per sector
                 query_str, expected_brand = query_tuple
                 try:
                     raw_items = _search_vinted(query_str, page=1, per_page=25)
@@ -265,7 +291,20 @@ class ArbitrageRadarService:
 
                         if comp and comp["net_flip_profit"] >= min_profit and comp["roi_pct"] >= min_roi:
                             seen_item_ids.add(str_id)
-                            discovered.append({
+                            casual_info = ai_arbitrage.calculate_casual_seller_index(
+                                title=str(extracted.get("title") or ""),
+                                price=price_val,
+                                description=str(extracted.get("description") or ""),
+                            )
+                            ai_alpha = ai_arbitrage.compute_ai_alpha_score(
+                                net_spread_gbp=comp["net_flip_profit"],
+                                roi_pct=comp["roi_pct"],
+                                ebay_sold_median=comp["ebay_sold_median"],
+                                vinted_asking_price=price_val,
+                                recent_sales_count=comp["recent_sales_count"],
+                                casual_seller_score=casual_info["casual_seller_score"],
+                            )
+                            candidates.append({
                                 "id": str_id,
                                 "title": str(extracted.get("title") or ""),
                                 "brand": comp["brand"],
@@ -294,14 +333,39 @@ class ArbitrageRadarService:
                                 "net_flip_profit": comp["net_flip_profit"],
                                 "roi_pct": comp["roi_pct"],
                                 "discount_pct": comp["discount_pct"],
-                                "opportunity_index": comp["opportunity_index"],
+                                "opportunity_index": ai_alpha["alpha_score"],
+                                "ai_alpha": ai_alpha,
+                                "casual_seller_info": casual_info,
                                 "recommended_snipe_cap": comp["recommended_snipe_cap"],
                             })
                 except Exception as exc:
                     logger.debug("Live sector query '%s' skipped: %s", query_str, exc)
 
-        logger.info("Market analysis complete: %d verified top picks identified.", len(discovered))
-        return discovered
+        # 3. Sort candidates by AI Alpha Score descending
+        candidates.sort(key=lambda x: x.get("ai_alpha", {}).get("alpha_score", 0), reverse=True)
+
+        # 4. Live Availability Shield: Concurrently verify top 35 candidates
+        # Discards ANY item that is already sold, reserved, or 404 on Vinted
+        top_candidates = candidates[:35]
+        verified_active = ai_arbitrage.verify_active_items_parallel(top_candidates, max_workers=6, timeout=10.0)
+
+        # Update SQLite if any database items turned out to be sold
+        verified_ids = {c["id"] for c in verified_active}
+        for cand in top_candidates:
+            if cand["id"] not in verified_ids and cand.get("source") == "database_stream":
+                db_item = db.query(SoldItem).filter(SoldItem.vinted_item_id == cand["id"]).first()
+                if db_item and not db_item.is_sold:
+                    db_item.is_sold = True
+                    db_item.status = "sold"
+                    logger.info("Marked stale database item #%s as sold in SQLite.", cand["id"])
+        db.commit()
+
+        logger.info(
+            "AI Arbitrage scan complete: %d / %d candidates verified 100%% active & buyable.",
+            len(verified_active),
+            len(top_candidates),
+        )
+        return verified_active
 
     def add_pick_to_sniper(self, db: Session, pick: Dict[str, Any]) -> Dict[str, Any]:
         """Auto-configure Deal Sniper to track and snipe items matching this verified arbitrage pick."""
@@ -309,7 +373,6 @@ class ArbitrageRadarService:
         brand = pick.get("brand") or ""
         cap = float(pick.get("recommended_snipe_cap") or 35.0)
 
-        # Check existing or create TrackedSearch
         existing = db.query(TrackedSearch).filter(TrackedSearch.search_text.ilike(search_text)).first()
         if existing:
             target_search = existing
@@ -324,7 +387,6 @@ class ArbitrageRadarService:
             db.commit()
             db.refresh(target_search)
 
-        # Lock Deal Sniper onto target
         from ..routers.sniper import deal_sniper
 
         with deal_sniper._lock:
@@ -339,6 +401,47 @@ class ArbitrageRadarService:
             "brand": target_search.brand,
             "max_price": cap,
             "message": f"Successfully added '{target_search.search_text}' to Deal Sniper with cap ≤ £{cap:.0f}!",
+        }
+
+    def target_predicted_product(self, db: Session, product_id: str) -> Dict[str, Any]:
+        """1-Click launch an automated sniper targeting an AI-predicted high-alpha product blueprint."""
+        blueprint = next((b for b in ai_arbitrage._predicted_blueprints if b["product_id"] == product_id), None)
+        if not blueprint:
+            raise ValueError(f"Unknown predicted product ID: {product_id}")
+
+        search_text = blueprint["product_name"]
+        brand = blueprint["brand"]
+        cap = float(blueprint["target_buy_ceiling_gbp"])
+
+        existing = db.query(TrackedSearch).filter(TrackedSearch.search_text.ilike(search_text)).first()
+        if existing:
+            target_search = existing
+        else:
+            target_search = TrackedSearch(
+                search_text=search_text,
+                brand=brand,
+                is_active=True,
+                variants_enabled=True,
+            )
+            db.add(target_search)
+            db.commit()
+            db.refresh(target_search)
+
+        from ..routers.sniper import deal_sniper
+
+        with deal_sniper._lock:
+            if target_search.id not in deal_sniper.selected_search_ids:
+                deal_sniper.selected_search_ids.append(target_search.id)
+            deal_sniper.item_max_prices[target_search.id] = cap
+
+        return {
+            "ok": True,
+            "search_id": target_search.id,
+            "search_text": target_search.search_text,
+            "brand": target_search.brand,
+            "max_price": cap,
+            "vague_exploits": blueprint.get("vague_search_exploits") or [],
+            "message": f"🎯 Deal Sniper locked onto '{target_search.search_text}' with buy ceiling ≤ £{cap:.0f}!",
         }
 
     def simulate_pick_buy(self, pick: Dict[str, Any], db: Optional[Session] = None) -> Dict[str, Any]:

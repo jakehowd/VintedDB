@@ -31,6 +31,10 @@ class SnipePickRequest(BaseModel):
     vinted_item_id: Optional[str] = None
 
 
+class TargetProductRequest(BaseModel):
+    product_id: str
+
+
 class SimBuyPickRequest(BaseModel):
     id: Optional[str] = None
     title: str
@@ -41,6 +45,34 @@ class SimBuyPickRequest(BaseModel):
     net_flip_profit: Optional[float] = None
     roi_pct: Optional[float] = None
     ebay_sold_median: Optional[float] = None
+
+
+@router.get("/predicted-products")
+def get_predicted_products(
+    sector: str = Query("all", description="Sector filter (all, outerwear, streetwear, knitwear, footwear, sportswear)"),
+):
+    """Retrieve AI-calculated high-alpha product targets and blueprints to snipe."""
+    from ..services.ai_arbitrage import ai_arbitrage
+    return {
+        "status": "success",
+        "sector": sector,
+        "predicted_products": ai_arbitrage.get_predicted_product_targets(sector=sector),
+    }
+
+
+@router.post("/target-product")
+def target_predicted_product(
+    payload: TargetProductRequest,
+    db: Session = Depends(get_db),
+):
+    """1-Click launch automated Deal Sniper targeting an AI-predicted high-alpha product blueprint."""
+    try:
+        return arbitrage_radar.target_predicted_product(
+            db=db,
+            product_id=payload.product_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 # ── Modern Cross-Market Arbitrage Endpoints ───────────────────────────────────

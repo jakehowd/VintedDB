@@ -6990,6 +6990,30 @@ class VintedApp {
     if (modal) modal.classList.add('hidden');
   }
 
+  switchArbitrageViewMode(mode = 'active') {
+    this.arbitrageViewMode = mode;
+    const btnActive = document.getElementById('arb-tab-btn-active');
+    const btnPredicted = document.getElementById('arb-tab-btn-predicted');
+    const containerActive = document.getElementById('arb-top-picks-container');
+    const containerPredicted = document.getElementById('arb-predicted-products-container');
+
+    if (mode === 'active') {
+      if (btnActive) btnActive.className = 'flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center cursor-pointer bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm';
+      if (btnPredicted) btnPredicted.className = 'flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center justify-center cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700';
+      if (containerActive) containerActive.classList.remove('hidden');
+      if (containerPredicted) containerPredicted.classList.add('hidden');
+    } else {
+      if (btnActive) btnActive.className = 'flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center justify-center cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700';
+      if (btnPredicted) btnPredicted.className = 'flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center cursor-pointer bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm';
+      if (containerActive) containerActive.classList.add('hidden');
+      if (containerPredicted) containerPredicted.classList.remove('hidden');
+      if (this.predictedProductsList) {
+        this.renderPredictedProducts(this.predictedProductsList);
+      }
+    }
+    if (window.lucide) lucide.createIcons();
+  }
+
   async loadTodaysArbitragePicks(sector = 'all', forceRefresh = false) {
     this.currentArbitrageSector = sector || 'all';
 
@@ -7017,6 +7041,7 @@ class VintedApp {
 
       this.cachedArbitrageData = data;
       this.arbitragePicksMap = new Map();
+      this.predictedProductsList = Array.isArray(data.predicted_products) ? data.predicted_products : [];
 
       const picks = Array.isArray(data.picks) ? data.picks : [];
       picks.forEach(p => {
@@ -7026,16 +7051,22 @@ class VintedApp {
       // Update Market Pulse Strip
       const pulse = data.market_pulse || {};
       const elPulseTotal = document.getElementById('arb-pulse-total-picks');
-      if (elPulseTotal) elPulseTotal.textContent = `${pulse.total_picks || 0} Picks`;
+      if (elPulseTotal) elPulseTotal.textContent = `${pulse.total_picks || picks.length} Deals`;
 
       const elPulseMaxProfit = document.getElementById('arb-pulse-max-profit');
       if (elPulseMaxProfit) elPulseMaxProfit.textContent = `+£${Number(pulse.highest_net_profit_gbp || 0).toFixed(2)}`;
 
+      const elPulseCasual = document.getElementById('arb-pulse-casual-count');
+      if (elPulseCasual) elPulseCasual.textContent = `${pulse.casual_seller_picks_count || 0} Clearouts`;
+
       const elPulseAvgRoi = document.getElementById('arb-pulse-avg-roi');
       if (elPulseAvgRoi) elPulseAvgRoi.textContent = `${Number(pulse.average_roi_pct || 0).toFixed(0)}% ROI`;
 
-      const elPulseRapid = document.getElementById('arb-pulse-rapid-count');
-      if (elPulseRapid) elPulseRapid.textContent = `${pulse.rapid_flips_count || 0} Deals`;
+      // Update switcher badges
+      const elTabBadgeActive = document.getElementById('arb-tab-badge-active');
+      if (elTabBadgeActive) elTabBadgeActive.textContent = picks.length;
+      const elTabBadgePred = document.getElementById('arb-tab-badge-predicted');
+      if (elTabBadgePred) elTabBadgePred.textContent = this.predictedProductsList.length;
 
       // Update sector count badges
       const sectorCounts = pulse.sector_counts || {};
@@ -7062,10 +7093,11 @@ class VintedApp {
       // Update sidebar badge
       const sideBadge = document.getElementById('sidebar-arbitrage-badge');
       if (sideBadge) {
-        sideBadge.textContent = pulse.total_picks > 0 ? `${pulse.total_picks} HOT` : '0';
+        sideBadge.textContent = picks.length > 0 ? `${picks.length} HOT` : '0';
       }
 
       this.renderTodaysTopPicks(picks);
+      this.renderPredictedProducts(this.predictedProductsList);
     } catch (err) {
       console.error('Arbitrage Picks Error:', err);
       this.showToast(err.message, 'error');
@@ -7106,6 +7138,12 @@ class VintedApp {
         ? allPicks
         : allPicks.filter(p => (p.sector || '').toLowerCase() === sector.toLowerCase());
       this.renderTodaysTopPicks(filtered);
+
+      const allPred = this.predictedProductsList || [];
+      const filteredPred = (sector === 'all')
+        ? allPred
+        : allPred.filter(p => (p.sector || '').toLowerCase() === sector.toLowerCase());
+      this.renderPredictedProducts(filteredPred);
     } else {
       this.loadTodaysArbitragePicks(sector, false);
     }
@@ -7143,6 +7181,19 @@ class VintedApp {
       const vintedUrl = p.url || `https://www.vinted.co.uk/items/${p.id}`;
       const ebayUrl = p.ebay_verification_url || `https://www.ebay.co.uk/sch/i.html?_nkw=${encodeURIComponent(p.ebay_query || p.ebay_verified_model || p.brand || p.title)}&LH_Sold=1&LH_Complete=1&_sop=13`;
 
+      // AI Alpha & Casual Seller Signals
+      const alpha = p.ai_alpha || {};
+      const alphaScore = alpha.alpha_score || p.opportunity_index || 85;
+      const alphaTier = alpha.alpha_tier || (alphaScore >= 90 ? '🌟 GRAIL ALPHA' : '🔥 HIGH ALPHA');
+      const casualInfo = p.casual_seller_info || {};
+      const isCasual = casualInfo.is_casual_seller;
+      const casualBadge = isCasual
+        ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center" title="${this.escapeHtmlAttr((casualInfo.signals || []).join(' • '))}">
+             <i data-lucide="sparkles" class="w-3 h-3 mr-1 text-purple-400"></i>
+             Casual Clearout Signal
+           </span>`
+        : '';
+
       return `
         <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-amber-500/40 transition flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <!-- Left Thumbnail + Meta -->
@@ -7150,6 +7201,10 @@ class VintedApp {
             <div class="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 shrink-0">
               ${photoHtml}
               <span class="absolute bottom-1 right-1 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-black/80 text-white">£${rawPrice.toFixed(0)}</span>
+              <span class="absolute top-1 left-1 px-1.5 py-0.2 rounded text-[8px] font-mono font-bold bg-emerald-500/90 text-slate-950 flex items-center">
+                <span class="w-1.5 h-1.5 rounded-full bg-slate-950 mr-1 animate-pulse"></span>
+                ACTIVE
+              </span>
             </div>
             <div class="space-y-1.5 flex-1 min-w-0">
               <div class="flex flex-wrap items-center gap-1.5">
@@ -7159,6 +7214,10 @@ class VintedApp {
                 <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300">
                   ${this.escapeHtmlAttr(p.brand || 'Apparel')}
                 </span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  ${this.escapeHtmlAttr(alphaTier)} (${alphaScore}/100)
+                </span>
+                ${casualBadge}
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-400 bg-slate-900 border border-slate-800">
                   ${this.escapeHtmlAttr(p.size || 'Regular')} • ${this.escapeHtmlAttr(p.condition || 'Good')}
                 </span>
@@ -7216,7 +7275,7 @@ class VintedApp {
                  rel="noopener noreferrer" 
                  class="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-slate-700 transition flex items-center cursor-pointer">
                 <i data-lucide="shopping-bag" class="w-3.5 h-3.5 mr-1 text-teal-400"></i>
-                <span>Vinted</span>
+                <span>Buy on Vinted</span>
               </a>
 
               <button type="button" 
@@ -7239,6 +7298,165 @@ class VintedApp {
     }).join('');
 
     if (window.lucide) lucide.createIcons();
+  }
+
+  renderPredictedProducts(products) {
+    const container = document.getElementById('arb-predicted-products-container');
+    if (!container) return;
+
+    if (!products || products.length === 0) {
+      container.innerHTML = `
+        <div class="py-12 text-center text-slate-500 space-y-2 glass-panel rounded-2xl border border-slate-800">
+          <i data-lucide="brain" class="w-8 h-8 mx-auto text-purple-400"></i>
+          <h4 class="text-sm font-bold text-white">No AI Product Targets for this Sector</h4>
+          <p class="text-xs text-slate-400">Select "All Sectors" to see high-inefficiency products across all categories.</p>
+        </div>
+      `;
+      if (window.lucide) lucide.createIcons();
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="p-4 rounded-2xl bg-gradient-to-r from-purple-950/30 via-slate-900/60 to-purple-950/30 border border-purple-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 mb-4">
+        <div class="space-y-1">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="brain-circuit" class="w-4 h-4 text-purple-400"></i>
+            <h3 class="text-sm font-bold text-white">AI-Calculated High-Inefficiency Resale Blueprints</h3>
+          </div>
+          <p class="text-xs text-purple-200/80">
+            These models suffer from persistent information asymmetry: uneducated casual sellers routinely list them far below fair market value. 
+            Click <strong>"Auto-Snipe This Product"</strong> to deploy Deal Sniper with tailored buy ceilings and vague-search keyword traps.
+          </p>
+        </div>
+        <span class="px-3 py-1 rounded-xl text-xs font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 shrink-0">
+          ${products.length} High-Yield Blueprints
+        </span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        ${products.map(b => {
+          const exploits = Array.isArray(b.vague_search_exploits) ? b.vague_search_exploits : [];
+
+          return `
+            <div class="p-5 rounded-2xl bg-slate-950/90 border border-slate-800 hover:border-purple-500/50 transition flex flex-col justify-between space-y-4 shadow-lg">
+              <div class="space-y-3">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <div class="flex items-center gap-1.5 mb-1">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                        ${this.escapeHtmlAttr(b.sector_label || 'High Alpha')}
+                      </span>
+                      <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300">
+                        ${this.escapeHtmlAttr(b.brand)}
+                      </span>
+                      <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        Alpha ${b.alpha_score}/100
+                      </span>
+                    </div>
+                    <h4 class="text-base font-bold text-white">${this.escapeHtmlAttr(b.product_name)}</h4>
+                  </div>
+                  <div class="text-right shrink-0 font-mono">
+                    <div class="text-lg font-black text-emerald-400">+£${Number(b.projected_net_profit_gbp || 0).toFixed(2)}</div>
+                    <div class="text-xs font-bold text-teal-300">${Number(b.projected_roi_pct || 0).toFixed(0)}% ROI</div>
+                  </div>
+                </div>
+
+                <!-- 4 Metrics Blueprint Strip -->
+                <div class="grid grid-cols-4 gap-1.5 p-2.5 rounded-xl bg-slate-900/90 text-center text-xs font-mono border border-slate-800">
+                  <div>
+                    <span class="text-[10px] text-slate-500 uppercase block">Buy Target</span>
+                    <strong class="text-amber-300">≤£${Number(b.target_buy_ceiling_gbp || 0).toFixed(0)}</strong>
+                  </div>
+                  <div>
+                    <span class="text-[10px] text-slate-500 uppercase block">eBay Median</span>
+                    <strong class="text-emerald-400">£${Number(b.predicted_ebay_sold_median || 0).toFixed(0)}</strong>
+                  </div>
+                  <div>
+                    <span class="text-[10px] text-slate-500 uppercase block">Resale Range</span>
+                    <strong class="text-slate-300">${this.escapeHtmlAttr(b.predicted_sold_range || '')}</strong>
+                  </div>
+                  <div>
+                    <span class="text-[10px] text-slate-500 uppercase block">Turnover</span>
+                    <strong class="text-cyan-300">${Number(b.historical_turnover_days || 2).toFixed(1)}d</strong>
+                  </div>
+                </div>
+
+                <p class="text-xs text-slate-300 leading-relaxed bg-slate-900/50 p-2.5 rounded-xl border border-slate-800/80">
+                  ${this.escapeHtmlAttr(b.rationale || '')}
+                </p>
+
+                <!-- Vague Keyword Traps Strip -->
+                ${exploits.length > 0 ? `
+                  <div class="space-y-1.5">
+                    <span class="text-[10px] font-bold text-purple-300 uppercase tracking-wider block flex items-center">
+                      <i data-lucide="target" class="w-3 h-3 mr-1 text-purple-400"></i>
+                      Casual Seller Vague Keyword Exploits:
+                    </span>
+                    <div class="flex flex-wrap gap-1.5">
+                      ${exploits.map(ex => `
+                        <span class="px-2 py-0.5 rounded-lg text-[11px] font-mono bg-slate-900 text-purple-200 border border-purple-500/20">
+                          "${this.escapeHtmlAttr(ex)}"
+                        </span>
+                      `).join('')}
+                    </div>
+                  </div>
+                ` : ''}
+
+                <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                  <span class="flex items-center text-amber-300">
+                    <i data-lucide="zap" class="w-3 h-3 mr-1"></i>
+                    ${this.escapeHtmlAttr(b.mispricing_frequency || 'High Influx')}
+                  </span>
+                  <span>Turnover: ${this.escapeHtmlAttr(b.turnover_speed || '< 48 hrs')}</span>
+                </div>
+              </div>
+
+              <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-3">
+                <a href="https://www.ebay.co.uk/sch/i.html?_nkw=${encodeURIComponent(b.product_name)}&LH_Sold=1&LH_Complete=1&_sop=13" 
+                   target="_blank" 
+                   rel="noopener noreferrer" 
+                   class="text-xs font-semibold text-slate-400 hover:text-amber-300 flex items-center transition">
+                  <i data-lucide="search" class="w-3.5 h-3.5 mr-1 text-amber-400"></i>
+                  <span>Verify eBay Comps</span>
+                </a>
+
+                <button type="button" 
+                        onclick="app.targetPredictedProduct('${this.escapeHtmlAttr(b.product_id)}')" 
+                        class="btn-primary-glow px-4 py-2 rounded-xl text-xs font-bold text-white transition flex items-center cursor-pointer shadow-md">
+                  <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1.5"></i>
+                  <span>Auto-Snipe This Product (≤ £${Number(b.target_buy_ceiling_gbp || 0).toFixed(0)})</span>
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+
+    if (window.lucide) lucide.createIcons();
+  }
+
+  async targetPredictedProduct(productId) {
+    if (!productId) return;
+    try {
+      this.showToast('Deploying Deal Sniper onto AI product blueprint...', 'info');
+
+      const res = await fetch('/api/arbitrage/target-product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_id: productId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to target predicted product');
+
+      await this.loadSearches();
+      await this.loadSniperTargetsInfo();
+
+      this.showToast(data.message || `🎯 Deal Sniper armed for '${data.search_text}' with buy ceiling ≤ £${data.max_price}!`, 'success');
+      this.showSniperView();
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    }
   }
 
   async snipeArbitragePick(pickId) {
