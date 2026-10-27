@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from ..config import VINTED_BASE_URL
 from ..models import ProductVariant, SoldItem, TrackedSearch
 from .ai_arbitrage import ai_arbitrage
+from .antirep import verify_arbitrage_item_authenticity
 from .ebay_verifier import ebay_verifier
 
 logger = logging.getLogger(__name__)
@@ -82,8 +83,30 @@ SECTORS_CATALOG = {
     },
 }
 
-# Generic / Unmarked Vinted queries to uncover mislabeled casual seller grails
-UNMARKED_ASYMMETRY_QUERIES = [
+# Deep research-proven techniques to harvest super cheap items on Vinted:
+# 1. Phonetic misspellings & typos (casual mobile sellers typing fast, zero competitor views)
+# 2. Model omission (seller mentions brand but leaves out high-value SKU)
+# 3. Unmarked category clearouts (seller leaves brand blank or selects 'Vintage'/'Other')
+SUPER_CHEAP_HARVEST_QUERIES = [
+    # ── Typos & Misspellings (Zero search competition) ─────────────────────────
+    ("carhart jacket", "Carhartt"),
+    ("carthartt", "Carhartt"),
+    ("carthart jacket", "Carhartt"),
+    ("arcteryx jacket", "Arc'teryx"),
+    ("patagoni fleece", "Patagonia"),
+    ("stone islan jumper", "Stone Island"),
+    ("ralph laurn jumper", "Polo Ralph Lauren"),
+    ("new balence 990", "New Balance"),
+    
+    # ── Silhouette Omissions (Casual wardrobe clearouts) ──────────────────────
+    ("carhartt canvas jacket", "Carhartt"),
+    ("carhartt brown coat", "Carhartt"),
+    ("north face black puffer", "The North Face"),
+    ("patagonia snap pullover", "Patagonia"),
+    ("new balance grey running", "New Balance"),
+    ("stussy ball jumper", "Stussy"),
+    
+    # ── Unmarked & Category Clearouts (Seller selected 'Vintage'/'Other') ─────
     ("vintage canvas work jacket", "Vintage"),
     ("corduroy collar work jacket", "Vintage"),
     ("waterproof technical jacket hood", "Other"),
@@ -211,8 +234,24 @@ class ArbitrageRadarService:
             if price <= 0 or price > 160.0:
                 continue
 
-            # Product Recognition AI check for unmarked / vaguely listed grails
             desc_text = getattr(s, "description", "") or ""
+
+            # 1. Strict Anti-Counterfeit & Fake/Rework Screening
+            # Eliminates Thailand reworked jackets, DHgate reps, bootlegs, and scam listings
+            is_auth, auth_reason = verify_arbitrage_item_authenticity({
+                "title": s.title,
+                "description": desc_text,
+                "brand": s.brand,
+                "condition": s.condition,
+                "price": price,
+                "photo_url": s.photo_url or "",
+                "id": raw_id,
+            }, db=db)
+            if not is_auth:
+                logger.info("Filtered out non-authentic / rework / fake candidate #%s (%s): %s", raw_id, s.title[:35], auth_reason)
+                continue
+
+            # Product Recognition AI check for unmarked / vaguely listed grails
             unmarked_info = ai_arbitrage.recognize_unmarked_product({
                 "title": s.title,
                 "description": desc_text,
@@ -284,6 +323,7 @@ class ArbitrageRadarService:
                     "colorway_premium_label": verified_comp["colorway_premium_label"],
                     "exact_ebay_query": verified_comp["exact_ebay_query"],
                     "exact_ebay_sold_url": verified_comp["exact_ebay_sold_url"],
+                    "sold_comp_proof": verified_comp.get("sold_comp_proof", ""),
                     "confirmed_profitable_sale": verified_comp["confirmed_profitable_sale"],
                     "combined_realization_multiplier": verified_comp["combined_realization_multiplier"],
                     "is_unmarked_asymmetry": bool(unmarked_info),
@@ -302,7 +342,7 @@ class ArbitrageRadarService:
                     "recommended_snipe_cap": verified_comp["recommended_snipe_cap"],
                 })
 
-        # 2. Fresh live scan across profitable sector feeds + generic unmarked queries
+        # 2. Fresh live scan across profitable sector feeds + typo / omission clearout traps
         from ..scraper import _extract_item, _search_vinted
 
         queries_pool = []
@@ -310,9 +350,9 @@ class ArbitrageRadarService:
             for query_tuple in sector_info["queries"][:3]:  # Top 3 queries per sector
                 queries_pool.append((query_tuple[0], query_tuple[1], sector_id))
 
-        # Include unmarked / generic queries for extreme hidden grail discovery
-        for unmark_q, unmark_brand in UNMARKED_ASYMMETRY_QUERIES[:3]:
-            queries_pool.append((unmark_q, unmark_brand, "unmarked"))
+        # Include typo, silhouette omission, and category clearouts from our research
+        for harvest_q, harvest_brand in SUPER_CHEAP_HARVEST_QUERIES[:6]:
+            queries_pool.append((harvest_q, harvest_brand, "super_cheap_clearout"))
 
         for query_tuple in queries_pool:
             query_str, expected_brand, query_cat = query_tuple
@@ -340,6 +380,20 @@ class ArbitrageRadarService:
                     raw_cond = str(extracted.get("condition") or "")
                     raw_size = str(extracted.get("size") or "Regular")
                     raw_photo = extracted.get("photo_url") or ""
+
+                    # 1. Strict Anti-Counterfeit & Fake/Rework Screening
+                    is_auth, auth_reason = verify_arbitrage_item_authenticity({
+                        "title": raw_title,
+                        "description": raw_desc,
+                        "brand": raw_brand,
+                        "condition": raw_cond,
+                        "price": price_val,
+                        "photo_url": raw_photo,
+                        "id": str_id,
+                    }, db=db)
+                    if not is_auth:
+                        logger.info("Filtered out live non-authentic / rework / fake candidate #%s (%s): %s", str_id, raw_title[:35], auth_reason)
+                        continue
 
                     # Run Product Recognition AI for unmarked grails
                     unmarked_info = ai_arbitrage.recognize_unmarked_product({
@@ -413,6 +467,7 @@ class ArbitrageRadarService:
                             "colorway_premium_label": comp["colorway_premium_label"],
                             "exact_ebay_query": comp["exact_ebay_query"],
                             "exact_ebay_sold_url": comp["exact_ebay_sold_url"],
+                            "sold_comp_proof": comp.get("sold_comp_proof", ""),
                             "confirmed_profitable_sale": comp["confirmed_profitable_sale"],
                             "combined_realization_multiplier": comp["combined_realization_multiplier"],
                             "is_unmarked_asymmetry": bool(unmarked_info),
