@@ -5660,6 +5660,7 @@ class VintedApp {
     this.closeAIModal();
     this.closeArbitrageModal();
     this.closeAutoBuyModal();
+    this.closeCrossListingModal();
     this.closeShortcutsModal();
     this.closeScraperTerminal();
     const mobDrawer = document.getElementById('mobile-items-drawer');
@@ -7180,105 +7181,178 @@ class VintedApp {
       const vintedUrl = p.url || `https://www.vinted.co.uk/items/${p.id}`;
       const exactEbayUrl = p.exact_ebay_sold_url || p.ebay_verification_url || `https://www.ebay.co.uk/sch/i.html?_nkw=${encodeURIComponent(p.ebay_query || p.ebay_verified_model || p.brand || p.title)}&LH_Sold=1&LH_Complete=1&_sop=13`;
       const isUnmarked = p.is_unmarked_asymmetry;
+      const depopComp = p.depop_comp;
+      const offerTarget = p.offer_target;
+      const lensUrl = p.google_lens_url;
+
+      // Determine highest net payout platform
+      const bestProfit = depopComp && depopComp.is_depop_superior ? Number(depopComp.depop_net_profit || netSpread) : netSpread;
+      const bestRoi = depopComp && depopComp.is_depop_superior ? Number(depopComp.depop_roi_pct || roiPct) : roiPct;
+      const bestPlatform = depopComp && depopComp.is_depop_superior ? 'Depop' : 'eBay UK';
 
       return `
-        <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/80 hover:border-amber-500/50 transition flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <!-- Left Thumbnail + Item Details -->
-          <div class="flex items-start space-x-3.5 flex-1 min-w-0">
-            <div class="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 shrink-0">
-              ${photoHtml}
-              <span class="absolute bottom-1 right-1 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-black/85 text-white">£${rawPrice.toFixed(0)}</span>
-              <span class="absolute top-1 left-1 px-1.5 py-0.2 rounded text-[8px] font-mono font-bold bg-emerald-500 text-slate-950">ACTIVE</span>
-            </div>
-
-            <div class="space-y-1.5 flex-1 min-w-0">
-              <!-- Title -->
-              <div>
-                <h4 class="text-sm sm:text-base font-bold text-white hover:text-amber-300 transition truncate">
-                  <a href="${this.escapeHtmlAttr(vintedUrl)}" target="_blank" rel="noopener noreferrer">
-                    ${this.escapeHtmlAttr(p.title)}
-                  </a>
-                </h4>
-                ${isUnmarked ? `
-                  <p class="text-xs text-amber-300 font-medium pt-0.5 flex items-center">
-                    <i data-lucide="sparkles" class="w-3 h-3 mr-1 text-amber-400"></i>
-                    <span>Casual Clearout: Identified as <strong>${this.escapeHtmlAttr(p.ebay_verified_model || '')}</strong></span>
-                  </p>
-                ` : ''}
+        <div class="p-4 rounded-2xl bg-slate-950/85 border border-slate-800/80 hover:border-amber-500/50 transition flex flex-col space-y-3 shadow-lg">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <!-- Left Thumbnail + Item Details -->
+            <div class="flex items-start space-x-3.5 flex-1 min-w-0">
+              <div class="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 shrink-0">
+                ${photoHtml}
+                <span class="absolute bottom-1 right-1 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-black/85 text-white">£${rawPrice.toFixed(0)}</span>
+                <span class="absolute top-1 left-1 px-1.5 py-0.2 rounded text-[8px] font-mono font-bold bg-emerald-500 text-slate-950">ACTIVE</span>
               </div>
 
-              <!-- Clean Metadata Row (Clean text, zero badge clutter) -->
-              <div class="text-xs text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                <span>Brand: <strong class="text-slate-200">${this.escapeHtmlAttr(p.brand || 'Apparel')}</strong></span>
-                <span class="text-slate-600">•</span>
-                <span>Size: <strong class="text-slate-200">${this.escapeHtmlAttr(p.size || 'Standard')}</strong></span>
-                <span class="text-slate-600">•</span>
-                <span>Condition: <strong class="text-slate-200">${this.escapeHtmlAttr(p.condition || 'Very Good')}</strong></span>
-                ${p.exact_colorway && p.exact_colorway !== 'Standard / Classic' ? `
-                  <span class="text-slate-600">•</span>
-                  <span>Color: <strong class="text-indigo-300">${this.escapeHtmlAttr(p.exact_colorway)}</strong></span>
-                ` : ''}
-                <span class="text-slate-600">•</span>
-                <span>Landed: <strong class="text-slate-300 font-mono">£${landedCost.toFixed(2)}</strong></span>
-              </div>
-
-              <!-- eBay Realized Sold Comps & Direct Verification Link -->
-              <div class="flex flex-wrap items-center gap-2 pt-1 text-xs">
-                <div class="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-emerald-300">
-                  <i data-lucide="check-circle-2" class="w-3.5 h-3.5 mr-1.5 text-emerald-400"></i>
-                  <span class="font-bold font-mono">eBay UK Sold: £${ebaySold.toFixed(2)}</span>
-                  ${p.recent_sales_count ? `<span class="text-[10px] text-emerald-400/80 ml-1.5 font-mono">(${p.recent_sales_count} sold)</span>` : ''}
+              <div class="space-y-1.5 flex-1 min-w-0">
+                <!-- Title -->
+                <div>
+                  <h4 class="text-sm sm:text-base font-bold text-white hover:text-amber-300 transition truncate">
+                    <a href="${this.escapeHtmlAttr(vintedUrl)}" target="_blank" rel="noopener noreferrer">
+                      ${this.escapeHtmlAttr(p.title)}
+                    </a>
+                  </h4>
+                  ${isUnmarked ? `
+                    <p class="text-xs text-amber-300 font-medium pt-0.5 flex items-center">
+                      <i data-lucide="sparkles" class="w-3 h-3 mr-1 text-amber-400"></i>
+                      <span>Casual Clearout: Identified as <strong>${this.escapeHtmlAttr(p.ebay_verified_model || '')}</strong></span>
+                    </p>
+                  ` : ''}
                 </div>
 
-                <a href="${this.escapeHtmlAttr(exactEbayUrl)}" 
+                <!-- Clean Metadata Row -->
+                <div class="text-xs text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span>Brand: <strong class="text-slate-200">${this.escapeHtmlAttr(p.brand || 'Apparel')}</strong></span>
+                  <span class="text-slate-600">•</span>
+                  <span>Size: <strong class="text-slate-200">${this.escapeHtmlAttr(p.size || 'Standard')}</strong></span>
+                  <span class="text-slate-600">•</span>
+                  <span>Condition: <strong class="text-slate-200">${this.escapeHtmlAttr(p.condition || 'Very Good')}</strong></span>
+                  ${p.exact_colorway && p.exact_colorway !== 'Standard / Classic' ? `
+                    <span class="text-slate-600">•</span>
+                    <span>Color: <strong class="text-indigo-300">${this.escapeHtmlAttr(p.exact_colorway)}</strong></span>
+                  ` : ''}
+                  <span class="text-slate-600">•</span>
+                  <span>Landed: <strong class="text-slate-300 font-mono">£${landedCost.toFixed(2)}</strong></span>
+                </div>
+
+                <!-- Dual Destination Marketplace Comps (eBay UK + Depop) -->
+                <div class="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                  <!-- eBay UK Comp Box -->
+                  <div class="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-emerald-300">
+                    <i data-lucide="check-circle-2" class="w-3.5 h-3.5 mr-1.5 text-emerald-400"></i>
+                    <span class="font-bold font-mono">eBay UK Sold: £${ebaySold.toFixed(2)}</span>
+                    ${p.recent_sales_count ? `<span class="text-[10px] text-emerald-400/80 ml-1.5 font-mono">(${p.recent_sales_count} sold)</span>` : ''}
+                  </div>
+
+                  <a href="${this.escapeHtmlAttr(exactEbayUrl)}" 
+                     target="_blank" 
+                     rel="noopener noreferrer" 
+                     class="inline-flex items-center px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-300 hover:text-amber-200 border border-slate-700/80 hover:border-amber-400/50 text-xs font-semibold transition cursor-pointer shadow-sm"
+                     title="${this.escapeHtmlAttr(p.sold_comp_proof || 'Verify completed and sold listings on eBay UK matching this exact model, colorway, and size')}">
+                    <i data-lucide="search" class="w-3 h-3 mr-1 text-amber-400"></i>
+                    <span>eBay Comps</span>
+                    <i data-lucide="external-link" class="w-3 h-3 ml-1 text-slate-400"></i>
+                  </a>
+
+                  ${depopComp ? `
+                    <!-- Depop UK Demographic Comp Box (0% Seller Fees) -->
+                    <div class="inline-flex items-center px-2.5 py-1 rounded-lg bg-rose-950/40 border border-rose-500/30 text-rose-300">
+                      <i data-lucide="sparkles" class="w-3.5 h-3.5 mr-1.5 text-rose-400"></i>
+                      <span class="font-bold font-mono">Depop: £${Number(depopComp.depop_sold_median || 0).toFixed(2)}</span>
+                      <span class="text-[10px] text-rose-400/80 ml-1.5 font-mono">(${Number(depopComp.depop_str_pct || 65).toFixed(0)}% STR)</span>
+                    </div>
+
+                    <a href="${this.escapeHtmlAttr(depopComp.depop_search_url)}" 
+                       target="_blank" 
+                       rel="noopener noreferrer" 
+                       class="inline-flex items-center px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-rose-300 hover:text-rose-200 border border-slate-700/80 hover:border-rose-400/50 text-xs font-semibold transition cursor-pointer shadow-sm">
+                      <span>Depop Market</span>
+                      <i data-lucide="external-link" class="w-3 h-3 ml-1 text-slate-400"></i>
+                    </a>
+
+                    ${depopComp.is_depop_superior ? `
+                      <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-rose-500/20 to-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        ⚡ +£${Number(depopComp.profit_delta_vs_ebay || 0).toFixed(2)} More on Depop
+                      </span>
+                    ` : ''}
+                  ` : ''}
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Financials & Action Buttons -->
+            <div class="flex items-center justify-between lg:justify-end gap-3.5 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-800/80">
+              <div class="text-left lg:text-right font-mono">
+                <div class="text-xl font-black text-emerald-400">
+                  +£${bestProfit.toFixed(2)}
+                </div>
+                <div class="flex items-center lg:justify-end space-x-1.5">
+                  <span class="text-xs font-bold text-teal-300">${bestRoi.toFixed(0)}% ROI</span>
+                  <span class="text-[11px] text-slate-400 font-sans">via ${bestPlatform}</span>
+                </div>
+              </div>
+
+              <div class="flex items-center space-x-1.5">
+                <a href="${this.escapeHtmlAttr(vintedUrl)}" 
                    target="_blank" 
                    rel="noopener noreferrer" 
-                   class="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-300 hover:text-amber-200 border border-slate-700/80 hover:border-amber-400/50 text-xs font-semibold transition cursor-pointer shadow-sm"
-                   title="${this.escapeHtmlAttr(p.sold_comp_proof || 'Verify completed and sold listings on eBay UK matching this exact model, colorway, and size')}">
-                  <i data-lucide="search" class="w-3 h-3 mr-1 text-amber-400"></i>
-                  <span>Verify on eBay UK Solds</span>
-                  <i data-lucide="external-link" class="w-3 h-3 ml-1 text-slate-400"></i>
+                   class="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-slate-700 transition flex items-center cursor-pointer">
+                  <i data-lucide="shopping-bag" class="w-3.5 h-3.5 mr-1 text-teal-400"></i>
+                  <span>Buy</span>
                 </a>
+
+                <button type="button" 
+                        onclick="app.snipeArbitragePick('${this.escapeHtmlAttr(String(p.id))}')" 
+                        class="px-3 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition flex items-center cursor-pointer shadow-sm">
+                  <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1"></i>
+                  <span>Snipe</span>
+                </button>
+
+                <button type="button" 
+                        onclick="app.openCrossListingModal('${this.escapeHtmlAttr(String(p.id))}')" 
+                        class="px-3 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center cursor-pointer shadow-sm"
+                        title="Open 1-Click Cross-Listing Draft Studio (eBay + Depop)">
+                  <i data-lucide="layers" class="w-3.5 h-3.5 mr-1"></i>
+                  <span>Draft Flip</span>
+                </button>
+
+                ${lensUrl ? `
+                  <a href="${this.escapeHtmlAttr(lensUrl)}" 
+                     target="_blank" 
+                     rel="noopener noreferrer" 
+                     class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-800 hover:border-cyan-500/30 transition flex items-center cursor-pointer"
+                     title="Visual Lens Reverse Image Verification">
+                    <i data-lucide="scan" class="w-3.5 h-3.5"></i>
+                  </a>
+                ` : ''}
+
+                <button type="button" 
+                        onclick="app.simBuyArbitragePick('${this.escapeHtmlAttr(String(p.id))}')" 
+                        class="px-2 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-purple-300 border border-slate-800 hover:border-purple-500/30 transition flex items-center cursor-pointer" 
+                        title="Simulate Paper Flip in Ledger">
+                  <i data-lucide="flask-conical" class="w-3.5 h-3.5"></i>
+                </button>
               </div>
             </div>
           </div>
 
-          <!-- Right Financials & Action Buttons -->
-          <div class="flex items-center justify-between lg:justify-end gap-3.5 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-800/80">
-            <div class="text-left lg:text-right font-mono">
-              <div class="text-lg font-black text-emerald-400">
-                +£${netSpread.toFixed(2)}
+          <!-- 20% Vinted Lowball Target Strip -->
+          ${offerTarget ? `
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-900/50 border border-slate-800/80 text-xs">
+              <div class="flex items-center space-x-2">
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  🎯 20% OFFER TARGET
+                </span>
+                <span class="text-slate-300 text-xs">
+                  Offer <strong class="text-amber-300 font-mono">£${Number(offerTarget.offer_20_price).toFixed(2)}</strong> (save £${Number(offerTarget.offer_discount_gbp).toFixed(2)}) 
+                  → Flips for up to <strong class="text-emerald-400 font-mono">+£${Number(offerTarget.max_offer_profit).toFixed(2)} Profit</strong>
+                </span>
               </div>
-              <div class="flex items-center lg:justify-end space-x-1.5">
-                <span class="text-xs font-bold text-teal-300">${roiPct.toFixed(0)}% ROI</span>
-                <span class="text-[11px] text-slate-400 font-sans">${this.escapeHtmlAttr(p.velocity_rating || '⚡ Fast Flip')}</span>
-              </div>
-            </div>
-
-            <div class="flex items-center space-x-2">
-              <a href="${this.escapeHtmlAttr(vintedUrl)}" 
-                 target="_blank" 
-                 rel="noopener noreferrer" 
-                 class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-slate-700 transition flex items-center cursor-pointer">
-                <i data-lucide="shopping-bag" class="w-3.5 h-3.5 mr-1 text-teal-400"></i>
-                <span>Buy on Vinted</span>
-              </a>
-
               <button type="button" 
-                      onclick="app.snipeArbitragePick('${this.escapeHtmlAttr(String(p.id))}')" 
-                      class="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition flex items-center cursor-pointer shadow-sm">
-                <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1"></i>
-                <span>Snipe</span>
-              </button>
-
-              <button type="button" 
-                      onclick="app.simBuyArbitragePick('${this.escapeHtmlAttr(String(p.id))}')" 
-                      class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-purple-300 border border-slate-800 hover:border-purple-500/30 transition flex items-center cursor-pointer" 
-                      title="Simulate Paper Flip in Ledger">
-                <i data-lucide="flask-conical" class="w-3.5 h-3.5"></i>
+                      onclick="app.copyToClipboard('${Number(offerTarget.offer_20_price).toFixed(2)}', '20% Offer Amount (£${Number(offerTarget.offer_20_price).toFixed(2)})')" 
+                      class="px-2 py-1 rounded-lg text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition cursor-pointer flex items-center">
+                <i data-lucide="copy" class="w-3 h-3 mr-1"></i>
+                <span>Copy £${Number(offerTarget.offer_20_price).toFixed(2)} Offer</span>
               </button>
             </div>
-          </div>
+          ` : ''}
         </div>
       `;
     }).join('');
@@ -7509,6 +7583,272 @@ class VintedApp {
     } catch (err) {
       this.showToast(err.message, 'error');
     }
+  }
+
+  copyToClipboard(text, label = 'Content') {
+    if (!text) return;
+    if (!navigator.clipboard) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      this.showToast(`📋 ${label} copied to clipboard!`, 'success');
+      return;
+    }
+    navigator.clipboard.writeText(text).then(() => {
+      this.showToast(`📋 ${label} copied to clipboard!`, 'success');
+    }).catch(() => {
+      this.showToast('Could not copy to clipboard', 'error');
+    });
+  }
+
+  async openCrossListingModal(pickId) {
+    const modal = document.getElementById('crosslist-modal');
+    const body = document.getElementById('crosslist-modal-body');
+    if (!modal || !body) return;
+
+    modal.classList.remove('hidden');
+    body.innerHTML = `
+      <div class="py-16 text-center space-y-3">
+        <i data-lucide="layers" class="w-8 h-8 mx-auto animate-spin text-indigo-400"></i>
+        <h4 class="text-sm font-bold text-white">Generating Multi-Site Listing Draft & Specifics...</h4>
+        <p class="text-xs text-slate-400">Optimizing 80-char eBay title, Depop hashtags, and lowball pricing targets.</p>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+
+    try {
+      const pick = this.arbitragePicksMap?.get(String(pickId)) || {};
+      const res = await fetch('/api/arbitrage/generate-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vinted_item_id: String(pickId),
+          title: pick.title,
+          brand: pick.brand,
+          model_name: pick.ebay_verified_model || pick.model_name,
+          size: pick.size,
+          condition: pick.condition,
+          colorway: pick.exact_colorway,
+          asking_price: pick.price || pick.vinted_asking_price,
+          ebay_sold_median: pick.ebay_sold_median,
+          depop_sold_median: pick.depop_comp?.depop_sold_median,
+          photo_url: pick.photo_url,
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to generate cross-listing draft');
+
+      this.renderCrossListingDraft(data);
+    } catch (err) {
+      body.innerHTML = `
+        <div class="p-6 text-center text-rose-400 space-y-2">
+          <i data-lucide="alert-circle" class="w-8 h-8 mx-auto"></i>
+          <p class="text-sm font-bold">${this.escapeHtmlAttr(err.message)}</p>
+        </div>
+      `;
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+
+  closeCrossListingModal() {
+    const modal = document.getElementById('crosslist-modal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  renderCrossListingDraft(data) {
+    const body = document.getElementById('crosslist-modal-body');
+    if (!body) return;
+
+    const eb = data.ebay_draft || {};
+    const dp = data.depop_draft || {};
+    const ofr = data.offer_engine || {};
+    const lens = data.visual_lens || {};
+    const specifics = eb.item_specifics || {};
+
+    body.innerHTML = `
+      <!-- Top Deal Summary Strip -->
+      <div class="p-4 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div class="flex items-center space-x-3 min-w-0">
+          ${data.photo_url ? `
+            <img src="${this.escapeHtmlAttr(data.photo_url)}" class="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-800">
+          ` : ''}
+          <div class="min-w-0">
+            <h4 class="text-sm font-bold text-white truncate">${this.escapeHtmlAttr(data.original_vinted_title || 'Item')}</h4>
+            <div class="text-xs text-slate-400 font-mono mt-0.5">
+              Vinted Asking: <strong class="text-white">£${Number(data.vinted_asking_price || 0).toFixed(2)}</strong>
+              ${ofr.offer_20_price ? `
+                <span class="text-slate-600 mx-1.5">•</span>
+                Max -20% Offer: <strong class="text-amber-300">£${Number(ofr.offer_20_price).toFixed(2)}</strong>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2 shrink-0">
+          ${lens.google_lens_url ? `
+            <a href="${this.escapeHtmlAttr(lens.google_lens_url)}" 
+               target="_blank" 
+               rel="noopener noreferrer" 
+               class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition flex items-center cursor-pointer shadow-sm">
+              <i data-lucide="scan" class="w-3.5 h-3.5 mr-1.5"></i>
+              <span>Google Lens Check</span>
+            </a>
+          ` : ''}
+        </div>
+      </div>
+
+      <!-- 20% Lowball Strategy Banner -->
+      <div class="p-3.5 rounded-xl bg-amber-950/30 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <div class="space-y-0.5">
+          <div class="flex items-center space-x-1.5">
+            <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
+            <span class="text-xs font-bold text-amber-300 uppercase tracking-wide">Vinted 20% Offer Target Strategy</span>
+          </div>
+          <p class="text-xs text-slate-300">
+            Send an instant offer of <strong class="text-amber-300 font-mono">£${Number(ofr.offer_20_price || 0).toFixed(2)}</strong> on Vinted. 
+            If accepted, your net profit increases to <strong class="text-emerald-400 font-mono">+£${Number(Math.max(ofr.ebay_profit_at_offer || 0, ofr.depop_profit_at_offer || 0)).toFixed(2)}</strong> 
+            (<span class="text-teal-300 font-mono">${Number(Math.max(ofr.ebay_roi_at_offer || 0, ofr.depop_roi_at_offer || 0)).toFixed(0)}% ROI</span>).
+          </p>
+        </div>
+        <button type="button" 
+                onclick="app.copyToClipboard('${Number(ofr.offer_20_price || 0).toFixed(2)}', 'Offer price £${Number(ofr.offer_20_price || 0).toFixed(2)}')" 
+                class="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition flex items-center cursor-pointer shrink-0">
+          <i data-lucide="copy" class="w-3.5 h-3.5 mr-1.5"></i>
+          <span>Copy £${Number(ofr.offer_20_price || 0).toFixed(2)}</span>
+        </button>
+      </div>
+
+      <!-- Dual Channel Draft Columns (eBay + Depop) -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- Column 1: eBay UK Draft Package -->
+        <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3.5 flex flex-col justify-between">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">EBAY UK DRAFT</span>
+                <span class="text-xs text-slate-400 font-mono">Max 80 Chars</span>
+              </div>
+              <span class="text-xs font-mono font-bold text-slate-400">
+                ${eb.title_char_count || 0}/80 chars
+              </span>
+            </div>
+
+            <!-- eBay Title Box -->
+            <div class="space-y-1">
+              <label class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">SEO Optimized Title</label>
+              <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 font-mono text-xs text-amber-300 select-all leading-relaxed">
+                ${this.escapeHtmlAttr(eb.title || '')}
+              </div>
+              <div class="flex justify-end pt-1">
+                <button type="button" 
+                        onclick="app.copyToClipboard('${this.escapeHtmlAttr(eb.title || '')}', 'eBay Title')" 
+                        class="text-xs text-indigo-400 hover:text-indigo-300 flex items-center cursor-pointer">
+                  <i data-lucide="copy" class="w-3 h-3 mr-1"></i>
+                  <span>Copy Title</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Pricing Metrics -->
+            <div class="grid grid-cols-2 gap-2 text-center text-xs font-mono p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+              <div>
+                <span class="text-[10px] text-slate-500 block uppercase">Recommended BIN</span>
+                <strong class="text-emerald-400 text-sm">£${Number(eb.recommended_bin_price || 0).toFixed(2)}</strong>
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-500 block uppercase">Auto-Accept Floor</span>
+                <strong class="text-slate-300 text-sm">£${Number(eb.best_offer_floor_price || 0).toFixed(2)}</strong>
+              </div>
+            </div>
+
+            <!-- Item Specifics Strip -->
+            <div class="space-y-1.5">
+              <label class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Pre-Filled Item Specifics</label>
+              <div class="grid grid-cols-2 gap-1.5 text-xs">
+                ${Object.entries(specifics).map(([k, v]) => `
+                  <div class="p-1.5 rounded-lg bg-slate-900/70 border border-slate-800/80 flex items-center justify-between">
+                    <span class="text-[11px] text-slate-400">${this.escapeHtmlAttr(k)}:</span>
+                    <strong class="text-slate-200 text-[11px] truncate ml-1">${this.escapeHtmlAttr(String(v))}</strong>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-2">
+            <a href="${this.escapeHtmlAttr(eb.prelist_url || '')}" 
+               target="_blank" 
+               rel="noopener noreferrer" 
+               class="w-full py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition flex items-center justify-center cursor-pointer shadow-md">
+              <i data-lucide="external-link" class="w-3.5 h-3.5 mr-1.5"></i>
+              <span>Open in eBay Pre-List Composer</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Column 2: Depop Aesthetic Draft Package -->
+        <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3.5 flex flex-col justify-between">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">DEPOP AESTHETIC</span>
+                <span class="text-xs text-rose-300 font-mono">0% Seller Fees</span>
+              </div>
+              <span class="text-xs font-mono font-bold text-emerald-400">
+                Ask: £${Number(dp.recommended_listing_price || 0).toFixed(2)}
+              </span>
+            </div>
+
+            <!-- Depop Description Box -->
+            <div class="space-y-1">
+              <label class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Aesthetic Listing Description</label>
+              <textarea readonly 
+                        id="depop-desc-textarea" 
+                        rows="8" 
+                        class="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 font-sans text-xs text-slate-200 leading-relaxed resize-none focus:outline-none select-all">${this.escapeHtmlAttr(dp.description || '')}</textarea>
+              <div class="flex justify-between items-center pt-1">
+                <span class="text-[10px] text-slate-500">Includes 5 high-traction hashtags</span>
+                <button type="button" 
+                        onclick="app.copyToClipboard(document.getElementById('depop-desc-textarea').value, 'Depop Description')" 
+                        class="text-xs text-rose-400 hover:text-rose-300 flex items-center cursor-pointer">
+                  <i data-lucide="copy" class="w-3 h-3 mr-1"></i>
+                  <span>Copy Description</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Hashtag Cloud -->
+            ${Array.isArray(dp.hashtags) && dp.hashtags.length > 0 ? `
+              <div class="space-y-1">
+                <span class="text-[10px] text-slate-400 uppercase font-semibold block">Hashtag Cloud:</span>
+                <div class="flex flex-wrap gap-1">
+                  ${dp.hashtags.map(tag => `
+                    <span class="px-2 py-0.5 rounded-lg text-[10px] font-mono bg-slate-900 text-rose-300 border border-rose-500/20">
+                      ${this.escapeHtmlAttr(tag)}
+                    </span>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="pt-2">
+            <a href="${this.escapeHtmlAttr(dp.create_listing_url || 'https://www.depop.com/products/create/')}" 
+               target="_blank" 
+               rel="noopener noreferrer" 
+               class="w-full py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white transition flex items-center justify-center cursor-pointer shadow-md">
+              <i data-lucide="external-link" class="w-3.5 h-3.5 mr-1.5"></i>
+              <span>Open Depop Listing Page</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    `;
+
+    if (window.lucide) lucide.createIcons();
   }
 
   openSettingsModal(tab = 'autobuy') {

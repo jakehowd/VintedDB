@@ -2732,8 +2732,37 @@
     </div>
   </div>
 
+  <!-- 1-Click Multi-Site Cross-Listing & Draft Generator Modal -->
+  <div id="crosslist-modal" onclick="if(event.target === this) app.closeCrossListingModal()" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 hidden">
+    <div class="glass-modal rounded-2xl max-w-4xl w-full p-5 sm:p-6 space-y-4 animate-fade-in shadow-2xl max-h-[92vh] flex flex-col">
+      <!-- Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800 shrink-0">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500/20 to-teal-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+            <i data-lucide="layers" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center">
+              1-Click Cross-Listing & Resale Studio
+              <span class="ml-2 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">EBAY UK & DEPOP</span>
+            </h3>
+            <p class="text-xs text-slate-400">Pre-packaged eBay UK listing specifics, Depop aesthetic descriptions, and 20% Vinted offer targets.</p>
+          </div>
+        </div>
+        <button type="button" onclick="app.closeCrossListingModal()" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div id="crosslist-modal-body" class="flex-1 overflow-y-auto space-y-4 pr-1">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+    </div>
+  </div>
+
   <!-- Application Logic -->
-  <script src="/static/app.js?v=3.7"></script>
+  <script src="/static/app.js?v=3.8"></script>
 </body>
 </html>
 

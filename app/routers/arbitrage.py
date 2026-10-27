@@ -47,6 +47,20 @@ class SimBuyPickRequest(BaseModel):
     ebay_sold_median: Optional[float] = None
 
 
+class GenerateDraftRequest(BaseModel):
+    vinted_item_id: Optional[str] = None
+    title: Optional[str] = None
+    brand: Optional[str] = None
+    model_name: Optional[str] = None
+    size: Optional[str] = None
+    condition: Optional[str] = None
+    colorway: Optional[str] = None
+    asking_price: Optional[float] = None
+    ebay_sold_median: Optional[float] = None
+    depop_sold_median: Optional[float] = None
+    photo_url: Optional[str] = None
+
+
 @router.get("/predicted-products")
 def get_predicted_products(
     sector: str = Query("all", description="Sector filter (all, outerwear, streetwear, knitwear, footwear, sportswear)"),
@@ -131,6 +145,31 @@ def simulate_arbitrage_paper_buy(
     return arbitrage_radar.simulate_pick_buy(
         pick=payload.model_dump(),
         db=db,
+    )
+
+
+@router.post("/generate-draft")
+def generate_cross_listing_draft_post(
+    payload: GenerateDraftRequest,
+    db: Session = Depends(get_db),
+):
+    """Generate complete 1-Click Cross-Listing Draft package (eBay + Depop) with 20% lowball offer guidance."""
+    return arbitrage_radar.generate_cross_listing_draft(
+        db=db,
+        vinted_item_id=payload.vinted_item_id,
+        pick_data=payload.model_dump(),
+    )
+
+
+@router.get("/draft/{vinted_item_id}")
+def generate_cross_listing_draft_get(
+    vinted_item_id: str,
+    db: Session = Depends(get_db),
+):
+    """Get 1-Click Cross-Listing Draft package by Vinted item ID."""
+    return arbitrage_radar.generate_cross_listing_draft(
+        db=db,
+        vinted_item_id=vinted_item_id,
     )
 
 

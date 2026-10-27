@@ -14,6 +14,7 @@ Completely rebuilt for real-world e-commerce & reselling arbitrage:
 from __future__ import annotations
 
 import logging
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -23,6 +24,7 @@ from ..config import VINTED_BASE_URL
 from ..models import ProductVariant, SoldItem, TrackedSearch
 from .ai_arbitrage import ai_arbitrage
 from .antirep import verify_arbitrage_item_authenticity
+from .depop_verifier import depop_verifier
 from .ebay_verifier import ebay_verifier
 
 logger = logging.getLogger(__name__)
@@ -340,6 +342,13 @@ class ArbitrageRadarService:
                     "ai_alpha": ai_alpha,
                     "casual_seller_info": casual_info,
                     "recommended_snipe_cap": verified_comp["recommended_snipe_cap"],
+                    "depop_comp": verified_comp.get("depop_comp"),
+                    "offer_target": verified_comp.get("offer_target"),
+                    "google_lens_url": (
+                        f"https://lens.google.com/uploadbyurl?url={urllib.parse.quote_plus(s.photo_url)}"
+                        if s.photo_url and s.photo_url.startswith("http")
+                        else ""
+                    ),
                 })
 
         # 2. Fresh live scan across profitable sector feeds + typo / omission clearout traps
@@ -484,6 +493,13 @@ class ArbitrageRadarService:
                             "ai_alpha": ai_alpha,
                             "casual_seller_info": casual_info,
                             "recommended_snipe_cap": comp["recommended_snipe_cap"],
+                            "depop_comp": comp.get("depop_comp"),
+                            "offer_target": comp.get("offer_target"),
+                            "google_lens_url": (
+                                f"https://lens.google.com/uploadbyurl?url={urllib.parse.quote_plus(raw_photo)}"
+                                if raw_photo and raw_photo.startswith("http")
+                                else ""
+                            ),
                         })
             except Exception as exc:
                 logger.debug("Live query '%s' skipped: %s", query_str, exc)
@@ -631,6 +647,63 @@ class ArbitrageRadarService:
         finally:
             if should_close:
                 db.close()
+
+    def generate_cross_listing_draft(
+        self,
+        db: Session,
+        vinted_item_id: Optional[str] = None,
+        pick_data: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Generate a complete 1-Click Cross-Listing Draft package (eBay + Depop) with 20% lowball offer guidance."""
+        data = dict(pick_data or {})
+
+        # If vinted_item_id provided, look up from cache or db to fill blanks
+        if vinted_item_id:
+            # 1. Search cached picks
+            found_cached = next((p for p in self._cached_picks if str(p.get("id")) == str(vinted_item_id)), None)
+            if found_cached:
+                data = {**found_cached, **data}
+            else:
+                # 2. Search database
+                db_item = db.query(SoldItem).filter(SoldItem.vinted_item_id == str(vinted_item_id)).first()
+                if db_item:
+                    data = {
+                        "id": str(db_item.vinted_item_id or db_item.id),
+                        "title": db_item.title,
+                        "brand": db_item.brand,
+                        "price": float(db_item.price or 0.0),
+                        "size": db_item.size or "Regular",
+                        "condition": db_item.condition or "Very Good",
+                        "photo_url": db_item.photo_url or "",
+                        **data,
+                    }
+
+        title = str(data.get("title") or "Apparel Item")
+        brand = str(data.get("brand") or "Vintage")
+        model = str(data.get("ebay_verified_model") or data.get("model_name") or title)
+        size = str(data.get("size") or "Regular")
+        condition = str(data.get("condition") or "Pre-owned / Very Good")
+        colorway = str(data.get("exact_colorway") or "Original")
+        asking_price = float(data.get("price") or data.get("vinted_asking_price") or 25.0)
+        ebay_sold_median = float(data.get("ebay_sold_median") or 65.0)
+
+        depop_comp = data.get("depop_comp") or {}
+        depop_sold_median = float(depop_comp.get("depop_sold_median") or 0.0) or None
+        photo_url = str(data.get("photo_url") or "")
+
+        return depop_verifier.generate_cross_listing_package(
+            title=title,
+            brand=brand,
+            model_name=model,
+            size=size,
+            condition=condition,
+            colorway=colorway,
+            asking_price=asking_price,
+            ebay_sold_median=ebay_sold_median,
+            depop_sold_median=depop_sold_median,
+            photo_url=photo_url,
+            vinted_item_id=str(vinted_item_id or data.get("id") or ""),
+        )
 
 
 # Singleton instance

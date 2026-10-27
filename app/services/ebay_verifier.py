@@ -19,6 +19,8 @@ import re
 import urllib.parse
 from typing import Any, Dict, List, Optional, Tuple
 
+from .depop_verifier import depop_verifier
+
 logger = logging.getLogger(__name__)
 
 
@@ -1043,6 +1045,43 @@ class EbayMarketVerifier:
             f"Sold Median: £{adjusted_median:.2f} (Range: £{adjusted_low:.0f} - £{adjusted_high:.0f})."
         )
 
+        # 9. Depop UK Demographic Price Disparity Verification (0% Selling Fee Model)
+        depop_comp = depop_verifier.verify_depop_arbitrage(
+            title=title,
+            vinted_landed_cost=total_landed,
+            brand=bench["brand"],
+            condition_multiplier=cond_info["multiplier"],
+            size_multiplier=size_info["multiplier"],
+            colorway_multiplier=color_info["colorway_multiplier"],
+            override_benchmark_model=override_benchmark_model,
+            ebay_net_profit=net_flip_profit,
+        )
+
+        # 10. Automated 20% Vinted Lowball / Offer Target Calculation
+        offer_20_price = round(asking * 0.80, 2)
+        offer_vinted_costs = self.calculate_vinted_landed_cost(offer_20_price)
+        offer_landed_cost = offer_vinted_costs["total_landed_cost"]
+        offer_net_profit_ebay = round(net_payout - offer_landed_cost, 2)
+        offer_roi_ebay = round((offer_net_profit_ebay / offer_landed_cost) * 100, 1) if offer_landed_cost > 0 else 0.0
+
+        offer_net_profit_depop = 0.0
+        offer_roi_depop = 0.0
+        if depop_comp:
+            offer_net_profit_depop = round(depop_comp["depop_net_payout"] - offer_landed_cost, 2)
+            offer_roi_depop = round((offer_net_profit_depop / offer_landed_cost) * 100, 1) if offer_landed_cost > 0 else 0.0
+
+        offer_target = {
+            "asking_price": asking,
+            "offer_20_price": offer_20_price,
+            "offer_discount_gbp": round(asking - offer_20_price, 2),
+            "offer_landed_cost": offer_landed_cost,
+            "offer_net_profit_ebay": offer_net_profit_ebay,
+            "offer_roi_ebay": offer_roi_ebay,
+            "offer_net_profit_depop": offer_net_profit_depop,
+            "offer_roi_depop": offer_roi_depop,
+            "max_offer_profit": max(offer_net_profit_ebay, offer_net_profit_depop),
+        }
+
         return {
             "verified": True,
             "model_name": bench["model_name"],
@@ -1090,6 +1129,8 @@ class EbayMarketVerifier:
             "discount_pct": discount_pct,
             "opportunity_index": opp_score,
             "recommended_snipe_cap": recommended_snipe_cap,
+            "depop_comp": depop_comp,
+            "offer_target": offer_target,
         }
 
 
