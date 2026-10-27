@@ -1105,7 +1105,7 @@
 
       </div>
 
-      <!-- View Container 4: High-Yield Market Inefficiency & Arbitrage Radar -->
+      <!-- View Container 4: Today's Top Arbitrage Picks (Cross-Market Vinted to eBay Engine) -->
       <div id="arbitrage-view" class="space-y-6 hidden animate-fade-in">
         
         <!-- Header Bar -->
@@ -1113,105 +1113,162 @@
           <div>
             <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
               <span class="text-amber-400 font-semibold uppercase tracking-wider flex items-center">
-                <i data-lucide="flame" class="w-3.5 h-3.5 mr-1 text-amber-400"></i>
-                Market Inefficiency Engine
+                <i data-lucide="scale" class="w-3.5 h-3.5 mr-1 text-amber-400"></i>
+                Cross-Market Intelligence
               </span>
               <span>/</span>
-              <span class="text-slate-300">Broad Market Discovery & Model Decomposition</span>
+              <span class="text-slate-300">Vinted UK ➔ eBay UK Secondary Realization</span>
             </div>
             <div class="flex items-center space-x-3">
-              <h2 class="text-2xl font-bold text-white tracking-tight">Arbitrage & Market Radar</h2>
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30">
-                <span class="w-2 h-2 rounded-full bg-amber-400 mr-1.5 pulse-live"></span>
-                AI MODEL ARBITRAGE
+              <h2 class="text-2xl font-bold text-white tracking-tight">Today's Top Arbitrage Picks</h2>
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 pulse-live"></span>
+                EBAY SOLD VERIFIED
               </span>
             </div>
             <p class="text-xs text-slate-400 mt-1 max-w-2xl">
-              Inspects broad profitable markets, decomposes items into individual models using local Vision/OCR models, tests each model for profit spread and cheap supply inflow, then synthesizes a strategic recommendation.
+              Autonomous cross-market engine that discovers underpriced items on Vinted UK, verifies actual realized sales on eBay UK, and computes true net flip profit after all fees and postage.
             </p>
           </div>
 
           <div class="flex items-center space-x-2.5 shrink-0">
-            <button type="button" onclick="app.showSniperView()" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-teal-300 border border-slate-800 transition cursor-pointer">
+            <button type="button" 
+                    id="btn-refresh-top-picks" 
+                    onclick="app.triggerArbitrageRefresh()" 
+                    class="btn-primary-glow inline-flex items-center px-4 py-2.5 rounded-xl text-xs font-bold text-white transition shadow-sm cursor-pointer">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1.5" id="icon-refresh-top-picks"></i>
+              <span>Refresh Market Scan</span>
+            </button>
+            <button type="button" 
+                    onclick="app.showSniperView()" 
+                    class="inline-flex items-center px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-teal-300 border border-slate-800 transition cursor-pointer">
               <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1.5 text-vinted"></i>
               Open Deal Sniper
             </button>
           </div>
         </div>
 
-        <!-- Curated Sector Quick-Picks Strip -->
-        <div class="glass-panel p-4 rounded-2xl border border-slate-800 space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center">
-              <i data-lucide="sparkles" class="w-3.5 h-3.5 mr-1.5 text-amber-400"></i>
-              High-Yield Sector Quick-Picks:
-            </span>
-            <span class="text-[11px] text-slate-500 hidden sm:inline">Click any sector to run instant model decomposition</span>
+        <!-- Market Pulse Financial Metrics Strip -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div class="glass-panel p-3.5 rounded-2xl border border-slate-800 flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+              <i data-lucide="flame" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase font-semibold tracking-wider block">Verified Picks Today</span>
+              <span id="arb-pulse-total-picks" class="text-lg font-bold font-mono text-white">--</span>
+            </div>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <button type="button" onclick="app.runArbitrageMarketAnalysis('Canon IXUS', 'Canon')" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700/80 hover:border-cyan-500/40 transition cursor-pointer flex items-center">
-              <i data-lucide="camera" class="w-3.5 h-3.5 mr-1.5 text-cyan-400"></i>
-              Canon IXUS (Digicams)
-            </button>
-            <button type="button" onclick="app.runArbitrageMarketAnalysis('North Face Nuptse', 'The North Face')" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-teal-300 border border-slate-700/80 hover:border-teal-500/40 transition cursor-pointer flex items-center">
-              <i data-lucide="cloud-rain" class="w-3.5 h-3.5 mr-1.5 text-teal-400"></i>
-              North Face Nuptse (Puffers)
-            </button>
-            <button type="button" onclick="app.runArbitrageMarketAnalysis('Carhartt Detroit jacket', 'Carhartt')" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-700/80 hover:border-amber-500/40 transition cursor-pointer flex items-center">
-              <i data-lucide="hammer" class="w-3.5 h-3.5 mr-1.5 text-amber-400"></i>
-              Carhartt Detroit (Workwear)
-            </button>
-            <button type="button" onclick="app.runArbitrageMarketAnalysis('Ralph Lauren cable knit', 'Polo Ralph Lauren')" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-indigo-300 border border-slate-700/80 hover:border-indigo-500/40 transition cursor-pointer flex items-center">
-              <i data-lucide="shirt" class="w-3.5 h-3.5 mr-1.5 text-indigo-400"></i>
-              Ralph Lauren Cable Knit
-            </button>
-            <button type="button" onclick="app.runArbitrageMarketAnalysis('Sony Cyber-shot', 'Sony')" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-slate-700/80 hover:border-emerald-500/40 transition cursor-pointer flex items-center">
-              <i data-lucide="camera" class="w-3.5 h-3.5 mr-1.5 text-emerald-400"></i>
-              Sony Cyber-shot (CCD)
-            </button>
-            <button type="button" onclick="app.runArbitrageMarketAnalysis('Patagonia Synchilla', 'Patagonia')" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-purple-300 border border-slate-700/80 hover:border-purple-500/40 transition cursor-pointer flex items-center">
-              <i data-lucide="feather" class="w-3.5 h-3.5 mr-1.5 text-purple-400"></i>
-              Patagonia Synchilla
-            </button>
+
+          <div class="glass-panel p-3.5 rounded-2xl border border-slate-800 flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+              <i data-lucide="pound-sterling" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase font-semibold tracking-wider block">Highest Net Profit</span>
+              <span id="arb-pulse-max-profit" class="text-lg font-bold font-mono text-emerald-400">--</span>
+            </div>
+          </div>
+
+          <div class="glass-panel p-3.5 rounded-2xl border border-slate-800 flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 shrink-0">
+              <i data-lucide="trending-up" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase font-semibold tracking-wider block">Average Flipping ROI</span>
+              <span id="arb-pulse-avg-roi" class="text-lg font-bold font-mono text-cyan-300">--</span>
+            </div>
+          </div>
+
+          <div class="glass-panel p-3.5 rounded-2xl border border-slate-800 flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+              <i data-lucide="zap" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase font-semibold tracking-wider block">Rapid Turnover (< 48h)</span>
+              <span id="arb-pulse-rapid-count" class="text-lg font-bold font-mono text-indigo-300">--</span>
+            </div>
           </div>
         </div>
 
-        <!-- Broad Market Search Input & Trigger Bar -->
-        <div class="glass-panel p-4 rounded-2xl border border-slate-800 space-y-3">
-          <form onsubmit="app.submitArbitrageMarketSearch(event)" class="flex flex-col sm:flex-row items-center gap-3">
-            <div class="relative flex-1 w-full">
-              <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400"></i>
-              <input type="text" id="arb-market-input" placeholder="Search any broad market or product (e.g. Nintendo 3DS, Barbour jacket, Bape hoodie, Olympus mju)..." class="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition shadow-inner">
-            </div>
-            <div class="flex items-center space-x-2 w-full sm:w-auto shrink-0">
-              <label class="flex items-center space-x-1.5 text-xs text-slate-400 cursor-pointer select-none">
-                <input type="checkbox" id="arb-market-fetch-live" class="custom-checkbox">
-                <span>Fetch Live UK Listings</span>
-              </label>
-              <button type="submit" id="arb-market-search-btn" class="btn-primary-glow flex-1 sm:flex-none inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-xs font-bold text-white transition shadow-sm cursor-pointer">
-                <i data-lucide="cpu" class="w-4 h-4 mr-1.5" id="arb-search-icon"></i>
-                <span>Analyze Market & Models</span>
-              </button>
-            </div>
-          </form>
+        <!-- Category / Sector Filter Pills Strip -->
+        <div class="glass-panel p-3 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
+          <div class="flex flex-wrap items-center gap-1.5" id="arb-sector-filters">
+            <button type="button" 
+                    onclick="app.filterArbitrageSector('all')" 
+                    id="arb-sector-btn-all" 
+                    class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center cursor-pointer bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              <i data-lucide="flame" class="w-3.5 h-3.5 mr-1.5 text-amber-400"></i>
+              <span>All Top Picks</span>
+              <span id="arb-sector-cnt-all" class="ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-mono bg-amber-500/30">0</span>
+            </button>
+            <button type="button" 
+                    onclick="app.filterArbitrageSector('outerwear')" 
+                    id="arb-sector-btn-outerwear" 
+                    class="px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700">
+              <i data-lucide="cloud-rain" class="w-3.5 h-3.5 mr-1.5 text-teal-400"></i>
+              <span>Outerwear & Gorpcore</span>
+              <span id="arb-sector-cnt-outerwear" class="ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-800 text-slate-400">0</span>
+            </button>
+            <button type="button" 
+                    onclick="app.filterArbitrageSector('streetwear')" 
+                    id="arb-sector-btn-streetwear" 
+                    class="px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5 mr-1.5 text-amber-400"></i>
+              <span>Cult Streetwear</span>
+              <span id="arb-sector-cnt-streetwear" class="ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-800 text-slate-400">0</span>
+            </button>
+            <button type="button" 
+                    onclick="app.filterArbitrageSector('knitwear')" 
+                    id="arb-sector-btn-knitwear" 
+                    class="px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700">
+              <i data-lucide="shirt" class="w-3.5 h-3.5 mr-1.5 text-indigo-400"></i>
+              <span>Luxury Knitwear</span>
+              <span id="arb-sector-cnt-knitwear" class="ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-800 text-slate-400">0</span>
+            </button>
+            <button type="button" 
+                    onclick="app.filterArbitrageSector('footwear')" 
+                    id="arb-sector-btn-footwear" 
+                    class="px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700">
+              <i data-lucide="footprints" class="w-3.5 h-3.5 mr-1.5 text-emerald-400"></i>
+              <span>High-Demand Footwear</span>
+              <span id="arb-sector-cnt-footwear" class="ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-800 text-slate-400">0</span>
+            </button>
+            <button type="button" 
+                    onclick="app.filterArbitrageSector('sportswear')" 
+                    id="arb-sector-btn-sportswear" 
+                    class="px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700">
+              <i data-lucide="trophy" class="w-3.5 h-3.5 mr-1.5 text-purple-400"></i>
+              <span>Retro Sportswear</span>
+              <span id="arb-sector-cnt-sportswear" class="ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-800 text-slate-400">0</span>
+            </button>
+          </div>
+
+          <div class="text-[11px] text-slate-500 font-mono flex items-center">
+            <span id="arb-last-scanned-time">Updated recently</span>
+          </div>
         </div>
 
         <!-- Loading State -->
-        <div id="arb-loading-container" class="hidden py-16 text-center space-y-3">
+        <div id="arb-picks-loading" class="hidden py-16 text-center space-y-3">
           <div class="w-12 h-12 mx-auto rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
             <i data-lucide="radar" class="w-6 h-6 animate-spin"></i>
           </div>
-          <h4 class="text-sm font-bold text-white">Decomposing Market Silhouette Into Discrete Models...</h4>
-          <p class="text-xs text-slate-400 max-w-md mx-auto" id="arb-loading-text">
-            Mining product codes, estimating market realization prices, calculating buyer fees, and testing individual models for cheap inflow arbitrage.
+          <h4 class="text-sm font-bold text-white">Running Cross-Market Arbitrage Intelligence...</h4>
+          <p class="text-xs text-slate-400 max-w-md mx-auto">
+            Scanning Vinted UK bargain listings across high-velocity sectors, calculating buyer fees, and verifying realized sold prices on eBay UK.
           </p>
         </div>
 
-        <!-- Strategy Recommendation Banner (Populated by JS) -->
-        <div id="arb-strategy-banner-container"></div>
+        <!-- Empty State -->
+        <div id="arb-picks-empty" class="hidden py-16 text-center space-y-2 glass-panel rounded-2xl border border-slate-800">
+          <i data-lucide="check-circle" class="w-8 h-8 mx-auto text-slate-600"></i>
+          <h4 class="text-sm font-bold text-white">No Arbitrage Inefficiencies in this Category Right Now</h4>
+          <p class="text-xs text-slate-400">Try selecting "All Top Picks" or click "Refresh Market Scan" to discover fresh listings.</p>
+        </div>
 
-        <!-- Model Profitability Cards Grid (Populated by JS) -->
-        <div id="arb-models-matrix-container" class="space-y-4"></div>
+        <!-- Today's Top Arbitrage Opportunity Cards Grid -->
+        <div id="arb-top-picks-container" class="space-y-3.5"></div>
       </div>
 
     </main>
@@ -2643,7 +2700,7 @@
   </div>
 
   <!-- Application Logic -->
-  <script src="/static/app.js?v=3.3"></script>
+  <script src="/static/app.js?v=3.4"></script>
 </body>
 </html>
 

@@ -1290,9 +1290,7 @@ class VintedApp {
     this.renderSidebar();
     if (window.lucide) lucide.createIcons();
 
-    if (!this.lastAnalyzedMarket) {
-      this.runArbitrageMarketAnalysis('Canon IXUS', 'Canon');
-    }
+    this.loadTodaysArbitragePicks(this.currentArbitrageSector || 'all', false);
   }
 
   async selectSearch(id) {
@@ -6981,7 +6979,7 @@ class VintedApp {
     await this.saveItemVariantTags(itemId, ids);
   }
 
-  // ── Market Inefficiency & Arbitrage Radar ──────────────────────────────────
+  // ── Today's Top Arbitrage Picks & Cross-Market Intelligence ────────────────
 
   openArbitrageModal() {
     this.showArbitrageView();
@@ -6992,305 +6990,318 @@ class VintedApp {
     if (modal) modal.classList.add('hidden');
   }
 
-  async runArbitrageMarketAnalysis(keyword, brand = null) {
-    if (!keyword) return;
-    this.lastAnalyzedMarket = keyword;
+  async loadTodaysArbitragePicks(sector = 'all', forceRefresh = false) {
+    this.currentArbitrageSector = sector || 'all';
 
-    const input = document.getElementById('arb-market-input');
-    if (input) input.value = keyword;
+    const btnRefresh = document.getElementById('btn-refresh-top-picks');
+    const iconRefresh = document.getElementById('icon-refresh-top-picks');
+    const loadingBox = document.getElementById('arb-picks-loading');
+    const emptyBox = document.getElementById('arb-picks-empty');
+    const container = document.getElementById('arb-top-picks-container');
 
-    const loadingBox = document.getElementById('arb-loading-container');
-    const loadingText = document.getElementById('arb-loading-text');
-    const bannerBox = document.getElementById('arb-strategy-banner-container');
-    const modelsBox = document.getElementById('arb-models-matrix-container');
-    const searchBtn = document.getElementById('arb-market-search-btn');
-    const searchIcon = document.getElementById('arb-search-icon');
+    if (btnRefresh) btnRefresh.disabled = true;
+    if (iconRefresh) iconRefresh.classList.add('animate-spin');
 
-    if (loadingBox) loadingBox.classList.remove('hidden');
-    if (loadingText) loadingText.textContent = `Mining product codes & testing model profitability for '${keyword}'...`;
-    if (bannerBox) bannerBox.innerHTML = '';
-    if (modelsBox) modelsBox.innerHTML = '';
-    if (searchBtn) searchBtn.disabled = true;
-    if (searchIcon) searchIcon.classList.add('animate-spin');
-
-    const fetchLive = document.getElementById('arb-market-fetch-live')?.checked ?? false;
+    // Show loading state if forcing refresh or no container contents
+    if (forceRefresh || !container || container.children.length === 0) {
+      if (loadingBox) loadingBox.classList.remove('hidden');
+      if (emptyBox) emptyBox.classList.add('hidden');
+      if (container) container.innerHTML = '';
+    }
 
     try {
-      const res = await fetch('/api/arbitrage/analyze-market', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword, brand, fetch_live: fetchLive })
-      });
+      const url = `/api/arbitrage/top-picks?sector=${encodeURIComponent(this.currentArbitrageSector)}&force_refresh=${forceRefresh ? 'true' : 'false'}`;
+      const res = await fetch(url);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Market analysis failed');
+      if (!res.ok) throw new Error(data.detail || 'Failed to load today\'s top arbitrage picks');
 
-      this.renderArbitrageStrategyBanner(data);
-      this.renderArbitrageModelsMatrix(data.models || [], keyword, data.strategy);
+      this.cachedArbitrageData = data;
+      this.arbitragePicksMap = new Map();
+
+      const picks = Array.isArray(data.picks) ? data.picks : [];
+      picks.forEach(p => {
+        if (p.id) this.arbitragePicksMap.set(String(p.id), p);
+      });
+
+      // Update Market Pulse Strip
+      const pulse = data.market_pulse || {};
+      const elPulseTotal = document.getElementById('arb-pulse-total-picks');
+      if (elPulseTotal) elPulseTotal.textContent = `${pulse.total_picks || 0} Picks`;
+
+      const elPulseMaxProfit = document.getElementById('arb-pulse-max-profit');
+      if (elPulseMaxProfit) elPulseMaxProfit.textContent = `+£${Number(pulse.highest_net_profit_gbp || 0).toFixed(2)}`;
+
+      const elPulseAvgRoi = document.getElementById('arb-pulse-avg-roi');
+      if (elPulseAvgRoi) elPulseAvgRoi.textContent = `${Number(pulse.average_roi_pct || 0).toFixed(0)}% ROI`;
+
+      const elPulseRapid = document.getElementById('arb-pulse-rapid-count');
+      if (elPulseRapid) elPulseRapid.textContent = `${pulse.rapid_flips_count || 0} Deals`;
+
+      // Update sector count badges
+      const sectorCounts = pulse.sector_counts || {};
+      const elCntAll = document.getElementById('arb-sector-cnt-all');
+      if (elCntAll) elCntAll.textContent = sectorCounts.all ?? picks.length;
+      const elCntOuter = document.getElementById('arb-sector-cnt-outerwear');
+      if (elCntOuter) elCntOuter.textContent = sectorCounts.outerwear ?? 0;
+      const elCntStreet = document.getElementById('arb-sector-cnt-streetwear');
+      if (elCntStreet) elCntStreet.textContent = sectorCounts.streetwear ?? 0;
+      const elCntKnit = document.getElementById('arb-sector-cnt-knitwear');
+      if (elCntKnit) elCntKnit.textContent = sectorCounts.knitwear ?? 0;
+      const elCntFoot = document.getElementById('arb-sector-cnt-footwear');
+      if (elCntFoot) elCntFoot.textContent = sectorCounts.footwear ?? 0;
+      const elCntSport = document.getElementById('arb-sector-cnt-sportswear');
+      if (elCntSport) elCntSport.textContent = sectorCounts.sportswear ?? 0;
+
+      // Update timestamp
+      const elTime = document.getElementById('arb-last-scanned-time');
+      if (elTime && data.scanned_at) {
+        const d = new Date(data.scanned_at);
+        elTime.textContent = `Scanned ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      }
+
+      // Update sidebar badge
+      const sideBadge = document.getElementById('sidebar-arbitrage-badge');
+      if (sideBadge) {
+        sideBadge.textContent = pulse.total_picks > 0 ? `${pulse.total_picks} HOT` : '0';
+      }
+
+      this.renderTodaysTopPicks(picks);
     } catch (err) {
+      console.error('Arbitrage Picks Error:', err);
       this.showToast(err.message, 'error');
-      if (bannerBox) {
-        bannerBox.innerHTML = `
-          <div class="p-4 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs">
-            Failed to analyze market: ${this.escapeHtmlAttr(err.message)}
+      if (container) {
+        container.innerHTML = `
+          <div class="py-12 text-center text-rose-400 space-y-2 glass-panel rounded-2xl border border-rose-500/30">
+            <i data-lucide="alert-triangle" class="w-8 h-8 mx-auto text-rose-500"></i>
+            <h4 class="text-sm font-bold">Failed to load Top Arbitrage Picks</h4>
+            <p class="text-xs text-rose-300 max-w-md mx-auto">${this.escapeHtmlAttr(err.message)}</p>
           </div>
         `;
       }
     } finally {
       if (loadingBox) loadingBox.classList.add('hidden');
-      if (searchBtn) searchBtn.disabled = false;
-      if (searchIcon) searchIcon.classList.remove('animate-spin');
+      if (btnRefresh) btnRefresh.disabled = false;
+      if (iconRefresh) iconRefresh.classList.remove('animate-spin');
       if (window.lucide) lucide.createIcons();
     }
   }
 
-  submitArbitrageMarketSearch(event) {
-    if (event) event.preventDefault();
-    const val = (document.getElementById('arb-market-input')?.value || '').trim();
-    if (!val) {
-      this.showToast('Please enter a broad market or product name.', 'info');
+  filterArbitrageSector(sector) {
+    this.currentArbitrageSector = sector || 'all';
+
+    // Update button active states
+    const filterButtons = document.querySelectorAll('#arb-sector-filters button');
+    filterButtons.forEach(btn => {
+      btn.className = 'px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700';
+    });
+
+    const activeBtn = document.getElementById(`arb-sector-btn-${sector}`);
+    if (activeBtn) {
+      activeBtn.className = 'px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center cursor-pointer bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm';
+    }
+
+    if (this.cachedArbitrageData && Array.isArray(this.cachedArbitrageData.picks)) {
+      const allPicks = this.cachedArbitrageData.picks;
+      const filtered = (sector === 'all')
+        ? allPicks
+        : allPicks.filter(p => (p.sector || '').toLowerCase() === sector.toLowerCase());
+      this.renderTodaysTopPicks(filtered);
+    } else {
+      this.loadTodaysArbitragePicks(sector, false);
+    }
+  }
+
+  triggerArbitrageRefresh() {
+    this.loadTodaysArbitragePicks(this.currentArbitrageSector || 'all', true);
+  }
+
+  renderTodaysTopPicks(picks) {
+    const container = document.getElementById('arb-top-picks-container');
+    const emptyBox = document.getElementById('arb-picks-empty');
+    if (!container) return;
+
+    if (!picks || picks.length === 0) {
+      container.innerHTML = '';
+      if (emptyBox) emptyBox.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
       return;
     }
-    this.runArbitrageMarketAnalysis(val);
-  }
 
-  renderArbitrageStrategyBanner(data) {
-    const container = document.getElementById('arb-strategy-banner-container');
-    if (!container) return;
+    if (emptyBox) emptyBox.classList.add('hidden');
 
-    const strat = data.strategy || {};
-    const broad = data.broad_market || {};
-    const kw = data.search_text || 'Market';
-    const isBroadRec = strat.verdict === 'RECOMMEND_BROAD_SNIPE';
-    const highProfitCount = strat.high_profit_models_count || 0;
+    container.innerHTML = picks.map(p => {
+      const rawPrice = Number(p.price != null ? p.price : (p.vinted_asking_price || 0));
+      const landedCost = Number(p.vinted_landed_cost || (rawPrice + 0.70 + (rawPrice * 0.05) + 2.95 + 0.60));
+      const ebaySold = Number(p.ebay_sold_median || 0);
+      const netSpread = Number(p.net_flip_profit != null ? p.net_flip_profit : (p.spread_gbp || 0));
+      const roiPct = Number(p.roi_pct != null ? p.roi_pct : (p.projected_roi_pct || 0));
+      const soldRange = p.ebay_sold_range_str || (p.ebay_sold_low ? `£${Number(p.ebay_sold_low).toFixed(0)} - £${Number(p.ebay_sold_high).toFixed(0)}` : 'Market Comp');
+      const photoHtml = p.photo_url
+        ? `<img src="${this.escapeHtmlAttr(p.photo_url)}" alt="${this.escapeHtmlAttr(p.title)}" class="w-full h-full object-cover">`
+        : `<div class="w-full h-full flex items-center justify-center text-slate-600"><i data-lucide="image" class="w-6 h-6"></i></div>`;
 
-    let badgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
-    let iconName = 'check-circle';
-    if (strat.badge_color === 'amber') {
-      badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
-      iconName = 'target';
-    } else if (strat.badge_color === 'slate') {
-      badgeClass = 'bg-slate-800 text-slate-300 border-slate-700';
-      iconName = 'info';
-    }
+      const vintedUrl = p.url || `https://www.vinted.co.uk/items/${p.id}`;
+      const ebayUrl = p.ebay_verification_url || `https://www.ebay.co.uk/sch/i.html?_nkw=${encodeURIComponent(p.ebay_query || p.ebay_verified_model || p.brand || p.title)}&LH_Sold=1&LH_Complete=1&_sop=13`;
 
-    const highProfitNames = (data.models || [])
-      .filter(m => m.net_spread_gbp >= 18.0)
-      .map(m => m.model_name);
-
-    container.innerHTML = `
-      <div class="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border border-slate-800 shadow-xl space-y-4">
-        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div class="space-y-1">
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${badgeClass} flex items-center">
-                <i data-lucide="${iconName}" class="w-3 h-3 mr-1"></i>
-                ${this.escapeHtmlAttr(strat.badge || 'STRATEGY VERDICT')}
-              </span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 font-mono">
-                ${data.total_items_inspected || 0} items analyzed
-              </span>
+      return `
+        <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-amber-500/40 transition flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <!-- Left Thumbnail + Meta -->
+          <div class="flex items-start space-x-3.5 flex-1 min-w-0">
+            <div class="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 shrink-0">
+              ${photoHtml}
+              <span class="absolute bottom-1 right-1 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-black/80 text-white">£${rawPrice.toFixed(0)}</span>
             </div>
-            <h3 class="text-base font-bold text-white">${this.escapeHtmlAttr(strat.title || 'Market Arbitrage Strategy')}</h3>
-            <p class="text-xs text-slate-300 leading-relaxed max-w-3xl">${this.escapeHtmlAttr(strat.rationale || '')}</p>
+            <div class="space-y-1.5 flex-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  ${this.escapeHtmlAttr(p.sector_label || 'Top Pick')}
+                </span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300">
+                  ${this.escapeHtmlAttr(p.brand || 'Apparel')}
+                </span>
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-400 bg-slate-900 border border-slate-800">
+                  ${this.escapeHtmlAttr(p.size || 'Regular')} • ${this.escapeHtmlAttr(p.condition || 'Good')}
+                </span>
+              </div>
+
+              <h4 class="text-sm font-bold text-white truncate hover:text-amber-300 transition">
+                <a href="${this.escapeHtmlAttr(vintedUrl)}" target="_blank" rel="noopener noreferrer">
+                  ${this.escapeHtmlAttr(p.title)}
+                </a>
+              </h4>
+
+              <!-- eBay Verified Comps Box -->
+              <div class="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                <div class="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-950/50 border border-emerald-500/30 text-emerald-300">
+                  <i data-lucide="check-circle-2" class="w-3.5 h-3.5 mr-1.5 text-emerald-400"></i>
+                  <span class="font-bold font-mono">eBay Sold: £${ebaySold.toFixed(2)}</span>
+                  ${p.recent_sales_count ? `<span class="text-[10px] text-emerald-400/80 ml-1.5 font-mono">(${p.recent_sales_count} sold)</span>` : ''}
+                </div>
+
+                <a href="${this.escapeHtmlAttr(ebayUrl)}" 
+                   target="_blank" 
+                   rel="noopener noreferrer" 
+                   class="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-300 hover:text-amber-200 border border-slate-700/80 hover:border-amber-400/50 text-xs font-semibold transition cursor-pointer shadow-sm">
+                  <i data-lucide="search" class="w-3 h-3 mr-1 text-amber-400"></i>
+                  <span>Verify on eBay UK Solds</span>
+                  <i data-lucide="external-link" class="w-3 h-3 ml-1 text-slate-400"></i>
+                </a>
+              </div>
+
+              <div class="text-[11px] text-slate-400 flex flex-wrap items-center gap-2 pt-0.5">
+                <span>Vinted Buy: <strong class="text-white font-mono">£${rawPrice.toFixed(2)}</strong></span>
+                <span class="text-slate-600">•</span>
+                <span>Landed Cost: <strong class="text-slate-300 font-mono">£${landedCost.toFixed(2)}</strong></span>
+                <span class="text-slate-600">•</span>
+                <span>Est. Range: <strong class="text-slate-300 font-mono">${this.escapeHtmlAttr(soldRange)}</strong></span>
+              </div>
+            </div>
           </div>
 
-          <div class="shrink-0 pt-2 lg:pt-0">
-            ${isBroadRec ? `
+          <!-- Right Financials & 1-Click Action Buttons -->
+          <div class="flex items-center justify-between lg:justify-end gap-3.5 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-800/80">
+            <div class="text-left lg:text-right font-mono">
+              <div class="text-lg font-black text-emerald-400">
+                +£${netSpread.toFixed(2)}
+              </div>
+              <div class="flex items-center lg:justify-end space-x-1.5">
+                <span class="text-xs font-bold text-teal-300">${roiPct.toFixed(0)}% ROI</span>
+                <span class="text-[10px] text-indigo-300 font-sans font-semibold">${this.escapeHtmlAttr(p.velocity_rating || '⚡ Fast Flip')}</span>
+              </div>
+            </div>
+
+            <div class="flex items-center space-x-2">
+              <a href="${this.escapeHtmlAttr(vintedUrl)}" 
+                 target="_blank" 
+                 rel="noopener noreferrer" 
+                 class="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-slate-700 transition flex items-center cursor-pointer">
+                <i data-lucide="shopping-bag" class="w-3.5 h-3.5 mr-1 text-teal-400"></i>
+                <span>Vinted</span>
+              </a>
+
               <button type="button" 
-                      onclick="app.activateArbitrageStrategy('${this.escapeHtmlAttr(kw)}', 'broad', [], ${strat.recommended_cap || 35})" 
-                      class="btn-primary-glow px-4 py-2.5 rounded-xl text-xs font-bold text-white transition flex items-center cursor-pointer shadow-md">
-                <i data-lucide="zap" class="w-4 h-4 mr-1.5"></i>
-                Snipe Broad Market (Cap ≤ £${Number(strat.recommended_cap || 35).toFixed(0)})
+                      onclick="app.snipeArbitragePick('${this.escapeHtmlAttr(String(p.id))}')" 
+                      class="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition flex items-center cursor-pointer shadow-sm">
+                <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1"></i>
+                <span>Snipe</span>
               </button>
-            ` : (highProfitCount > 0 ? `
+
               <button type="button" 
-                      onclick="app.activateArbitrageStrategy('${this.escapeHtmlAttr(kw)}', 'model', ${JSON.stringify(highProfitNames).replace(/"/g, '&quot;')}, ${strat.recommended_cap || 45})" 
-                      class="px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition flex items-center cursor-pointer shadow-md">
-                <i data-lucide="target" class="w-4 h-4 mr-1.5"></i>
-                Snipe Top ${highProfitCount} Profitable Models
+                      onclick="app.simBuyArbitragePick('${this.escapeHtmlAttr(String(p.id))}')" 
+                      class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-purple-300 border border-slate-800 hover:border-purple-500/30 transition flex items-center cursor-pointer" 
+                      title="Simulate Paper Flip in Ledger">
+                <i data-lucide="flask-conical" class="w-3.5 h-3.5"></i>
               </button>
-            ` : `
-              <button type="button" 
-                      onclick="app.activateArbitrageStrategy('${this.escapeHtmlAttr(kw)}', 'broad', [], ${strat.recommended_cap || 30})" 
-                      class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center cursor-pointer">
-                <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1.5"></i>
-                Monitor Below £${Number(strat.recommended_cap || 30).toFixed(0)}
-              </button>
-            `)}
+            </div>
           </div>
-        </div>
-
-        <!-- Broad Market Financial Strip -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3 border-t border-slate-800/80 text-xs">
-          <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
-            <span class="text-[10px] text-slate-400 uppercase tracking-wider block">Cheap Entry Inflow</span>
-            <span class="text-base font-bold font-mono text-white">£${Number(broad.cheap_entry_price || 0).toFixed(2)}</span>
-          </div>
-          <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
-            <span class="text-[10px] text-slate-400 uppercase tracking-wider block">Median Market Resale</span>
-            <span class="text-base font-bold font-mono text-emerald-400">£${Number(broad.market_sold_median || 0).toFixed(2)}</span>
-          </div>
-          <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
-            <span class="text-[10px] text-slate-400 uppercase tracking-wider block">Net Profit Spread</span>
-            <span class="text-base font-bold font-mono text-teal-300">+£${Number(broad.net_spread_gbp || 0).toFixed(2)}</span>
-          </div>
-          <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
-            <span class="text-[10px] text-slate-400 uppercase tracking-wider block">Flipping ROI</span>
-            <span class="text-base font-bold font-mono text-cyan-300">${Number(broad.projected_roi_pct || 0).toFixed(0)}% ROI</span>
-          </div>
-        </div>
-      </div>
-    `;
-    if (window.lucide) lucide.createIcons();
-  }
-
-  renderArbitrageModelsMatrix(models, keyword, strategy = {}) {
-    const container = document.getElementById('arb-models-matrix-container');
-    if (!container) return;
-
-    if (!models || models.length === 0) {
-      container.innerHTML = `
-        <div class="py-8 text-center text-slate-500 text-xs">
-          No distinct product models recognized for this query.
         </div>
       `;
-      return;
-    }
+    }).join('');
 
-    container.innerHTML = `
-      <div class="flex items-center justify-between pb-1">
-        <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center">
-          <i data-lucide="layers" class="w-3.5 h-3.5 mr-1.5 text-cyan-400"></i>
-          Discovered Product Models & Individual Profitability (${models.length}):
-        </h4>
-        <span class="text-[11px] text-slate-500">Sorted by highest net spread</span>
-      </div>
-
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        ${models.map(m => {
-          let badgeClass = 'bg-slate-800 text-slate-300 border-slate-700';
-          if (m.badge_type === 'grail') badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
-          else if (m.badge_type === 'high') badgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
-          else if (m.badge_type === 'standard') badgeClass = 'bg-teal-500/20 text-teal-300 border-teal-500/40';
-
-          const previews = Array.isArray(m.preview_deals) ? m.preview_deals : [];
-
-          return `
-            <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between space-y-3.5">
-              <div class="space-y-2">
-                <div class="flex items-start justify-between gap-2">
-                  <div>
-                    <div class="flex items-center gap-1.5 mb-1">
-                      <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${badgeClass}">
-                        ${this.escapeHtmlAttr(m.status)}
-                      </span>
-                      <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-400">
-                        ${this.escapeHtmlAttr(m.resale_tier || 'STANDARD')}
-                      </span>
-                    </div>
-                    <h5 class="text-sm font-bold text-white">${this.escapeHtmlAttr(m.model_name)}</h5>
-                    ${m.short_description ? `<p class="text-[11px] text-slate-400 mt-0.5 line-clamp-2">${this.escapeHtmlAttr(m.short_description)}</p>` : ''}
-                  </div>
-                  <div class="text-right shrink-0 font-mono">
-                    <div class="text-base font-black text-emerald-400">+£${Number(m.net_spread_gbp || 0).toFixed(2)}</div>
-                    <div class="text-[10px] text-teal-300 font-bold">${Number(m.roi_pct || 0).toFixed(0)}% ROI</div>
-                  </div>
-                </div>
-
-                <!-- 4 Metrics row -->
-                <div class="grid grid-cols-4 gap-1.5 p-2 rounded-xl bg-slate-900/90 text-center text-[10px] font-mono border border-slate-800">
-                  <div>
-                    <span class="text-slate-500 block">Cheap Buy</span>
-                    <strong class="text-white">£${Number(m.cheap_entry_price || 0).toFixed(0)}</strong>
-                  </div>
-                  <div>
-                    <span class="text-slate-500 block">Landed Cost</span>
-                    <strong class="text-slate-300">£${Number(m.total_landed_cost || 0).toFixed(0)}</strong>
-                  </div>
-                  <div>
-                    <span class="text-slate-500 block">Sold Resale</span>
-                    <strong class="text-emerald-400">£${Number(m.market_sold_median || 0).toFixed(0)}</strong>
-                  </div>
-                  <div>
-                    <span class="text-slate-500 block">Snipe Cap</span>
-                    <strong class="text-amber-300">≤£${Number(m.recommended_snipe_price || 35).toFixed(0)}</strong>
-                  </div>
-                </div>
-
-                <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-                  <span class="flex items-center text-cyan-300">
-                    <i data-lucide="zap" class="w-3 h-3 mr-1"></i>
-                    ${this.escapeHtmlAttr(m.velocity_tag || 'Active Pace')}
-                  </span>
-                  <span>${m.cheap_inflow_count || 0} cheap listings observed</span>
-                </div>
-
-                <!-- Preview bargains -->
-                ${previews.length > 0 ? `
-                  <div class="pt-2 border-t border-slate-800/80">
-                    <span class="text-[10px] font-semibold text-slate-400 block mb-1.5">Live Underpriced Listings:</span>
-                    <div class="space-y-1.5">
-                      ${previews.map(p => `
-                        <a href="${p.url || ('https://www.vinted.co.uk/items/' + p.id)}" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between p-1.5 rounded-lg bg-slate-900/70 hover:bg-slate-800 border border-slate-800/60 transition group text-[11px]">
-                          <div class="flex items-center space-x-2 min-w-0 pr-2">
-                            ${p.photo_url ? `<img src="${p.photo_url}" class="w-6 h-6 object-cover rounded shrink-0">` : ''}
-                            <span class="text-slate-300 truncate group-hover:text-white">${this.escapeHtmlAttr(p.title || 'Listing')}</span>
-                          </div>
-                          <span class="font-mono font-bold text-emerald-400 shrink-0">£${Number(p.price || 0).toFixed(2)}</span>
-                        </a>
-                      `).join('')}
-                    </div>
-                  </div>
-                ` : ''}
-              </div>
-
-              <div class="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
-                <span class="text-[10px] text-slate-500 font-mono">Model: ${this.escapeHtmlAttr(m.model_name.slice(0, 18))}</span>
-                <button type="button" 
-                        onclick="app.activateArbitrageStrategy('${this.escapeHtmlAttr(keyword)}', 'model', ['${this.escapeHtmlAttr(m.model_name)}'], ${m.recommended_snipe_price || 35})" 
-                        class="px-3 py-1.5 rounded-xl text-xs font-bold bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/30 transition flex items-center cursor-pointer shadow-sm">
-                  <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1 text-vinted"></i>
-                  Snipe This Model (≤ £${Number(m.recommended_snipe_price || 35).toFixed(0)})
-                </button>
-              </div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    `;
     if (window.lucide) lucide.createIcons();
   }
 
-  async activateArbitrageStrategy(keyword, mode, targetModelNames = [], recPrice = null) {
-    if (!keyword) return;
+  async snipeArbitragePick(pickId) {
+    const pick = this.arbitragePicksMap?.get(String(pickId));
+    if (!pick) {
+      this.showToast('Could not find pick details.', 'error');
+      return;
+    }
 
     try {
-      this.showToast('Configuring Deal Sniper & locking onto target strategy...', 'info');
-
-      const res = await fetch('/api/arbitrage/activate-strategy', {
+      this.showToast(`Locking Deal Sniper onto '${pick.ebay_verified_model || pick.title}'...`, 'info');
+      const res = await fetch('/api/arbitrage/snipe-pick', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          search_text: keyword,
-          mode: mode || 'broad',
-          target_model_names: targetModelNames,
-          recommended_max_price: recPrice
+          title: pick.title,
+          brand: pick.brand,
+          ebay_verified_model: pick.ebay_verified_model,
+          recommended_snipe_cap: pick.recommended_snipe_cap,
+          vinted_item_id: pick.id,
         })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to activate strategy');
+      if (!res.ok) throw new Error(data.detail || 'Failed to add pick to Deal Sniper');
 
       await this.loadSearches();
       await this.loadSniperTargetsInfo();
 
-      this.showToast(
-        mode === 'model'
-          ? `🎯 Deal Sniper locked onto model(s): ${targetModelNames.join(', ')}!`
-          : `🎯 Deal Sniper locked onto broad market '${keyword}'!`,
-        'success'
-      );
-
+      this.showToast(`🎯 Added '${pick.ebay_verified_model || pick.brand}' to Deal Sniper with cap ≤ £${Number(pick.recommended_snipe_cap || 35).toFixed(0)}!`, 'success');
       this.showSniperView();
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    }
+  }
+
+  async simBuyArbitragePick(pickId) {
+    const pick = this.arbitragePicksMap?.get(String(pickId));
+    if (!pick) {
+      this.showToast('Could not find pick details.', 'error');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/arbitrage/sim-buy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: pick.id,
+          title: pick.title,
+          price: pick.price || pick.vinted_asking_price,
+          url: pick.url,
+          photo_url: pick.photo_url,
+          ebay_verified_model: pick.ebay_verified_model,
+          net_flip_profit: pick.net_flip_profit,
+          roi_pct: pick.roi_pct,
+          ebay_sold_median: pick.ebay_sold_median,
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Simulation order failed');
+
+      this.showToast(data.message || '🧪 Paper flip executed and logged!', 'success');
+      this.loadAutoBuyLedger();
     } catch (err) {
       this.showToast(err.message, 'error');
     }
@@ -7328,209 +7339,19 @@ class VintedApp {
   }
 
   async loadArbitrageRadar(forceRefresh = false) {
-    const btn = document.getElementById('btn-arbitrage-rescan');
-    const icon = document.getElementById('arbitrage-rescan-icon');
-    const container = document.getElementById('arbitrage-cards-container');
-
-    if (btn) btn.disabled = true;
-    if (icon) icon.classList.add('animate-spin');
-
-    if (forceRefresh && container) {
-      container.innerHTML = `
-        <div class="py-12 text-center text-slate-400 space-y-2">
-          <i data-lucide="radar" class="w-8 h-8 mx-auto animate-spin text-amber-400"></i>
-          <p class="text-xs font-semibold">Running deep market velocity & cheap inflow scan...</p>
-        </div>
-      `;
-      if (window.lucide) lucide.createIcons();
-    }
-
-    try {
-      const endpoint = forceRefresh ? '/api/arbitrage/scan' : '/api/arbitrage/radar';
-      const method = forceRefresh ? 'POST' : 'GET';
-      const body = forceRefresh ? JSON.stringify({ include_live_scan: false }) : null;
-
-      const res = await fetch(endpoint, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body
-      });
-      if (!res.ok) throw new Error('Failed to load market arbitrage radar');
-      const data = await res.json();
-
-      const opps = Array.isArray(data.opportunities) ? data.opportunities : [];
-
-      // Update stat counters
-      const elTotal = document.getElementById('arb-stat-total');
-      if (elTotal) elTotal.textContent = data.total_opportunities || opps.length;
-
-      const elMaxSpread = document.getElementById('arb-stat-max-spread');
-      if (elMaxSpread) {
-        const maxSpread = opps.reduce((acc, o) => Math.max(acc, Number(o.spread_gbp != null ? o.spread_gbp : (o.net_spread || 0))), 0);
-        elMaxSpread.textContent = `£${maxSpread.toFixed(2)}`;
-      }
-
-      const elRapid = document.getElementById('arb-stat-rapid');
-      if (elRapid) {
-        const rapidCount = opps.filter(o => (o.velocity_tag || '').includes('Rapid') || o.velocity_level === 'rapid' || o.velocity_level === 'fast').length;
-        elRapid.textContent = rapidCount;
-      }
-
-      const elAvgRoi = document.getElementById('arb-stat-avg-roi');
-      if (elAvgRoi) {
-        const avgRoi = opps.length > 0
-          ? (opps.reduce((acc, o) => acc + Number(o.projected_roi_pct != null ? o.projected_roi_pct : (o.roi_pct || 0)), 0) / opps.length)
-          : 0;
-        elAvgRoi.textContent = `${avgRoi.toFixed(0)}%`;
-      }
-
-      // Update sidebar badge if any opportunities exist
-      const sideBadge = document.getElementById('sidebar-arbitrage-badge');
-      if (sideBadge) {
-        sideBadge.textContent = opps.length > 0 ? `${opps.length} HOT` : '0';
-      }
-
-      this.renderArbitrageOpportunities(opps);
-    } catch (err) {
-      console.error('Arbitrage Radar Error:', err);
-      if (container) {
-        container.innerHTML = `
-          <div class="py-8 text-center text-rose-400 space-y-1">
-            <i data-lucide="alert-triangle" class="w-6 h-6 mx-auto"></i>
-            <p class="text-xs font-semibold">${this.escapeHtmlAttr(err.message)}</p>
-          </div>
-        `;
-        if (window.lucide) lucide.createIcons();
-      }
-    } finally {
-      if (btn) btn.disabled = false;
-      if (icon) icon.classList.remove('animate-spin');
-    }
-  }
-
-  renderArbitrageOpportunities(opps) {
-    const container = document.getElementById('arbitrage-cards-container');
-    if (!container) return;
-
-    if (!opps || opps.length === 0) {
-      container.innerHTML = `
-        <div class="py-12 text-center text-slate-500 space-y-2">
-          <i data-lucide="check-circle-2" class="w-8 h-8 mx-auto text-slate-600"></i>
-          <p class="text-xs font-semibold text-slate-400">Market is currently in equilibrium.</p>
-          <p class="text-[11px] text-slate-500">Run a new live scrape or wait for new mispriced listings to be recorded.</p>
-        </div>
-      `;
-      if (window.lucide) lucide.createIcons();
-      return;
-    }
-
-    container.innerHTML = opps.map(opp => {
-      const keyword = opp.search_text || opp.target_name || opp.keyword || 'Opportunity';
-      const brand = opp.brand || opp.brand_name || '';
-      const cheapInflow = opp.cheap_listings_count != null ? opp.cheap_listings_count : (opp.cheap_listings_inflow || opp.cheap_inflow_count || 0);
-      const cheapEntryPrice = Number(opp.cheap_entry_price != null ? opp.cheap_entry_price : (opp.entry_price || 0));
-      const medianSold = Number(opp.market_sold_median != null ? opp.market_sold_median : (opp.median_sold_price || opp.market_sold_price || 0));
-      const netSpread = Number(opp.spread_gbp != null ? opp.spread_gbp : (opp.net_spread || (medianSold - cheapEntryPrice)));
-      const roiPct = Number(opp.projected_roi_pct != null ? opp.projected_roi_pct : (opp.roi_pct || 0));
-      const velocityText = opp.velocity_tag || opp.velocity_description || (opp.velocity_level === 'rapid' ? '⚡ Rapid (< 48 hrs)' : '🚀 Fast Turnover');
-      const searchId = opp.search_id || null;
-      const targetCap = opp.recommended_max_snipe_price || opp.recommended_max_buy || Math.round(cheapEntryPrice * 1.15) || 35;
-
-      const tagBadge = opp.variant_name
-        ? `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">↳ ${this.escapeHtmlAttr(opp.variant_name)}</span>`
-        : '';
-
-      return `
-        <div class="p-4 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-amber-500/40 transition flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div class="space-y-1.5 flex-1 min-w-0">
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                🔥 HIGH CHEAP INFLOW (${cheapInflow} items under £${cheapEntryPrice.toFixed(0)})
-              </span>
-              ${brand ? `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300">${this.escapeHtmlAttr(brand)}</span>` : ''}
-              ${tagBadge}
-            </div>
-
-            <h4 class="text-sm font-bold text-white truncate">
-              ${this.escapeHtmlAttr(keyword)}
-            </h4>
-
-            <p class="text-xs text-slate-400">
-              ${this.escapeHtmlAttr(opp.rationale || `Consistent buyer demand at £${medianSold.toFixed(0)} with frequent influx of bargain sellers at £${cheapEntryPrice.toFixed(0)}.`)}
-            </p>
-
-            <div class="flex flex-wrap items-center gap-3 text-[11px] pt-1">
-              <span class="text-slate-400">Entry: <strong class="text-white font-mono">£${cheapEntryPrice.toFixed(2)}</strong></span>
-              <span class="text-slate-600">•</span>
-              <span class="text-slate-400">Market Resale: <strong class="text-emerald-400 font-mono">£${medianSold.toFixed(2)}</strong></span>
-              <span class="text-slate-600">•</span>
-              <span class="text-slate-400">Pace: <strong class="text-cyan-300">${this.escapeHtmlAttr(velocityText)}</strong></span>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between md:justify-end gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-800/80">
-            <div class="text-left md:text-right">
-              <div class="text-base font-black font-mono text-emerald-400">
-                +£${netSpread.toFixed(2)}
-              </div>
-              <div class="text-[10px] font-mono text-teal-300 font-bold">
-                ${roiPct.toFixed(0)}% ROI
-              </div>
-            </div>
-
-            <button type="button" 
-                    onclick="app.addArbitrageToSniper(${searchId}, '${this.escapeHtmlAttr(keyword)}', '${this.escapeHtmlAttr(brand)}', ${targetCap})"
-                    class="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow-sm flex items-center cursor-pointer">
-              <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1.5"></i>
-              Track & Snipe
-            </button>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    if (window.lucide) lucide.createIcons();
+    return this.loadTodaysArbitragePicks('all', forceRefresh);
   }
 
   async addArbitrageToSniper(searchId, keyword, brand, targetCap) {
-    try {
-      this.closeArbitrageModal();
-
-      if (searchId) {
-        this.sniperTargetsInitialized = true;
-        this.sniperTargets.add(Number(searchId));
-        this.showToast(`Locked Deal Sniper onto '${keyword}' (Target cap: £${targetCap})!`, 'success');
-        this.showSniperView();
-        await this.loadSniperTargetsInfo();
-        return;
-      }
-
-      // If not yet in tracked searches, create/enable it via API
-      const res = await fetch('/api/arbitrage/add-to-sniper', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          keyword,
-          brand_name: brand,
-          target_max_price: targetCap
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to add target to sniper');
-
-      await this.loadSearches();
-      await this.loadSniperTargetsInfo();
-
-      if (data.search_id) {
-        this.sniperTargetsInitialized = true;
-        this.sniperTargets.add(Number(data.search_id));
-      }
-
-      this.showToast(`🎯 Added '${keyword}' to Deal Sniper with £${targetCap} cap!`, 'success');
+    if (searchId) {
+      this.sniperTargetsInitialized = true;
+      this.sniperTargets.add(Number(searchId));
+      this.showToast(`Locked Deal Sniper onto '${keyword}' (Target cap: £${targetCap})!`, 'success');
       this.showSniperView();
-    } catch (err) {
-      this.showToast(err.message, 'error');
+      await this.loadSniperTargetsInfo();
+      return;
     }
+    return this.snipeArbitragePick(searchId);
   }
 
   // ── Auto-Checkout & Paper Trading Simulation Profile ───────────────────────
