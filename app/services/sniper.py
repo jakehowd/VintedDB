@@ -32,7 +32,6 @@ from ..services.antirep import (
 )
 from ..services.item_classifier import is_child_size, is_item_relevant, normalize_categories
 from ..services.resale_evaluator import resale_evaluator
-from ..services.sniper_executor import sniper_executor
 from ..services.variant_vision import variant_vision_service
 
 logger = logging.getLogger(__name__)
@@ -1018,18 +1017,6 @@ class DealSniperService:
                                 f"⚠️ Filtered by AI Profit Gate: '{item_title}' (£{item_price:.2f}) projected profit £{resale_eval['projected_net_profit']:+.2f} ({resale_eval['roi_pct']:.0f}% ROI, {resale_eval['verdict']}) below threshold (Min £{self.min_net_profit:.2f}, {self.min_roi_pct:.0f}% ROI).",
                             )
                             continue
-
-                    # Automated Checkout / Paper Trading Simulation Execution
-                    should_buy, buy_reason = sniper_executor.should_auto_execute(db, deal_card, resale_eval)
-                    if should_buy:
-                        order_res = sniper_executor.execute_deal(db, deal_card, resale_eval)
-                        deal_card["autobuy_order"] = order_res
-                        order_prefix = "🧪 SIMULATED" if order_res["is_simulation"] else "⚡ LIVE"
-                        self._add_log(
-                            "AUTO-BUY",
-                            f"{order_prefix} AUTO-BUY: Acquired '{item_title}' for £{item_price:.2f} (Landed: £{order_res['total_landed_cost']:.2f}). "
-                            f"Projected profit: +£{order_res['projected_net_profit']:.2f} ({order_res['projected_roi_pct']:.0f}% ROI). [Order #{order_res['order_id']}]",
-                        )
 
                     with self._lock:
                         self.sniped_deals.insert(0, deal_card)

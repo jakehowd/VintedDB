@@ -58,7 +58,7 @@
             UK LIVE
           </span>
         </div>
-        <p class="text-[11px] text-slate-400 hidden xl:block">AI Model Decomposition, Fast Arbitrage Radar & Automated Deal Sniping</p>
+        <p class="text-[11px] text-slate-400 hidden xl:block">AI Model Decomposition & Automated Deal Sniping</p>
       </div>
     </div>
 
@@ -68,12 +68,6 @@
         <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1.5 text-vinted"></i>
         <span>Deal Sniper</span>
         <span id="header-sniper-badge" class="ml-1.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-slate-800 text-emerald-400 border border-slate-700">0</span>
-      </button>
-
-      <button id="tab-nav-arbitrage" onclick="app.showArbitrageView()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer">
-        <i data-lucide="flame" class="w-3.5 h-3.5 mr-1.5 text-amber-400"></i>
-        <span>Arbitrage Radar</span>
-        <span class="ml-1.5 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">HOT</span>
       </button>
 
       <button id="tab-nav-database" onclick="app.showDatabaseExplorerView()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer">
@@ -90,8 +84,16 @@
         <span class="hidden lg:inline">Terminal</span>
       </button>
 
+      <!-- Dedicated Proxy Settings Quick Button -->
+      <button id="btn-header-proxy-settings" onclick="app.openAntiBanModal()" class="inline-flex items-center px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-950/80 hover:bg-slate-800 text-amber-300 hover:text-amber-200 border border-slate-800 hover:border-amber-500/40 transition shadow-sm cursor-pointer" title="Configure Rotating Proxies & Test Connection">
+        <i data-lucide="shield" class="w-3.5 h-3.5 mr-1 sm:mr-1.5 text-amber-400"></i>
+        <span class="hidden sm:inline">Proxy Settings</span>
+        <span class="sm:hidden">Proxies</span>
+        <span id="header-proxy-status-dot" class="ml-1.5 w-2 h-2 rounded-full bg-emerald-400"></span>
+      </button>
+
       <!-- Consolidated Settings & Security Hub Button -->
-      <button id="btn-open-settings-hub" onclick="app.openSettingsModal()" class="inline-flex items-center px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-950/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-cyan-500/40 transition shadow-sm cursor-pointer" title="System Settings Hub (Auto-Buy, Anti-Ban Proxies, AI Keys, Scheduler)">
+      <button id="btn-open-settings-hub" onclick="app.openSettingsModal('scraper')" class="inline-flex items-center px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-950/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-cyan-500/40 transition shadow-sm cursor-pointer" title="System Settings Hub (Anti-Ban Proxies, AI Keys, Scheduler)">
         <i data-lucide="settings" class="w-3.5 h-3.5 mr-1 sm:mr-1.5 text-cyan-400"></i>
         <span class="hidden sm:inline">Settings</span>
         <span id="header-settings-dot" class="ml-1 w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
@@ -133,20 +135,20 @@
             <div class="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400 group-hover:scale-105 transition-transform">
               <i data-lucide="crosshair" class="w-3.5 h-3.5 text-vinted"></i>
             </div>
-            <span>Deal Sniper & Auto-Buy</span>
+            <span>Deal Sniper</span>
           </div>
           <span id="sniper-deals-badge" class="px-2 py-0.5 text-[11px] font-mono font-bold rounded-full bg-slate-800 text-emerald-400 border border-slate-700">0</span>
         </button>
 
-        <!-- Fast-Flip Arbitrage & Market Inefficiency Radar Button -->
-        <button id="nav-arbitrage-btn" onclick="app.showArbitrageView()" class="sidebar-item w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition group">
+        <!-- Proxy Settings Quick Button -->
+        <button id="sidebar-proxy-btn" onclick="app.openAntiBanModal()" class="sidebar-item w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition group">
           <div class="flex items-center space-x-2">
             <div class="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform">
-              <i data-lucide="flame" class="w-3.5 h-3.5 text-amber-400"></i>
+              <i data-lucide="shield" class="w-3.5 h-3.5 text-amber-400"></i>
             </div>
-            <span>Arbitrage Radar</span>
+            <span>Proxy Settings</span>
           </div>
-          <span id="sidebar-arbitrage-badge" class="px-2 py-0.5 text-[10px] font-mono font-bold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">HOT</span>
+          <span id="sidebar-proxy-count" class="px-2 py-0.5 text-[10px] font-mono font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">ONLINE</span>
         </button>
 
         <!-- Advanced Database Explorer Page Button -->
@@ -455,16 +457,6 @@
           </div>
 
           <div class="flex items-center space-x-2.5 shrink-0">
-            <button id="btn-sniper-arbitrage" onclick="app.showArbitrageView()" class="inline-flex items-center px-3 py-2 rounded-xl text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition cursor-pointer" title="Switch to Market Inefficiency & Arbitrage Radar">
-              <i data-lucide="flame" class="w-3.5 h-3.5 mr-1.5 text-amber-400"></i>
-              Arbitrage Radar
-            </button>
-
-            <button id="btn-sniper-autobuy" onclick="app.openSettingsModal('autobuy')" class="inline-flex items-center px-3 py-2 rounded-xl text-xs font-semibold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition cursor-pointer" title="Configure Card/Shipping or Paper Trading Simulation Profile">
-              <i data-lucide="zap" class="w-3.5 h-3.5 mr-1.5 text-cyan-400"></i>
-              Auto-Buy & Sim
-            </button>
-
             <button id="btn-sniper-clear" onclick="app.clearSniperDeals()" class="inline-flex items-center px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer">
               <i data-lucide="trash-2" class="w-3.5 h-3.5 mr-1.5 text-slate-400"></i>
               Clear Stream
@@ -474,58 +466,6 @@
               <i data-lucide="play" class="w-4 h-4 mr-1.5 fill-current" id="sniper-toggle-icon"></i>
               <span id="sniper-toggle-text">Start Sniping</span>
             </button>
-          </div>
-        </div>
-
-        <!-- Unified Paper Trading & AI Quality Gate Performance Bar -->
-        <div class="p-3.5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border border-slate-800 shadow-lg flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div class="flex flex-wrap items-center gap-3">
-            <button type="button" onclick="app.openSettingsModal('autobuy')" id="sniper-execution-pill" class="px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 transition flex items-center cursor-pointer shadow-sm" title="Click to edit shipping address, card details, or toggle paper trading">
-              <span class="w-2 h-2 rounded-full bg-cyan-400 mr-2 pulse-live"></span>
-              <span id="sniper-execution-mode-text">🧪 PAPER TRADING (SIMULATION)</span>
-              <i data-lucide="chevron-right" class="w-3.5 h-3.5 ml-1 opacity-70"></i>
-            </button>
-
-            <div class="flex items-center space-x-3 text-[11px] font-mono border-l border-slate-800 pl-3">
-              <span class="text-slate-400">Capital: <strong id="ticker-capital" class="text-white">£0.00</strong></span>
-              <span class="text-slate-600">•</span>
-              <span class="text-slate-400">Resale: <strong id="ticker-resale" class="text-cyan-300">£0.00</strong></span>
-              <span class="text-slate-600">•</span>
-              <span class="text-slate-400">Paper Profit: <strong id="ticker-profit" class="text-emerald-400 font-bold">+£0.00</strong></span>
-              <span class="text-slate-600">•</span>
-              <span class="text-slate-400">ROI: <strong id="ticker-roi" class="text-teal-300">0%</strong></span>
-            </div>
-          </div>
-
-          <div class="flex items-center space-x-2">
-            <label class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-emerald-500/30 text-[11px] font-semibold text-emerald-300 cursor-pointer select-none" title="Filter out unprofitable or high-risk listings">
-              <input type="checkbox" id="sniper-ai-gate-toggle" checked class="custom-checkbox">
-              <span>AI Profit Gate (Min £12, 30% ROI)</span>
-            </label>
-
-            <button type="button" onclick="app.toggleInlineLedger()" id="btn-toggle-inline-ledger" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer flex items-center" title="Toggle Simulated Orders Ledger">
-              <i data-lucide="history" class="w-3.5 h-3.5 mr-1 text-cyan-400"></i>
-              <span>Ledger (<span id="ticker-order-count">0</span>)</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Collapsible Inline Simulated Orders Ledger -->
-        <div id="sniper-inline-ledger" class="glass-panel p-4 rounded-2xl border border-cyan-500/20 space-y-3 hidden animate-fade-in">
-          <div class="flex items-center justify-between pb-2 border-b border-slate-800">
-            <div class="flex items-center space-x-2">
-              <i data-lucide="history" class="w-4 h-4 text-cyan-400"></i>
-              <h4 class="text-xs font-bold text-white uppercase tracking-wider">Simulated Paper Orders Ledger</h4>
-            </div>
-            <div class="flex items-center space-x-2 text-xs">
-              <button type="button" onclick="app.clearAutoBuyLedger()" class="text-rose-400 hover:text-rose-300 hover:underline cursor-pointer text-[11px] font-medium">Clear History</button>
-              <button type="button" onclick="app.toggleInlineLedger()" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 cursor-pointer">
-                <i data-lucide="x" class="w-4 h-4"></i>
-              </button>
-            </div>
-          </div>
-          <div id="sniper-inline-ledger-container" class="max-h-64 overflow-y-auto space-y-2">
-            <!-- Simulated orders populated dynamically -->
           </div>
         </div>
 
@@ -612,7 +552,7 @@
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-800/80 text-xs">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-800/80 text-xs">
               <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between">
                 <span class="text-[11px] text-slate-400">Min Net Profit:</span>
                 <div class="flex items-center space-x-1 font-mono">
@@ -626,13 +566,6 @@
                   <input type="number" id="sniper-min-roi" value="30" min="5" max="500" step="5" class="w-14 bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-teal-300 font-bold focus:outline-none">
                   <span class="text-teal-400 font-bold">%</span>
                 </div>
-              </div>
-              <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between">
-                <span class="text-[11px] text-slate-400">Auto-Buy State:</span>
-                <button type="button" onclick="app.openAutoBuyModal()" id="sniper-autobuy-state-btn" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/20 transition cursor-pointer flex items-center">
-                  <i data-lucide="zap" class="w-3 h-3 mr-1 text-cyan-400"></i>
-                  <span id="sniper-autobuy-state-text">SIMULATION (Paper Trading)</span>
-                </button>
               </div>
             </div>
           </div>
@@ -809,7 +742,7 @@
             </button>
 
             <button onclick="app.loadDatabaseExplorerData()" class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer" title="Refresh all records">
-              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1.5"></i>
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1.5" id="db-refresh-icon"></i>
               <span>Refresh</span>
             </button>
           </div>
@@ -1103,205 +1036,6 @@
           </div>
         </div>
 
-      </div>
-
-      <!-- View Container 4: Today's Top Arbitrage Picks (Cross-Market Vinted to eBay Engine) -->
-      <div id="arbitrage-view" class="space-y-6 hidden animate-fade-in">
-        
-        <!-- Header Bar -->
-        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-800">
-          <div>
-            <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
-              <span class="text-amber-400 font-semibold uppercase tracking-wider flex items-center">
-                <i data-lucide="cpu" class="w-3.5 h-3.5 mr-1 text-amber-400"></i>
-                AI Arbitrage & Quant Intelligence
-              </span>
-              <span>/</span>
-              <span class="text-slate-300">Vinted UK ➔ eBay UK Secondary Realization</span>
-            </div>
-            <div class="flex items-center space-x-3">
-              <h2 class="text-2xl font-bold text-white tracking-tight">AI Arbitrage Radar</h2>
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 pulse-live"></span>
-                100% LIVE VERIFIED (0 SOLD ITEMS)
-              </span>
-              <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">
-                ALPHA ANOMALY GATE
-              </span>
-            </div>
-            <p class="text-xs text-slate-400 mt-1 max-w-2xl">
-              Experimental multi-dimensional arbitrage scanner detecting uneducated casual seller mispricings, cross-market eBay spreads, and predictive product targets to snipe.
-            </p>
-          </div>
-
-          <div class="flex items-center space-x-2.5 shrink-0">
-            <button type="button" 
-                    id="btn-refresh-top-picks" 
-                    onclick="app.triggerArbitrageRefresh()" 
-                    class="btn-primary-glow inline-flex items-center px-4 py-2.5 rounded-xl text-xs font-bold text-white transition shadow-sm cursor-pointer">
-              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1.5" id="icon-refresh-top-picks"></i>
-              <span>Refresh Live Scan</span>
-            </button>
-            <button type="button" 
-                    onclick="app.showSniperView()" 
-                    class="inline-flex items-center px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-teal-300 border border-slate-800 transition cursor-pointer">
-              <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1.5 text-vinted"></i>
-              Open Deal Sniper
-            </button>
-          </div>
-        </div>
-
-        <!-- Mode Segmented Switcher (Live Active vs AI Predictive Blueprints) -->
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 p-1.5 rounded-2xl bg-slate-950/80 border border-slate-800">
-          <div class="flex items-center space-x-1.5 w-full sm:w-auto">
-            <button type="button" 
-                    id="arb-tab-btn-active" 
-                    onclick="app.switchArbitrageViewMode('active')" 
-                    class="flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center cursor-pointer bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm">
-              <span class="w-2 h-2 rounded-full bg-emerald-400 mr-2 pulse-live"></span>
-              <span>Live Active Bargains</span>
-              <span id="arb-tab-badge-active" class="ml-2 px-1.5 py-0.2 rounded text-[10px] font-mono bg-amber-500/30 text-amber-200">0</span>
-            </button>
-            <button type="button" 
-                    id="arb-tab-btn-predicted" 
-                    onclick="app.switchArbitrageViewMode('predicted')" 
-                    class="flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center justify-center cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700">
-              <i data-lucide="brain-circuit" class="w-3.5 h-3.5 mr-1.5 text-purple-400"></i>
-              <span>AI Product Targets & Blueprints</span>
-              <span id="arb-tab-badge-predicted" class="ml-2 px-1.5 py-0.2 rounded text-[10px] font-mono bg-purple-500/20 text-purple-300">9</span>
-            </button>
-          </div>
-
-          <div class="text-[11px] text-slate-400 flex items-center space-x-2 px-3">
-            <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
-            <span class="text-slate-300 font-medium">All active items live-verified unsold & ready to buy</span>
-          </div>
-        </div>
-
-        <!-- Market Pulse Financial Metrics Strip -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div class="glass-panel p-3.5 rounded-2xl border border-slate-800 flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
-              <i data-lucide="flame" class="w-5 h-5"></i>
-            </div>
-            <div>
-              <span class="text-[10px] text-slate-400 uppercase font-semibold tracking-wider block">Live Active Snipes</span>
-              <span id="arb-pulse-total-picks" class="text-lg font-bold font-mono text-white">--</span>
-            </div>
-          </div>
-
-          <div class="glass-panel p-3.5 rounded-2xl border border-slate-800 flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
-              <i data-lucide="pound-sterling" class="w-5 h-5"></i>
-            </div>
-            <div>
-              <span class="text-[10px] text-slate-400 uppercase font-semibold tracking-wider block">Highest Realized Margin</span>
-              <span id="arb-pulse-max-profit" class="text-lg font-bold font-mono text-emerald-400">--</span>
-            </div>
-          </div>
-
-          <div class="glass-panel p-3.5 rounded-2xl border border-slate-800 flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
-              <i data-lucide="sparkles" class="w-5 h-5"></i>
-            </div>
-            <div>
-              <span class="text-[10px] text-slate-400 uppercase font-semibold tracking-wider block">Casual Seller Clearouts</span>
-              <span id="arb-pulse-casual-count" class="text-lg font-bold font-mono text-purple-300">--</span>
-            </div>
-          </div>
-
-          <div class="glass-panel p-3.5 rounded-2xl border border-slate-800 flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 shrink-0">
-              <i data-lucide="trending-up" class="w-5 h-5"></i>
-            </div>
-            <div>
-              <span class="text-[10px] text-slate-400 uppercase font-semibold tracking-wider block">Average Flipping ROI</span>
-              <span id="arb-pulse-avg-roi" class="text-lg font-bold font-mono text-cyan-300">--</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Category / Sector Filter Pills Strip -->
-        <div class="glass-panel p-3 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
-          <div class="flex flex-wrap items-center gap-1.5" id="arb-sector-filters">
-            <button type="button" 
-                    onclick="app.filterArbitrageSector('all')" 
-                    id="arb-sector-btn-all" 
-                    class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center cursor-pointer bg-amber-500/20 text-amber-300 border border-amber-500/40">
-              <i data-lucide="flame" class="w-3.5 h-3.5 mr-1.5 text-amber-400"></i>
-              <span>All Top Picks</span>
-              <span id="arb-sector-cnt-all" class="ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-mono bg-amber-500/30">0</span>
-            </button>
-            <button type="button" 
-                    onclick="app.filterArbitrageSector('outerwear')" 
-                    id="arb-sector-btn-outerwear" 
-                    class="px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700">
-              <i data-lucide="cloud-rain" class="w-3.5 h-3.5 mr-1.5 text-teal-400"></i>
-              <span>Outerwear & Gorpcore</span>
-              <span id="arb-sector-cnt-outerwear" class="ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-800 text-slate-400">0</span>
-            </button>
-            <button type="button" 
-                    onclick="app.filterArbitrageSector('streetwear')" 
-                    id="arb-sector-btn-streetwear" 
-                    class="px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700">
-              <i data-lucide="sparkles" class="w-3.5 h-3.5 mr-1.5 text-amber-400"></i>
-              <span>Cult Streetwear</span>
-              <span id="arb-sector-cnt-streetwear" class="ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-800 text-slate-400">0</span>
-            </button>
-            <button type="button" 
-                    onclick="app.filterArbitrageSector('knitwear')" 
-                    id="arb-sector-btn-knitwear" 
-                    class="px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700">
-              <i data-lucide="shirt" class="w-3.5 h-3.5 mr-1.5 text-indigo-400"></i>
-              <span>Luxury Knitwear</span>
-              <span id="arb-sector-cnt-knitwear" class="ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-800 text-slate-400">0</span>
-            </button>
-            <button type="button" 
-                    onclick="app.filterArbitrageSector('footwear')" 
-                    id="arb-sector-btn-footwear" 
-                    class="px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700">
-              <i data-lucide="footprints" class="w-3.5 h-3.5 mr-1.5 text-emerald-400"></i>
-              <span>High-Demand Footwear</span>
-              <span id="arb-sector-cnt-footwear" class="ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-800 text-slate-400">0</span>
-            </button>
-            <button type="button" 
-                    onclick="app.filterArbitrageSector('sportswear')" 
-                    id="arb-sector-btn-sportswear" 
-                    class="px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700">
-              <i data-lucide="trophy" class="w-3.5 h-3.5 mr-1.5 text-purple-400"></i>
-              <span>Retro Sportswear</span>
-              <span id="arb-sector-cnt-sportswear" class="ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-800 text-slate-400">0</span>
-            </button>
-          </div>
-
-          <div class="text-[11px] text-slate-500 font-mono flex items-center">
-            <span id="arb-last-scanned-time">Updated recently</span>
-          </div>
-        </div>
-
-        <!-- Loading State -->
-        <div id="arb-picks-loading" class="hidden py-16 text-center space-y-3">
-          <div class="w-12 h-12 mx-auto rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-            <i data-lucide="radar" class="w-6 h-6 animate-spin"></i>
-          </div>
-          <h4 class="text-sm font-bold text-white">Running AI Arbitrage Intelligence...</h4>
-          <p class="text-xs text-slate-400 max-w-md mx-auto">
-            Scanning Vinted UK feeds, inspecting public item pages to eliminate already-sold items, calculating casual seller anomalies, and verifying eBay UK realized comps.
-          </p>
-        </div>
-
-        <!-- Empty State -->
-        <div id="arb-picks-empty" class="hidden py-16 text-center space-y-2 glass-panel rounded-2xl border border-slate-800">
-          <i data-lucide="check-circle" class="w-8 h-8 mx-auto text-slate-600"></i>
-          <h4 class="text-sm font-bold text-white">No Arbitrage Inefficiencies in this Category Right Now</h4>
-          <p class="text-xs text-slate-400">Try selecting "All Top Picks" or click "Refresh Live Scan" to discover fresh listings.</p>
-        </div>
-
-        <!-- Container 1: Live Active Arbitrage Deals (100% Verified Unsold) -->
-        <div id="arb-top-picks-container" class="space-y-3.5"></div>
-
-        <!-- Container 2: AI Predicted Product Blueprints (Target & Snipe) -->
-        <div id="arb-predicted-products-container" class="hidden space-y-4"></div>
       </div>
 
     </main>
@@ -2463,306 +2197,8 @@
     </div>
   </div>
 
-  <!-- Fast-Flip Arbitrage & Market Inefficiency Radar Modal -->
-  <div id="arbitrage-modal" onclick="if(event.target === this) app.closeArbitrageModal()" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 hidden">
-    <div class="glass-modal rounded-2xl max-w-4xl w-full p-5 sm:p-6 space-y-4 animate-fade-in shadow-2xl max-h-[90vh] flex flex-col">
-      <!-- Header -->
-      <div class="flex items-center justify-between pb-3 border-b border-slate-800 shrink-0">
-        <div class="flex items-center space-x-2.5">
-          <div class="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
-            <i data-lucide="flame" class="w-4 h-4"></i>
-          </div>
-          <div>
-            <h3 class="text-base font-bold text-white flex items-center">
-              Market Inefficiency & Arbitrage Radar
-              <span class="ml-2 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">VINTED UK SCANNER</span>
-            </h3>
-            <p class="text-xs text-slate-400">Identifies items with high volume of new cheap listings selling rapidly despite commanding much higher market resale values.</p>
-          </div>
-        </div>
-        <div class="flex items-center space-x-2">
-          <button type="button" onclick="app.loadArbitrageRadar(true)" id="btn-arbitrage-rescan" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition cursor-pointer">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1.5" id="arbitrage-rescan-icon"></i>
-            Scan Live Inefficiencies
-          </button>
-          <button type="button" onclick="app.closeArbitrageModal()" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 cursor-pointer">
-            <i data-lucide="x" class="w-4 h-4"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- Opportunity Metric Highlights -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
-        <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
-          <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Inefficiencies Found</span>
-          <span id="arb-stat-total" class="text-xl font-black font-mono text-white">0</span>
-        </div>
-        <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
-          <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Max Net Spread</span>
-          <span id="arb-stat-max-spread" class="text-xl font-black font-mono text-emerald-400">£0.00</span>
-        </div>
-        <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
-          <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Rapid Flip Items</span>
-          <span id="arb-stat-rapid" class="text-xl font-black font-mono text-amber-300">0</span>
-        </div>
-        <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
-          <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Avg Flipping ROI</span>
-          <span id="arb-stat-avg-roi" class="text-xl font-black font-mono text-cyan-300">0%</span>
-        </div>
-      </div>
-
-      <!-- Arbitrage Opportunities Stream -->
-      <div id="arbitrage-cards-container" class="flex-1 overflow-y-auto space-y-3.5 pr-1">
-        <div class="py-12 text-center text-slate-500 space-y-2">
-          <i data-lucide="radar" class="w-8 h-8 mx-auto animate-spin text-amber-400"></i>
-          <p class="text-xs">Analyzing market sales velocity & cheap inflow spreads...</p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Auto-Checkout & Paper Trading Simulation Modal -->
-  <div id="autobuy-modal" onclick="if(event.target === this) app.closeAutoBuyModal()" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 hidden">
-    <div class="glass-modal rounded-2xl max-w-3xl w-full p-5 sm:p-6 space-y-4 animate-fade-in shadow-2xl max-h-[92vh] flex flex-col">
-      <!-- Header -->
-      <div class="flex items-center justify-between pb-3 border-b border-slate-800 shrink-0">
-        <div class="flex items-center space-x-2.5">
-          <div class="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-            <i data-lucide="zap" class="w-4 h-4"></i>
-          </div>
-          <div>
-            <h3 class="text-base font-bold text-white flex items-center">
-              Sniper Auto-Checkout & Paper Trading Profile
-              <span id="autobuy-mode-pill" class="ml-2 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">SIMULATION MODE</span>
-            </h3>
-            <p class="text-xs text-slate-400">Configure auto-buy card & shipping credentials, or keep them blank to safely simulate sniped purchases.</p>
-          </div>
-        </div>
-        <button type="button" onclick="app.closeAutoBuyModal()" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 cursor-pointer">
-          <i data-lucide="x" class="w-4 h-4"></i>
-        </button>
-      </div>
-
-      <!-- Navigation Tabs inside Modal -->
-      <div class="flex items-center space-x-2 border-b border-slate-800 shrink-0 pb-1 text-xs">
-        <button type="button" id="tab-autobuy-profile" onclick="app.switchAutoBuyTab('profile')" class="px-3 py-1.5 font-bold rounded-lg bg-slate-800 text-cyan-300 border border-slate-700 cursor-pointer">
-          <i data-lucide="credit-card" class="w-3.5 h-3.5 inline mr-1"></i>
-          Execution & Credentials
-        </button>
-        <button type="button" id="tab-autobuy-ledger" onclick="app.switchAutoBuyTab('ledger')" class="px-3 py-1.5 font-semibold rounded-lg text-slate-400 hover:text-white cursor-pointer">
-          <i data-lucide="list-ordered" class="w-3.5 h-3.5 inline mr-1"></i>
-          Simulated Orders Ledger
-          <span id="autobuy-ledger-badge" class="ml-1 px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-800 text-slate-300">0</span>
-        </button>
-      </div>
-
-      <!-- Tab 1: Profile & Settings -->
-      <div id="autobuy-panel-profile" class="flex-1 overflow-y-auto space-y-4 pr-1">
-        <!-- Safety Banner -->
-        <div class="p-3.5 rounded-xl bg-cyan-950/30 border border-cyan-500/30 flex items-start space-x-3 text-xs">
-          <i data-lucide="info" class="w-5 h-5 text-cyan-400 shrink-0 mt-0.5"></i>
-          <div class="space-y-1">
-            <h4 class="font-bold text-cyan-200">Test & Simulation Guarantee</h4>
-            <p class="text-slate-300 text-[11px] leading-relaxed">
-              Whenever <strong>Simulation Mode</strong> is enabled OR if your card/address details are left blank, all sniped purchases are run as <strong>zero-risk paper trading simulations</strong>. 
-              The engine models exact landed costs, reserves stock in memory, logs simulated order IDs, and calculates your projected ROI without charging any money.
-            </p>
-          </div>
-        </div>
-
-        <form id="autobuy-profile-form" onsubmit="app.saveAutoBuyProfile(event)" class="space-y-4 text-xs">
-          <!-- Simulation Mode & Master Toggle -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-950/80 border border-slate-800">
-            <label class="flex items-center space-x-2.5 cursor-pointer">
-              <input type="checkbox" id="ab-simulation-mode" checked class="custom-checkbox">
-              <div>
-                <span class="font-bold text-white block">Simulation Mode (Paper Trading)</span>
-                <span class="text-[10px] text-slate-400">Zero money charged; test what gets sniped & picked</span>
-              </div>
-            </label>
-            <label class="flex items-center space-x-2.5 cursor-pointer">
-              <input type="checkbox" id="ab-autobuy-enabled" class="custom-checkbox">
-              <div>
-                <span class="font-bold text-white block">Auto-Buy on Sniper Hits</span>
-                <span class="text-[10px] text-slate-400">Automatically trigger purchase when deal passes AI gate</span>
-              </div>
-            </label>
-          </div>
-
-          <!-- Shipping Details Section -->
-          <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
-            <h4 class="text-xs font-bold text-white flex items-center pb-2 border-b border-slate-800/80">
-              <i data-lucide="map-pin" class="w-3.5 h-3.5 mr-1.5 text-teal-400"></i>
-              Shipping Address Profile <span class="text-[10px] text-slate-500 font-normal ml-2">(Keep blank to test simulation)</span>
-            </h4>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <div>
-                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Full Recipient Name</label>
-                <input type="text" id="ab-ship-name" placeholder="Leave blank for test mode" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-vinted">
-              </div>
-              <div>
-                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Phone Number (SMS updates)</label>
-                <input type="text" id="ab-ship-phone" placeholder="e.g. 07123456789" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-vinted">
-              </div>
-              <div class="sm:col-span-2">
-                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Address Line 1</label>
-                <input type="text" id="ab-ship-addr1" placeholder="e.g. 10 High Street" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-vinted">
-              </div>
-              <div>
-                <label class="block text-[11px] font-semibold text-slate-300 mb-1">City / Town</label>
-                <input type="text" id="ab-ship-city" placeholder="e.g. Manchester" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-vinted">
-              </div>
-              <div>
-                <label class="block text-[11px] font-semibold text-slate-300 mb-1">UK Postcode</label>
-                <input type="text" id="ab-ship-postcode" placeholder="e.g. M1 1AA" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-vinted">
-              </div>
-            </div>
-          </div>
-
-          <!-- Payment Details Section -->
-          <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
-            <h4 class="text-xs font-bold text-white flex items-center pb-2 border-b border-slate-800/80">
-              <i data-lucide="credit-card" class="w-3.5 h-3.5 mr-1.5 text-cyan-400"></i>
-              Payment Card Profile <span class="text-[10px] text-slate-500 font-normal ml-2">(Keep blank to test simulation · card numbers are masked)</span>
-            </h4>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <div class="sm:col-span-2">
-                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Cardholder Name</label>
-                <input type="text" id="ab-card-name" placeholder="Name on card" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-vinted">
-              </div>
-              <div>
-                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Expiry (MM/YY)</label>
-                <input type="text" id="ab-card-exp" placeholder="MM/YY" maxlength="5" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-vinted">
-              </div>
-              <div class="sm:col-span-2">
-                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Card Number (Stored locally only)</label>
-                <input type="text" id="ab-card-num" placeholder="•••• •••• •••• ••••" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-vinted">
-              </div>
-              <div>
-                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Security Code (CVV)</label>
-                <input type="password" id="ab-card-cvv" placeholder="•••" maxlength="4" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-vinted">
-              </div>
-            </div>
-          </div>
-
-          <!-- Execution Safety Safeguards -->
-          <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
-            <h4 class="text-xs font-bold text-white flex items-center pb-2 border-b border-slate-800/80">
-              <i data-lucide="shield-check" class="w-3.5 h-3.5 mr-1.5 text-emerald-400"></i>
-              Execution Safety Safeguards & Spending Caps
-            </h4>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              <div>
-                <label class="block text-[10px] font-semibold text-slate-400 mb-1">Max Price / Item</label>
-                <div class="relative">
-                  <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center text-slate-400 text-xs font-bold">£</span>
-                  <input type="number" id="ab-max-price" value="45" min="1" max="1000" class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-6 pr-2 py-1.5 text-xs text-emerald-400 font-mono font-bold focus:outline-none">
-                </div>
-              </div>
-              <div>
-                <label class="block text-[10px] font-semibold text-slate-400 mb-1">Daily Spend Cap</label>
-                <div class="relative">
-                  <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center text-slate-400 text-xs font-bold">£</span>
-                  <input type="number" id="ab-daily-cap" value="150" min="1" max="10000" class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-6 pr-2 py-1.5 text-xs text-cyan-300 font-mono font-bold focus:outline-none">
-                </div>
-              </div>
-              <div>
-                <label class="block text-[10px] font-semibold text-slate-400 mb-1">Min AI Score (0-100)</label>
-                <input type="number" id="ab-min-score" value="65" min="10" max="100" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono font-bold focus:outline-none">
-              </div>
-              <div>
-                <label class="block text-[10px] font-semibold text-slate-400 mb-1">Min Net Profit (£)</label>
-                <div class="relative">
-                  <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center text-slate-400 text-xs font-bold">£</span>
-                  <input type="number" id="ab-min-profit" value="15" min="1" max="500" class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-6 pr-2 py-1.5 text-xs text-emerald-400 font-mono font-bold focus:outline-none">
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="pt-2 border-t border-slate-800 flex items-center justify-end gap-2">
-            <button type="button" onclick="app.closeAutoBuyModal()" class="px-3 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer">
-              Cancel
-            </button>
-            <button type="submit" class="btn-primary-glow px-5 py-2 rounded-xl text-xs font-bold text-white transition cursor-pointer">
-              Save Execution Profile
-            </button>
-          </div>
-        </form>
-      </div>
-
-      <!-- Tab 2: Orders Ledger -->
-      <div id="autobuy-panel-ledger" class="flex-1 overflow-y-auto space-y-3.5 pr-1 hidden">
-        <!-- Performance summary strip -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
-            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Capital Deployed</span>
-            <span id="ledger-stat-spend" class="text-lg font-black font-mono text-cyan-300">£0.00</span>
-          </div>
-          <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
-            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Projected Resale</span>
-            <span id="ledger-stat-resale" class="text-lg font-black font-mono text-white">£0.00</span>
-          </div>
-          <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
-            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Total Paper Profit</span>
-            <span id="ledger-stat-profit" class="text-lg font-black font-mono text-emerald-400">+£0.00</span>
-          </div>
-          <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
-            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Simulated ROI</span>
-            <span id="ledger-stat-roi" class="text-lg font-black font-mono text-teal-300">0%</span>
-          </div>
-        </div>
-
-        <div class="flex items-center justify-between text-xs pt-1">
-          <span class="text-slate-400 font-semibold flex items-center">
-            <i data-lucide="history" class="w-3.5 h-3.5 mr-1 text-slate-400"></i>
-            Historical Executed Snipes & Paper Trades
-          </span>
-          <button type="button" onclick="app.clearAutoBuyLedger()" class="text-rose-400 hover:text-rose-300 text-[11px] font-semibold hover:underline cursor-pointer">
-            Clear Ledger History
-          </button>
-        </div>
-
-        <div id="autobuy-orders-container" class="space-y-2.5">
-          <div class="py-12 text-center text-slate-500 text-xs">
-            No simulated orders recorded yet. As bargains appear in Deal Sniper or when you click "Simulate Pick", they will be logged here.
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 1-Click Multi-Site Cross-Listing & Draft Generator Modal -->
-  <div id="crosslist-modal" onclick="if(event.target === this) app.closeCrossListingModal()" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 hidden">
-    <div class="glass-modal rounded-2xl max-w-4xl w-full p-5 sm:p-6 space-y-4 animate-fade-in shadow-2xl max-h-[92vh] flex flex-col">
-      <!-- Header -->
-      <div class="flex items-center justify-between pb-3 border-b border-slate-800 shrink-0">
-        <div class="flex items-center space-x-2.5">
-          <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500/20 to-teal-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-            <i data-lucide="layers" class="w-4 h-4"></i>
-          </div>
-          <div>
-            <h3 class="text-base font-bold text-white flex items-center">
-              1-Click Cross-Listing & Resale Studio
-              <span class="ml-2 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">EBAY UK & DEPOP</span>
-            </h3>
-            <p class="text-xs text-slate-400">Pre-packaged eBay UK listing specifics, Depop aesthetic descriptions, and 20% Vinted offer targets.</p>
-          </div>
-        </div>
-        <button type="button" onclick="app.closeCrossListingModal()" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 cursor-pointer">
-          <i data-lucide="x" class="w-4 h-4"></i>
-        </button>
-      </div>
-
-      <!-- Modal Body (Scrollable) -->
-      <div id="crosslist-modal-body" class="flex-1 overflow-y-auto space-y-4 pr-1">
-        <!-- Rendered dynamically by app.js -->
-      </div>
-    </div>
-  </div>
-
   <!-- Application Logic -->
-  <script src="/static/app.js?v=3.8"></script>
+  <script src="/static/app.js?v=4.0"></script>
 </body>
 </html>
 

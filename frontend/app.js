@@ -99,8 +99,7 @@ class VintedApp {
       this.loadSniperTargetsInfo(),
       this.loadAntiBanStatus(),
       this.loadAIStatus(),
-      this.loadDatabaseSummaryBadges(),
-      this.loadAutoBuyProfile()
+      this.loadDatabaseSummaryBadges()
     ]);
     this.startSchedulerCountdownLoop();
     this.startTerminalPolling();
@@ -1225,17 +1224,13 @@ class VintedApp {
 
     // Header tabs
     const tabSniper = document.getElementById('tab-nav-sniper');
-    const tabArb = document.getElementById('tab-nav-arbitrage');
     const tabDb = document.getElementById('tab-nav-database');
     if (tabSniper) tabSniper.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center bg-teal-500/20 text-teal-300 border border-teal-500/30 shadow-sm cursor-pointer';
-    if (tabArb) tabArb.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer';
     if (tabDb) tabDb.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer';
 
     // Sidebar buttons
     const sniperBtn = document.getElementById('nav-sniper-btn');
     if (sniperBtn) sniperBtn.classList.add('active');
-    const arbBtn = document.getElementById('nav-arbitrage-btn');
-    if (arbBtn) arbBtn.classList.remove('active');
     const dbBtn = document.getElementById('nav-db-explorer-btn');
     if (dbBtn) dbBtn.classList.remove('active');
     
@@ -1244,53 +1239,13 @@ class VintedApp {
     if (itemDetail) itemDetail.classList.add('hidden');
     const dbView = document.getElementById('database-explorer-view');
     if (dbView) dbView.classList.add('hidden');
-    const arbView = document.getElementById('arbitrage-view');
-    if (arbView) arbView.classList.add('hidden');
     
     const sniperView = document.getElementById('sniper-view');
     if (sniperView) sniperView.classList.remove('hidden');
 
     this.renderSidebar();
     this.renderSniperTargets();
-    this.loadAutoBuyLedger();
     if (window.lucide) lucide.createIcons();
-  }
-
-  showArbitrageView() {
-    this.currentSearchId = null;
-    this.isDbExplorerActive = false;
-
-    // Header tabs
-    const tabSniper = document.getElementById('tab-nav-sniper');
-    const tabArb = document.getElementById('tab-nav-arbitrage');
-    const tabDb = document.getElementById('tab-nav-database');
-    if (tabSniper) tabSniper.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer';
-    if (tabArb) tabArb.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm cursor-pointer';
-    if (tabDb) tabDb.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer';
-
-    // Sidebar buttons
-    const sniperBtn = document.getElementById('nav-sniper-btn');
-    if (sniperBtn) sniperBtn.classList.remove('active');
-    const arbBtn = document.getElementById('nav-arbitrage-btn');
-    if (arbBtn) arbBtn.classList.add('active');
-    const dbBtn = document.getElementById('nav-db-explorer-btn');
-    if (dbBtn) dbBtn.classList.remove('active');
-
-    // View containers
-    const itemDetail = document.getElementById('item-detail-view');
-    if (itemDetail) itemDetail.classList.add('hidden');
-    const sniperView = document.getElementById('sniper-view');
-    if (sniperView) sniperView.classList.add('hidden');
-    const dbView = document.getElementById('database-explorer-view');
-    if (dbView) dbView.classList.add('hidden');
-
-    const arbView = document.getElementById('arbitrage-view');
-    if (arbView) arbView.classList.remove('hidden');
-
-    this.renderSidebar();
-    if (window.lucide) lucide.createIcons();
-
-    this.loadTodaysArbitragePicks(this.currentArbitrageSector || 'all', false);
   }
 
   async selectSearch(id) {
@@ -1304,23 +1259,17 @@ class VintedApp {
 
     // Header tabs
     const tabSniper = document.getElementById('tab-nav-sniper');
-    const tabArb = document.getElementById('tab-nav-arbitrage');
     const tabDb = document.getElementById('tab-nav-database');
     if (tabSniper) tabSniper.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer';
-    if (tabArb) tabArb.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer';
     if (tabDb) tabDb.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer';
 
     const sniperBtn = document.getElementById('nav-sniper-btn');
     if (sniperBtn) sniperBtn.classList.remove('active');
-    const arbBtn = document.getElementById('nav-arbitrage-btn');
-    if (arbBtn) arbBtn.classList.remove('active');
     const dbBtn = document.getElementById('nav-db-explorer-btn');
     if (dbBtn) dbBtn.classList.remove('active');
 
     const sniperView = document.getElementById('sniper-view');
     if (sniperView) sniperView.classList.add('hidden');
-    const arbView = document.getElementById('arbitrage-view');
-    if (arbView) arbView.classList.add('hidden');
     const dbView = document.getElementById('database-explorer-view');
     if (dbView) dbView.classList.add('hidden');
 
@@ -1337,16 +1286,12 @@ class VintedApp {
 
     // Header tabs
     const tabSniper = document.getElementById('tab-nav-sniper');
-    const tabArb = document.getElementById('tab-nav-arbitrage');
     const tabDb = document.getElementById('tab-nav-database');
     if (tabSniper) tabSniper.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer';
-    if (tabArb) tabArb.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer';
     if (tabDb) tabDb.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shadow-sm cursor-pointer';
 
     const sniperBtn = document.getElementById('nav-sniper-btn');
     if (sniperBtn) sniperBtn.classList.remove('active');
-    const arbBtn = document.getElementById('nav-arbitrage-btn');
-    if (arbBtn) arbBtn.classList.remove('active');
     const dbBtn = document.getElementById('nav-db-explorer-btn');
     if (dbBtn) dbBtn.classList.add('active');
 
@@ -1354,8 +1299,6 @@ class VintedApp {
     if (itemDetail) itemDetail.classList.add('hidden');
     const sniperView = document.getElementById('sniper-view');
     if (sniperView) sniperView.classList.add('hidden');
-    const arbView = document.getElementById('arbitrage-view');
-    if (arbView) arbView.classList.add('hidden');
 
     const dbView = document.getElementById('database-explorer-view');
     if (dbView) dbView.classList.remove('hidden');
@@ -2702,13 +2645,6 @@ class VintedApp {
         ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-teal-300 border border-slate-700 font-mono">${this.escapeHtmlAttr(deal.liquidity_rating)}</span>`
         : '';
 
-      const autobuyBadge = deal.autobuy_order
-        ? `<div class="px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center">
-             <i data-lucide="zap" class="w-3 h-3 mr-1 text-cyan-400"></i>
-             ${deal.autobuy_order.is_simulation ? '🧪 SIMULATED PICK' : '⚡ LIVE BUY'} · #${this.escapeHtmlAttr(deal.autobuy_order.order_id)}
-           </div>`
-        : '';
-
       return `
         <div class="deal-card deal-card-new p-4 rounded-2xl flex flex-col justify-between space-y-3 relative group" data-deal-id="${deal.id}" tabindex="0" onclick="app.setFocusedDealById('${deal.id}')">
           <!-- Dismiss button -->
@@ -2786,8 +2722,6 @@ class VintedApp {
               <span class="text-emerald-400">Projected Net Profit:</span>
               <span class="font-mono text-emerald-400 font-extrabold tabular-nums">+£${netProfit.toFixed(2)} <span class="text-[10px] text-emerald-400/80 font-normal">(${roiPct.toFixed(0)}% ROI)</span></span>
             </div>
-
-            ${autobuyBadge}
           </div>
 
           <!-- Bottom bar: Size, Condition & Action Buttons -->
@@ -2800,13 +2734,6 @@ class VintedApp {
             </div>
 
             <div class="flex items-center space-x-1.5 shrink-0">
-              <button type="button" 
-                      onclick="event.stopPropagation(); app.simulateBuyDeal('${deal.id}')" 
-                      class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 transition cursor-pointer flex items-center" 
-                      title="Simulate paper trading automated purchase">
-                <i data-lucide="play" class="w-3 h-3 mr-1 fill-current"></i>
-                <span>Sim Pick</span>
-              </button>
 
               ${vintedUrl ? `
                 <a href="${vintedUrl}" target="_blank" rel="noopener noreferrer" class="btn-primary-glow inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-bold text-white transition shadow-sm cursor-pointer shrink-0">
@@ -3515,6 +3442,9 @@ class VintedApp {
   }
 
   async loadDatabaseExplorerData() {
+    const refreshIcon = document.getElementById('db-refresh-icon');
+    if (refreshIcon) refreshIcon.classList.add('animate-spin');
+
     try {
       const [analyticsRes, monthlyRes] = await Promise.all([
         fetch('/api/database/analytics'),
@@ -3537,6 +3467,9 @@ class VintedApp {
     } catch (err) {
       console.error('Failed to load database explorer data:', err);
       this.showToast('Failed to load database explorer data', 'error');
+    } finally {
+      if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+      if (window.lucide) lucide.createIcons();
     }
   }
 
@@ -4932,6 +4865,33 @@ class VintedApp {
   applyAntiBanStatusUI(status, populateInputs = false) {
     if (!status) return;
 
+    // Header proxy button live status dot
+    const headerProxyDot = document.getElementById('header-proxy-status-dot');
+    if (headerProxyDot) {
+      if (status.circuit_breaker_active) {
+        headerProxyDot.className = 'ml-1.5 w-2 h-2 rounded-full bg-rose-400 pulse-live';
+      } else if (status.is_proxied) {
+        headerProxyDot.className = 'ml-1.5 w-2 h-2 rounded-full bg-emerald-400';
+      } else {
+        headerProxyDot.className = 'ml-1.5 w-2 h-2 rounded-full bg-amber-400';
+      }
+    }
+
+    // Sidebar proxy count badge
+    const sidebarProxyCount = document.getElementById('sidebar-proxy-count');
+    if (sidebarProxyCount) {
+      if (status.circuit_breaker_active) {
+        sidebarProxyCount.className = 'px-2 py-0.5 text-[10px] font-mono font-bold rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30';
+        sidebarProxyCount.textContent = 'COOLDOWN';
+      } else if (status.is_proxied) {
+        sidebarProxyCount.className = 'px-2 py-0.5 text-[10px] font-mono font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+        sidebarProxyCount.textContent = `${status.total_proxies_count} PROXIES`;
+      } else {
+        sidebarProxyCount.className = 'px-2 py-0.5 text-[10px] font-mono font-bold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30';
+        sidebarProxyCount.textContent = 'DIRECT IP';
+      }
+    }
+
     // Header badge
     const headerBadge = document.getElementById('header-antiban-badge');
     if (headerBadge) {
@@ -5658,9 +5618,6 @@ class VintedApp {
     this.closeDatabaseModal();
     this.closeAntiBanModal();
     this.closeAIModal();
-    this.closeArbitrageModal();
-    this.closeAutoBuyModal();
-    this.closeCrossListingModal();
     this.closeShortcutsModal();
     this.closeScraperTerminal();
     const mobDrawer = document.getElementById('mobile-items-drawer');
@@ -6478,6 +6435,7 @@ class VintedApp {
   async researchVariantsFromSniper(searchId) {
     if (!searchId) return;
     const btn = document.getElementById(`btn-sniper-research-${searchId}`);
+    const orig = btn ? btn.innerHTML : '';
     if (btn) {
       btn.disabled = true;
       btn.innerHTML = '<i data-lucide="loader-2" class="w-3 h-3 mr-1 animate-spin"></i><span>Researching…</span>';
@@ -6499,6 +6457,12 @@ class VintedApp {
       this.showToast(`Ready! Discovered ${(data.models || []).length} product models for Deal Sniper.`, 'success');
     } catch (err) {
       this.showToast(err.message, 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        if (window.lucide) lucide.createIcons();
+      }
       this.renderSniperTargets();
     }
   }
@@ -6980,610 +6944,7 @@ class VintedApp {
     await this.saveItemVariantTags(itemId, ids);
   }
 
-  // ── Today's Top Arbitrage Picks & Cross-Market Intelligence ────────────────
-
-  openArbitrageModal() {
-    this.showArbitrageView();
-  }
-
-  closeArbitrageModal() {
-    const modal = document.getElementById('arbitrage-modal');
-    if (modal) modal.classList.add('hidden');
-  }
-
-  switchArbitrageViewMode(mode = 'active') {
-    this.arbitrageViewMode = mode;
-    const btnActive = document.getElementById('arb-tab-btn-active');
-    const btnPredicted = document.getElementById('arb-tab-btn-predicted');
-    const containerActive = document.getElementById('arb-top-picks-container');
-    const containerPredicted = document.getElementById('arb-predicted-products-container');
-
-    if (mode === 'active') {
-      if (btnActive) btnActive.className = 'flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center cursor-pointer bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm';
-      if (btnPredicted) btnPredicted.className = 'flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center justify-center cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700';
-      if (containerActive) containerActive.classList.remove('hidden');
-      if (containerPredicted) containerPredicted.classList.add('hidden');
-    } else {
-      if (btnActive) btnActive.className = 'flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center justify-center cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700';
-      if (btnPredicted) btnPredicted.className = 'flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center cursor-pointer bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm';
-      if (containerActive) containerActive.classList.add('hidden');
-      if (containerPredicted) containerPredicted.classList.remove('hidden');
-      if (this.predictedProductsList) {
-        this.renderPredictedProducts(this.predictedProductsList);
-      }
-    }
-    if (window.lucide) lucide.createIcons();
-  }
-
-  async loadTodaysArbitragePicks(sector = 'all', forceRefresh = false) {
-    this.currentArbitrageSector = sector || 'all';
-
-    const btnRefresh = document.getElementById('btn-refresh-top-picks');
-    const iconRefresh = document.getElementById('icon-refresh-top-picks');
-    const loadingBox = document.getElementById('arb-picks-loading');
-    const emptyBox = document.getElementById('arb-picks-empty');
-    const container = document.getElementById('arb-top-picks-container');
-
-    if (btnRefresh) btnRefresh.disabled = true;
-    if (iconRefresh) iconRefresh.classList.add('animate-spin');
-
-    // Show loading state if forcing refresh or no container contents
-    if (forceRefresh || !container || container.children.length === 0) {
-      if (loadingBox) loadingBox.classList.remove('hidden');
-      if (emptyBox) emptyBox.classList.add('hidden');
-      if (container) container.innerHTML = '';
-    }
-
-    try {
-      const url = `/api/arbitrage/top-picks?sector=${encodeURIComponent(this.currentArbitrageSector)}&force_refresh=${forceRefresh ? 'true' : 'false'}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to load today\'s top arbitrage picks');
-
-      this.cachedArbitrageData = data;
-      this.arbitragePicksMap = new Map();
-      this.predictedProductsList = Array.isArray(data.predicted_products) ? data.predicted_products : [];
-
-      const picks = Array.isArray(data.picks) ? data.picks : [];
-      picks.forEach(p => {
-        if (p.id) this.arbitragePicksMap.set(String(p.id), p);
-      });
-
-      // Update Market Pulse Strip
-      const pulse = data.market_pulse || {};
-      const elPulseTotal = document.getElementById('arb-pulse-total-picks');
-      if (elPulseTotal) elPulseTotal.textContent = `${pulse.total_picks || picks.length} Deals`;
-
-      const elPulseMaxProfit = document.getElementById('arb-pulse-max-profit');
-      if (elPulseMaxProfit) elPulseMaxProfit.textContent = `+£${Number(pulse.highest_net_profit_gbp || 0).toFixed(2)}`;
-
-      const elPulseCasual = document.getElementById('arb-pulse-casual-count');
-      if (elPulseCasual) elPulseCasual.textContent = `${pulse.casual_seller_picks_count || 0} Clearouts`;
-
-      const elPulseAvgRoi = document.getElementById('arb-pulse-avg-roi');
-      if (elPulseAvgRoi) elPulseAvgRoi.textContent = `${Number(pulse.average_roi_pct || 0).toFixed(0)}% ROI`;
-
-      // Update switcher badges
-      const elTabBadgeActive = document.getElementById('arb-tab-badge-active');
-      if (elTabBadgeActive) elTabBadgeActive.textContent = picks.length;
-      const elTabBadgePred = document.getElementById('arb-tab-badge-predicted');
-      if (elTabBadgePred) elTabBadgePred.textContent = this.predictedProductsList.length;
-
-      // Update sector count badges
-      const sectorCounts = pulse.sector_counts || {};
-      const elCntAll = document.getElementById('arb-sector-cnt-all');
-      if (elCntAll) elCntAll.textContent = sectorCounts.all ?? picks.length;
-      const elCntOuter = document.getElementById('arb-sector-cnt-outerwear');
-      if (elCntOuter) elCntOuter.textContent = sectorCounts.outerwear ?? 0;
-      const elCntStreet = document.getElementById('arb-sector-cnt-streetwear');
-      if (elCntStreet) elCntStreet.textContent = sectorCounts.streetwear ?? 0;
-      const elCntKnit = document.getElementById('arb-sector-cnt-knitwear');
-      if (elCntKnit) elCntKnit.textContent = sectorCounts.knitwear ?? 0;
-      const elCntFoot = document.getElementById('arb-sector-cnt-footwear');
-      if (elCntFoot) elCntFoot.textContent = sectorCounts.footwear ?? 0;
-      const elCntSport = document.getElementById('arb-sector-cnt-sportswear');
-      if (elCntSport) elCntSport.textContent = sectorCounts.sportswear ?? 0;
-
-      // Update timestamp
-      const elTime = document.getElementById('arb-last-scanned-time');
-      if (elTime && data.scanned_at) {
-        const d = new Date(data.scanned_at);
-        elTime.textContent = `Scanned ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-      }
-
-      // Update sidebar badge
-      const sideBadge = document.getElementById('sidebar-arbitrage-badge');
-      if (sideBadge) {
-        sideBadge.textContent = picks.length > 0 ? `${picks.length} HOT` : '0';
-      }
-
-      this.renderTodaysTopPicks(picks);
-      this.renderPredictedProducts(this.predictedProductsList);
-    } catch (err) {
-      console.error('Arbitrage Picks Error:', err);
-      this.showToast(err.message, 'error');
-      if (container) {
-        container.innerHTML = `
-          <div class="py-12 text-center text-rose-400 space-y-2 glass-panel rounded-2xl border border-rose-500/30">
-            <i data-lucide="alert-triangle" class="w-8 h-8 mx-auto text-rose-500"></i>
-            <h4 class="text-sm font-bold">Failed to load Top Arbitrage Picks</h4>
-            <p class="text-xs text-rose-300 max-w-md mx-auto">${this.escapeHtmlAttr(err.message)}</p>
-          </div>
-        `;
-      }
-    } finally {
-      if (loadingBox) loadingBox.classList.add('hidden');
-      if (btnRefresh) btnRefresh.disabled = false;
-      if (iconRefresh) iconRefresh.classList.remove('animate-spin');
-      if (window.lucide) lucide.createIcons();
-    }
-  }
-
-  filterArbitrageSector(sector) {
-    this.currentArbitrageSector = sector || 'all';
-
-    // Update button active states
-    const filterButtons = document.querySelectorAll('#arb-sector-filters button');
-    filterButtons.forEach(btn => {
-      btn.className = 'px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700';
-    });
-
-    const activeBtn = document.getElementById(`arb-sector-btn-${sector}`);
-    if (activeBtn) {
-      activeBtn.className = 'px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center cursor-pointer bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm';
-    }
-
-    if (this.cachedArbitrageData && Array.isArray(this.cachedArbitrageData.picks)) {
-      const allPicks = this.cachedArbitrageData.picks;
-      const filtered = (sector === 'all')
-        ? allPicks
-        : allPicks.filter(p => (p.sector || '').toLowerCase() === sector.toLowerCase());
-      this.renderTodaysTopPicks(filtered);
-
-      const allPred = this.predictedProductsList || [];
-      const filteredPred = (sector === 'all')
-        ? allPred
-        : allPred.filter(p => (p.sector || '').toLowerCase() === sector.toLowerCase());
-      this.renderPredictedProducts(filteredPred);
-    } else {
-      this.loadTodaysArbitragePicks(sector, false);
-    }
-  }
-
-  triggerArbitrageRefresh() {
-    this.loadTodaysArbitragePicks(this.currentArbitrageSector || 'all', true);
-  }
-
-  renderTodaysTopPicks(picks) {
-    const container = document.getElementById('arb-top-picks-container');
-    const emptyBox = document.getElementById('arb-picks-empty');
-    if (!container) return;
-
-    if (!picks || picks.length === 0) {
-      container.innerHTML = '';
-      if (emptyBox) emptyBox.classList.remove('hidden');
-      if (window.lucide) lucide.createIcons();
-      return;
-    }
-
-    if (emptyBox) emptyBox.classList.add('hidden');
-
-    container.innerHTML = picks.map(p => {
-      const rawPrice = Number(p.price != null ? p.price : (p.vinted_asking_price || 0));
-      const landedCost = Number(p.vinted_landed_cost || (rawPrice + 0.70 + (rawPrice * 0.05) + 2.95 + 0.60));
-      const ebaySold = Number(p.ebay_sold_median || 0);
-      const netSpread = Number(p.net_flip_profit != null ? p.net_flip_profit : (p.spread_gbp || 0));
-      const roiPct = Number(p.roi_pct != null ? p.roi_pct : (p.projected_roi_pct || 0));
-      const photoHtml = p.photo_url
-        ? `<img src="${this.escapeHtmlAttr(p.photo_url)}" alt="${this.escapeHtmlAttr(p.title)}" class="w-full h-full object-cover">`
-        : `<div class="w-full h-full flex items-center justify-center text-slate-600"><i data-lucide="image" class="w-6 h-6"></i></div>`;
-
-      const vintedUrl = p.url || `https://www.vinted.co.uk/items/${p.id}`;
-      const exactEbayUrl = p.exact_ebay_sold_url || p.ebay_verification_url || `https://www.ebay.co.uk/sch/i.html?_nkw=${encodeURIComponent(p.ebay_query || p.ebay_verified_model || p.brand || p.title)}&LH_Sold=1&LH_Complete=1&_sop=13`;
-      const isUnmarked = p.is_unmarked_asymmetry;
-      const depopComp = p.depop_comp;
-      const offerTarget = p.offer_target;
-      const lensUrl = p.google_lens_url;
-
-      // Determine highest net payout platform
-      const bestProfit = depopComp && depopComp.is_depop_superior ? Number(depopComp.depop_net_profit || netSpread) : netSpread;
-      const bestRoi = depopComp && depopComp.is_depop_superior ? Number(depopComp.depop_roi_pct || roiPct) : roiPct;
-      const bestPlatform = depopComp && depopComp.is_depop_superior ? 'Depop' : 'eBay UK';
-
-      return `
-        <div class="p-4 rounded-2xl bg-slate-950/85 border border-slate-800/80 hover:border-amber-500/50 transition flex flex-col space-y-3 shadow-lg">
-          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <!-- Left Thumbnail + Item Details -->
-            <div class="flex items-start space-x-3.5 flex-1 min-w-0">
-              <div class="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 shrink-0">
-                ${photoHtml}
-                <span class="absolute bottom-1 right-1 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-black/85 text-white">£${rawPrice.toFixed(0)}</span>
-                <span class="absolute top-1 left-1 px-1.5 py-0.2 rounded text-[8px] font-mono font-bold bg-emerald-500 text-slate-950">ACTIVE</span>
-              </div>
-
-              <div class="space-y-1.5 flex-1 min-w-0">
-                <!-- Title -->
-                <div>
-                  <h4 class="text-sm sm:text-base font-bold text-white hover:text-amber-300 transition truncate">
-                    <a href="${this.escapeHtmlAttr(vintedUrl)}" target="_blank" rel="noopener noreferrer">
-                      ${this.escapeHtmlAttr(p.title)}
-                    </a>
-                  </h4>
-                  ${isUnmarked ? `
-                    <p class="text-xs text-amber-300 font-medium pt-0.5 flex items-center">
-                      <i data-lucide="sparkles" class="w-3 h-3 mr-1 text-amber-400"></i>
-                      <span>Casual Clearout: Identified as <strong>${this.escapeHtmlAttr(p.ebay_verified_model || '')}</strong></span>
-                    </p>
-                  ` : ''}
-                </div>
-
-                <!-- Clean Metadata Row -->
-                <div class="text-xs text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                  <span>Brand: <strong class="text-slate-200">${this.escapeHtmlAttr(p.brand || 'Apparel')}</strong></span>
-                  <span class="text-slate-600">•</span>
-                  <span>Size: <strong class="text-slate-200">${this.escapeHtmlAttr(p.size || 'Standard')}</strong></span>
-                  <span class="text-slate-600">•</span>
-                  <span>Condition: <strong class="text-slate-200">${this.escapeHtmlAttr(p.condition || 'Very Good')}</strong></span>
-                  ${p.exact_colorway && p.exact_colorway !== 'Standard / Classic' ? `
-                    <span class="text-slate-600">•</span>
-                    <span>Color: <strong class="text-indigo-300">${this.escapeHtmlAttr(p.exact_colorway)}</strong></span>
-                  ` : ''}
-                  <span class="text-slate-600">•</span>
-                  <span>Landed: <strong class="text-slate-300 font-mono">£${landedCost.toFixed(2)}</strong></span>
-                </div>
-
-                <!-- Dual Destination Marketplace Comps (eBay UK + Depop) -->
-                <div class="flex flex-wrap items-center gap-2 pt-1 text-xs">
-                  <!-- eBay UK Comp Box -->
-                  <div class="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-emerald-300">
-                    <i data-lucide="check-circle-2" class="w-3.5 h-3.5 mr-1.5 text-emerald-400"></i>
-                    <span class="font-bold font-mono">eBay UK Sold: £${ebaySold.toFixed(2)}</span>
-                    ${p.recent_sales_count ? `<span class="text-[10px] text-emerald-400/80 ml-1.5 font-mono">(${p.recent_sales_count} sold)</span>` : ''}
-                  </div>
-
-                  <a href="${this.escapeHtmlAttr(exactEbayUrl)}" 
-                     target="_blank" 
-                     rel="noopener noreferrer" 
-                     class="inline-flex items-center px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-300 hover:text-amber-200 border border-slate-700/80 hover:border-amber-400/50 text-xs font-semibold transition cursor-pointer shadow-sm"
-                     title="${this.escapeHtmlAttr(p.sold_comp_proof || 'Verify completed and sold listings on eBay UK matching this exact model, colorway, and size')}">
-                    <i data-lucide="search" class="w-3 h-3 mr-1 text-amber-400"></i>
-                    <span>eBay Comps</span>
-                    <i data-lucide="external-link" class="w-3 h-3 ml-1 text-slate-400"></i>
-                  </a>
-
-                  ${depopComp ? `
-                    <!-- Depop UK Demographic Comp Box (0% Seller Fees) -->
-                    <div class="inline-flex items-center px-2.5 py-1 rounded-lg bg-rose-950/40 border border-rose-500/30 text-rose-300">
-                      <i data-lucide="sparkles" class="w-3.5 h-3.5 mr-1.5 text-rose-400"></i>
-                      <span class="font-bold font-mono">Depop: £${Number(depopComp.depop_sold_median || 0).toFixed(2)}</span>
-                      <span class="text-[10px] text-rose-400/80 ml-1.5 font-mono">(${Number(depopComp.depop_str_pct || 65).toFixed(0)}% STR)</span>
-                    </div>
-
-                    <a href="${this.escapeHtmlAttr(depopComp.depop_search_url)}" 
-                       target="_blank" 
-                       rel="noopener noreferrer" 
-                       class="inline-flex items-center px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-rose-300 hover:text-rose-200 border border-slate-700/80 hover:border-rose-400/50 text-xs font-semibold transition cursor-pointer shadow-sm">
-                      <span>Depop Market</span>
-                      <i data-lucide="external-link" class="w-3 h-3 ml-1 text-slate-400"></i>
-                    </a>
-
-                    ${depopComp.is_depop_superior ? `
-                      <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-rose-500/20 to-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                        ⚡ +£${Number(depopComp.profit_delta_vs_ebay || 0).toFixed(2)} More on Depop
-                      </span>
-                    ` : ''}
-                  ` : ''}
-                </div>
-              </div>
-            </div>
-
-            <!-- Right Financials & Action Buttons -->
-            <div class="flex items-center justify-between lg:justify-end gap-3.5 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-800/80">
-              <div class="text-left lg:text-right font-mono">
-                <div class="text-xl font-black text-emerald-400">
-                  +£${bestProfit.toFixed(2)}
-                </div>
-                <div class="flex items-center lg:justify-end space-x-1.5">
-                  <span class="text-xs font-bold text-teal-300">${bestRoi.toFixed(0)}% ROI</span>
-                  <span class="text-[11px] text-slate-400 font-sans">via ${bestPlatform}</span>
-                </div>
-              </div>
-
-              <div class="flex items-center space-x-1.5">
-                <a href="${this.escapeHtmlAttr(vintedUrl)}" 
-                   target="_blank" 
-                   rel="noopener noreferrer" 
-                   class="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-slate-700 transition flex items-center cursor-pointer">
-                  <i data-lucide="shopping-bag" class="w-3.5 h-3.5 mr-1 text-teal-400"></i>
-                  <span>Buy</span>
-                </a>
-
-                <button type="button" 
-                        onclick="app.snipeArbitragePick('${this.escapeHtmlAttr(String(p.id))}')" 
-                        class="px-3 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition flex items-center cursor-pointer shadow-sm">
-                  <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1"></i>
-                  <span>Snipe</span>
-                </button>
-
-                <button type="button" 
-                        onclick="app.openCrossListingModal('${this.escapeHtmlAttr(String(p.id))}')" 
-                        class="px-3 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center cursor-pointer shadow-sm"
-                        title="Open 1-Click Cross-Listing Draft Studio (eBay + Depop)">
-                  <i data-lucide="layers" class="w-3.5 h-3.5 mr-1"></i>
-                  <span>Draft Flip</span>
-                </button>
-
-                ${lensUrl ? `
-                  <a href="${this.escapeHtmlAttr(lensUrl)}" 
-                     target="_blank" 
-                     rel="noopener noreferrer" 
-                     class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-800 hover:border-cyan-500/30 transition flex items-center cursor-pointer"
-                     title="Visual Lens Reverse Image Verification">
-                    <i data-lucide="scan" class="w-3.5 h-3.5"></i>
-                  </a>
-                ` : ''}
-
-                <button type="button" 
-                        onclick="app.simBuyArbitragePick('${this.escapeHtmlAttr(String(p.id))}')" 
-                        class="px-2 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-purple-300 border border-slate-800 hover:border-purple-500/30 transition flex items-center cursor-pointer" 
-                        title="Simulate Paper Flip in Ledger">
-                  <i data-lucide="flask-conical" class="w-3.5 h-3.5"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- 20% Vinted Lowball Target Strip -->
-          ${offerTarget ? `
-            <div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-900/50 border border-slate-800/80 text-xs">
-              <div class="flex items-center space-x-2">
-                <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  🎯 20% OFFER TARGET
-                </span>
-                <span class="text-slate-300 text-xs">
-                  Offer <strong class="text-amber-300 font-mono">£${Number(offerTarget.offer_20_price).toFixed(2)}</strong> (save £${Number(offerTarget.offer_discount_gbp).toFixed(2)}) 
-                  → Flips for up to <strong class="text-emerald-400 font-mono">+£${Number(offerTarget.max_offer_profit).toFixed(2)} Profit</strong>
-                </span>
-              </div>
-              <button type="button" 
-                      onclick="app.copyToClipboard('${Number(offerTarget.offer_20_price).toFixed(2)}', '20% Offer Amount (£${Number(offerTarget.offer_20_price).toFixed(2)})')" 
-                      class="px-2 py-1 rounded-lg text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition cursor-pointer flex items-center">
-                <i data-lucide="copy" class="w-3 h-3 mr-1"></i>
-                <span>Copy £${Number(offerTarget.offer_20_price).toFixed(2)} Offer</span>
-              </button>
-            </div>
-          ` : ''}
-        </div>
-      `;
-    }).join('');
-
-    if (window.lucide) lucide.createIcons();
-  }
-
-  renderPredictedProducts(products) {
-    const container = document.getElementById('arb-predicted-products-container');
-    if (!container) return;
-
-    if (!products || products.length === 0) {
-      container.innerHTML = `
-        <div class="py-12 text-center text-slate-500 space-y-2 glass-panel rounded-2xl border border-slate-800">
-          <i data-lucide="brain" class="w-8 h-8 mx-auto text-purple-400"></i>
-          <h4 class="text-sm font-bold text-white">No AI Product Targets for this Sector</h4>
-          <p class="text-xs text-slate-400">Select "All Sectors" to see high-inefficiency products across all categories.</p>
-        </div>
-      `;
-      if (window.lucide) lucide.createIcons();
-      return;
-    }
-
-    container.innerHTML = `
-      <div class="p-4 rounded-2xl bg-gradient-to-r from-purple-950/30 via-slate-900/60 to-purple-950/30 border border-purple-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 mb-4">
-        <div class="space-y-1">
-          <div class="flex items-center space-x-2">
-            <i data-lucide="brain-circuit" class="w-4 h-4 text-purple-400"></i>
-            <h3 class="text-sm font-bold text-white">AI-Calculated High-Inefficiency Resale Blueprints</h3>
-          </div>
-          <p class="text-xs text-purple-200/80">
-            These models suffer from persistent information asymmetry: uneducated casual sellers routinely list them far below fair market value. 
-            Click <strong>"Auto-Snipe This Product"</strong> to deploy Deal Sniper with tailored buy ceilings and vague-search keyword traps.
-          </p>
-        </div>
-        <span class="px-3 py-1 rounded-xl text-xs font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 shrink-0">
-          ${products.length} High-Yield Blueprints
-        </span>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        ${products.map(b => {
-          const exploits = Array.isArray(b.vague_search_exploits) ? b.vague_search_exploits : [];
-
-          return `
-            <div class="p-5 rounded-2xl bg-slate-950/90 border border-slate-800 hover:border-purple-500/50 transition flex flex-col justify-between space-y-4 shadow-lg">
-              <div class="space-y-3">
-                <div class="flex items-start justify-between gap-3">
-                  <div>
-                    <div class="flex items-center gap-1.5 mb-1">
-                      <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                        ${this.escapeHtmlAttr(b.sector_label || 'High Alpha')}
-                      </span>
-                      <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300">
-                        ${this.escapeHtmlAttr(b.brand)}
-                      </span>
-                      <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                        Alpha ${b.alpha_score}/100
-                      </span>
-                    </div>
-                    <h4 class="text-base font-bold text-white">${this.escapeHtmlAttr(b.product_name)}</h4>
-                  </div>
-                  <div class="text-right shrink-0 font-mono">
-                    <div class="text-lg font-black text-emerald-400">+£${Number(b.projected_net_profit_gbp || 0).toFixed(2)}</div>
-                    <div class="text-xs font-bold text-teal-300">${Number(b.projected_roi_pct || 0).toFixed(0)}% ROI</div>
-                  </div>
-                </div>
-
-                <!-- 4 Metrics Blueprint Strip -->
-                <div class="grid grid-cols-4 gap-1.5 p-2.5 rounded-xl bg-slate-900/90 text-center text-xs font-mono border border-slate-800">
-                  <div>
-                    <span class="text-[10px] text-slate-500 uppercase block">Buy Target</span>
-                    <strong class="text-amber-300">≤£${Number(b.target_buy_ceiling_gbp || 0).toFixed(0)}</strong>
-                  </div>
-                  <div>
-                    <span class="text-[10px] text-slate-500 uppercase block">eBay Median</span>
-                    <strong class="text-emerald-400">£${Number(b.predicted_ebay_sold_median || 0).toFixed(0)}</strong>
-                  </div>
-                  <div>
-                    <span class="text-[10px] text-slate-500 uppercase block">Resale Range</span>
-                    <strong class="text-slate-300">${this.escapeHtmlAttr(b.predicted_sold_range || '')}</strong>
-                  </div>
-                  <div>
-                    <span class="text-[10px] text-slate-500 uppercase block">Turnover</span>
-                    <strong class="text-cyan-300">${Number(b.historical_turnover_days || 2).toFixed(1)}d</strong>
-                  </div>
-                </div>
-
-                <p class="text-xs text-slate-300 leading-relaxed bg-slate-900/50 p-2.5 rounded-xl border border-slate-800/80">
-                  ${this.escapeHtmlAttr(b.rationale || '')}
-                </p>
-
-                <!-- Vague Keyword Traps Strip -->
-                ${exploits.length > 0 ? `
-                  <div class="space-y-1.5">
-                    <span class="text-[10px] font-bold text-purple-300 uppercase tracking-wider block flex items-center">
-                      <i data-lucide="target" class="w-3 h-3 mr-1 text-purple-400"></i>
-                      Casual Seller Vague Keyword Exploits:
-                    </span>
-                    <div class="flex flex-wrap gap-1.5">
-                      ${exploits.map(ex => `
-                        <span class="px-2 py-0.5 rounded-lg text-[11px] font-mono bg-slate-900 text-purple-200 border border-purple-500/20">
-                          "${this.escapeHtmlAttr(ex)}"
-                        </span>
-                      `).join('')}
-                    </div>
-                  </div>
-                ` : ''}
-
-                <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-                  <span class="flex items-center text-amber-300">
-                    <i data-lucide="zap" class="w-3 h-3 mr-1"></i>
-                    ${this.escapeHtmlAttr(b.mispricing_frequency || 'High Influx')}
-                  </span>
-                  <span>Turnover: ${this.escapeHtmlAttr(b.turnover_speed || '< 48 hrs')}</span>
-                </div>
-              </div>
-
-              <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-3">
-                <a href="https://www.ebay.co.uk/sch/i.html?_nkw=${encodeURIComponent(b.product_name)}&LH_Sold=1&LH_Complete=1&_sop=13" 
-                   target="_blank" 
-                   rel="noopener noreferrer" 
-                   class="text-xs font-semibold text-slate-400 hover:text-amber-300 flex items-center transition">
-                  <i data-lucide="search" class="w-3.5 h-3.5 mr-1 text-amber-400"></i>
-                  <span>Verify eBay Comps</span>
-                </a>
-
-                <button type="button" 
-                        onclick="app.targetPredictedProduct('${this.escapeHtmlAttr(b.product_id)}')" 
-                        class="btn-primary-glow px-4 py-2 rounded-xl text-xs font-bold text-white transition flex items-center cursor-pointer shadow-md">
-                  <i data-lucide="crosshair" class="w-3.5 h-3.5 mr-1.5"></i>
-                  <span>Auto-Snipe This Product (≤ £${Number(b.target_buy_ceiling_gbp || 0).toFixed(0)})</span>
-                </button>
-              </div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    `;
-
-    if (window.lucide) lucide.createIcons();
-  }
-
-  async targetPredictedProduct(productId) {
-    if (!productId) return;
-    try {
-      this.showToast('Deploying Deal Sniper onto AI product blueprint...', 'info');
-
-      const res = await fetch('/api/arbitrage/target-product', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product_id: productId })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to target predicted product');
-
-      await this.loadSearches();
-      await this.loadSniperTargetsInfo();
-
-      this.showToast(data.message || `🎯 Deal Sniper armed for '${data.search_text}' with buy ceiling ≤ £${data.max_price}!`, 'success');
-      this.showSniperView();
-    } catch (err) {
-      this.showToast(err.message, 'error');
-    }
-  }
-
-  async snipeArbitragePick(pickId) {
-    const pick = this.arbitragePicksMap?.get(String(pickId));
-    if (!pick) {
-      this.showToast('Could not find pick details.', 'error');
-      return;
-    }
-
-    try {
-      this.showToast(`Locking Deal Sniper onto '${pick.ebay_verified_model || pick.title}'...`, 'info');
-      const res = await fetch('/api/arbitrage/snipe-pick', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: pick.title,
-          brand: pick.brand,
-          ebay_verified_model: pick.ebay_verified_model,
-          recommended_snipe_cap: pick.recommended_snipe_cap,
-          vinted_item_id: pick.id,
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to add pick to Deal Sniper');
-
-      await this.loadSearches();
-      await this.loadSniperTargetsInfo();
-
-      this.showToast(`🎯 Added '${pick.ebay_verified_model || pick.brand}' to Deal Sniper with cap ≤ £${Number(pick.recommended_snipe_cap || 35).toFixed(0)}!`, 'success');
-      this.showSniperView();
-    } catch (err) {
-      this.showToast(err.message, 'error');
-    }
-  }
-
-  async simBuyArbitragePick(pickId) {
-    const pick = this.arbitragePicksMap?.get(String(pickId));
-    if (!pick) {
-      this.showToast('Could not find pick details.', 'error');
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/arbitrage/sim-buy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: pick.id,
-          title: pick.title,
-          price: pick.price || pick.vinted_asking_price,
-          url: pick.url,
-          photo_url: pick.photo_url,
-          ebay_verified_model: pick.ebay_verified_model,
-          net_flip_profit: pick.net_flip_profit,
-          roi_pct: pick.roi_pct,
-          ebay_sold_median: pick.ebay_sold_median,
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Simulation order failed');
-
-      this.showToast(data.message || '🧪 Paper flip executed and logged!', 'success');
-      this.loadAutoBuyLedger();
-    } catch (err) {
-      this.showToast(err.message, 'error');
-    }
-  }
+  // ── Utility & Settings Hub ───────────────────────────────────────────────
 
   copyToClipboard(text, label = 'Content') {
     if (!text) return;
@@ -7604,257 +6965,8 @@ class VintedApp {
     });
   }
 
-  async openCrossListingModal(pickId) {
-    const modal = document.getElementById('crosslist-modal');
-    const body = document.getElementById('crosslist-modal-body');
-    if (!modal || !body) return;
-
-    modal.classList.remove('hidden');
-    body.innerHTML = `
-      <div class="py-16 text-center space-y-3">
-        <i data-lucide="layers" class="w-8 h-8 mx-auto animate-spin text-indigo-400"></i>
-        <h4 class="text-sm font-bold text-white">Generating Multi-Site Listing Draft & Specifics...</h4>
-        <p class="text-xs text-slate-400">Optimizing 80-char eBay title, Depop hashtags, and lowball pricing targets.</p>
-      </div>
-    `;
-    if (window.lucide) lucide.createIcons();
-
-    try {
-      const pick = this.arbitragePicksMap?.get(String(pickId)) || {};
-      const res = await fetch('/api/arbitrage/generate-draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          vinted_item_id: String(pickId),
-          title: pick.title,
-          brand: pick.brand,
-          model_name: pick.ebay_verified_model || pick.model_name,
-          size: pick.size,
-          condition: pick.condition,
-          colorway: pick.exact_colorway,
-          asking_price: pick.price || pick.vinted_asking_price,
-          ebay_sold_median: pick.ebay_sold_median,
-          depop_sold_median: pick.depop_comp?.depop_sold_median,
-          photo_url: pick.photo_url,
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to generate cross-listing draft');
-
-      this.renderCrossListingDraft(data);
-    } catch (err) {
-      body.innerHTML = `
-        <div class="p-6 text-center text-rose-400 space-y-2">
-          <i data-lucide="alert-circle" class="w-8 h-8 mx-auto"></i>
-          <p class="text-sm font-bold">${this.escapeHtmlAttr(err.message)}</p>
-        </div>
-      `;
-      if (window.lucide) lucide.createIcons();
-    }
-  }
-
-  closeCrossListingModal() {
-    const modal = document.getElementById('crosslist-modal');
-    if (modal) modal.classList.add('hidden');
-  }
-
-  renderCrossListingDraft(data) {
-    const body = document.getElementById('crosslist-modal-body');
-    if (!body) return;
-
-    const eb = data.ebay_draft || {};
-    const dp = data.depop_draft || {};
-    const ofr = data.offer_engine || {};
-    const lens = data.visual_lens || {};
-    const specifics = eb.item_specifics || {};
-
-    body.innerHTML = `
-      <!-- Top Deal Summary Strip -->
-      <div class="p-4 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div class="flex items-center space-x-3 min-w-0">
-          ${data.photo_url ? `
-            <img src="${this.escapeHtmlAttr(data.photo_url)}" class="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-800">
-          ` : ''}
-          <div class="min-w-0">
-            <h4 class="text-sm font-bold text-white truncate">${this.escapeHtmlAttr(data.original_vinted_title || 'Item')}</h4>
-            <div class="text-xs text-slate-400 font-mono mt-0.5">
-              Vinted Asking: <strong class="text-white">£${Number(data.vinted_asking_price || 0).toFixed(2)}</strong>
-              ${ofr.offer_20_price ? `
-                <span class="text-slate-600 mx-1.5">•</span>
-                Max -20% Offer: <strong class="text-amber-300">£${Number(ofr.offer_20_price).toFixed(2)}</strong>
-              ` : ''}
-            </div>
-          </div>
-        </div>
-
-        <div class="flex items-center space-x-2 shrink-0">
-          ${lens.google_lens_url ? `
-            <a href="${this.escapeHtmlAttr(lens.google_lens_url)}" 
-               target="_blank" 
-               rel="noopener noreferrer" 
-               class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition flex items-center cursor-pointer shadow-sm">
-              <i data-lucide="scan" class="w-3.5 h-3.5 mr-1.5"></i>
-              <span>Google Lens Check</span>
-            </a>
-          ` : ''}
-        </div>
-      </div>
-
-      <!-- 20% Lowball Strategy Banner -->
-      <div class="p-3.5 rounded-xl bg-amber-950/30 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-        <div class="space-y-0.5">
-          <div class="flex items-center space-x-1.5">
-            <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
-            <span class="text-xs font-bold text-amber-300 uppercase tracking-wide">Vinted 20% Offer Target Strategy</span>
-          </div>
-          <p class="text-xs text-slate-300">
-            Send an instant offer of <strong class="text-amber-300 font-mono">£${Number(ofr.offer_20_price || 0).toFixed(2)}</strong> on Vinted. 
-            If accepted, your net profit increases to <strong class="text-emerald-400 font-mono">+£${Number(Math.max(ofr.ebay_profit_at_offer || 0, ofr.depop_profit_at_offer || 0)).toFixed(2)}</strong> 
-            (<span class="text-teal-300 font-mono">${Number(Math.max(ofr.ebay_roi_at_offer || 0, ofr.depop_roi_at_offer || 0)).toFixed(0)}% ROI</span>).
-          </p>
-        </div>
-        <button type="button" 
-                onclick="app.copyToClipboard('${Number(ofr.offer_20_price || 0).toFixed(2)}', 'Offer price £${Number(ofr.offer_20_price || 0).toFixed(2)}')" 
-                class="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition flex items-center cursor-pointer shrink-0">
-          <i data-lucide="copy" class="w-3.5 h-3.5 mr-1.5"></i>
-          <span>Copy £${Number(ofr.offer_20_price || 0).toFixed(2)}</span>
-        </button>
-      </div>
-
-      <!-- Dual Channel Draft Columns (eBay + Depop) -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <!-- Column 1: eBay UK Draft Package -->
-        <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3.5 flex flex-col justify-between">
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center space-x-2">
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">EBAY UK DRAFT</span>
-                <span class="text-xs text-slate-400 font-mono">Max 80 Chars</span>
-              </div>
-              <span class="text-xs font-mono font-bold text-slate-400">
-                ${eb.title_char_count || 0}/80 chars
-              </span>
-            </div>
-
-            <!-- eBay Title Box -->
-            <div class="space-y-1">
-              <label class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">SEO Optimized Title</label>
-              <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 font-mono text-xs text-amber-300 select-all leading-relaxed">
-                ${this.escapeHtmlAttr(eb.title || '')}
-              </div>
-              <div class="flex justify-end pt-1">
-                <button type="button" 
-                        onclick="app.copyToClipboard('${this.escapeHtmlAttr(eb.title || '')}', 'eBay Title')" 
-                        class="text-xs text-indigo-400 hover:text-indigo-300 flex items-center cursor-pointer">
-                  <i data-lucide="copy" class="w-3 h-3 mr-1"></i>
-                  <span>Copy Title</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- Pricing Metrics -->
-            <div class="grid grid-cols-2 gap-2 text-center text-xs font-mono p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
-              <div>
-                <span class="text-[10px] text-slate-500 block uppercase">Recommended BIN</span>
-                <strong class="text-emerald-400 text-sm">£${Number(eb.recommended_bin_price || 0).toFixed(2)}</strong>
-              </div>
-              <div>
-                <span class="text-[10px] text-slate-500 block uppercase">Auto-Accept Floor</span>
-                <strong class="text-slate-300 text-sm">£${Number(eb.best_offer_floor_price || 0).toFixed(2)}</strong>
-              </div>
-            </div>
-
-            <!-- Item Specifics Strip -->
-            <div class="space-y-1.5">
-              <label class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Pre-Filled Item Specifics</label>
-              <div class="grid grid-cols-2 gap-1.5 text-xs">
-                ${Object.entries(specifics).map(([k, v]) => `
-                  <div class="p-1.5 rounded-lg bg-slate-900/70 border border-slate-800/80 flex items-center justify-between">
-                    <span class="text-[11px] text-slate-400">${this.escapeHtmlAttr(k)}:</span>
-                    <strong class="text-slate-200 text-[11px] truncate ml-1">${this.escapeHtmlAttr(String(v))}</strong>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          </div>
-
-          <div class="pt-2">
-            <a href="${this.escapeHtmlAttr(eb.prelist_url || '')}" 
-               target="_blank" 
-               rel="noopener noreferrer" 
-               class="w-full py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition flex items-center justify-center cursor-pointer shadow-md">
-              <i data-lucide="external-link" class="w-3.5 h-3.5 mr-1.5"></i>
-              <span>Open in eBay Pre-List Composer</span>
-            </a>
-          </div>
-        </div>
-
-        <!-- Column 2: Depop Aesthetic Draft Package -->
-        <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3.5 flex flex-col justify-between">
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center space-x-2">
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">DEPOP AESTHETIC</span>
-                <span class="text-xs text-rose-300 font-mono">0% Seller Fees</span>
-              </div>
-              <span class="text-xs font-mono font-bold text-emerald-400">
-                Ask: £${Number(dp.recommended_listing_price || 0).toFixed(2)}
-              </span>
-            </div>
-
-            <!-- Depop Description Box -->
-            <div class="space-y-1">
-              <label class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Aesthetic Listing Description</label>
-              <textarea readonly 
-                        id="depop-desc-textarea" 
-                        rows="8" 
-                        class="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 font-sans text-xs text-slate-200 leading-relaxed resize-none focus:outline-none select-all">${this.escapeHtmlAttr(dp.description || '')}</textarea>
-              <div class="flex justify-between items-center pt-1">
-                <span class="text-[10px] text-slate-500">Includes 5 high-traction hashtags</span>
-                <button type="button" 
-                        onclick="app.copyToClipboard(document.getElementById('depop-desc-textarea').value, 'Depop Description')" 
-                        class="text-xs text-rose-400 hover:text-rose-300 flex items-center cursor-pointer">
-                  <i data-lucide="copy" class="w-3 h-3 mr-1"></i>
-                  <span>Copy Description</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- Hashtag Cloud -->
-            ${Array.isArray(dp.hashtags) && dp.hashtags.length > 0 ? `
-              <div class="space-y-1">
-                <span class="text-[10px] text-slate-400 uppercase font-semibold block">Hashtag Cloud:</span>
-                <div class="flex flex-wrap gap-1">
-                  ${dp.hashtags.map(tag => `
-                    <span class="px-2 py-0.5 rounded-lg text-[10px] font-mono bg-slate-900 text-rose-300 border border-rose-500/20">
-                      ${this.escapeHtmlAttr(tag)}
-                    </span>
-                  `).join('')}
-                </div>
-              </div>
-            ` : ''}
-          </div>
-
-          <div class="pt-2">
-            <a href="${this.escapeHtmlAttr(dp.create_listing_url || 'https://www.depop.com/products/create/')}" 
-               target="_blank" 
-               rel="noopener noreferrer" 
-               class="w-full py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white transition flex items-center justify-center cursor-pointer shadow-md">
-              <i data-lucide="external-link" class="w-3.5 h-3.5 mr-1.5"></i>
-              <span>Open Depop Listing Page</span>
-            </a>
-          </div>
-        </div>
-      </div>
-    `;
-
-    if (window.lucide) lucide.createIcons();
-  }
-
-  openSettingsModal(tab = 'autobuy') {
-    if (tab === 'autobuy') {
-      this.openAutoBuyModal();
-    } else if (tab === 'antiban') {
+  openSettingsModal(tab = 'antiban') {
+    if (tab === 'antiban') {
       this.openAntiBanModal();
     } else if (tab === 'ai') {
       this.openAIModal();
@@ -7864,371 +6976,9 @@ class VintedApp {
   }
 
   closeSettingsModal() {
-    this.closeAutoBuyModal();
     this.closeAntiBanModal();
     this.closeAIModal();
     this.closeScraperModal();
-  }
-
-  toggleInlineLedger() {
-    const el = document.getElementById('sniper-inline-ledger');
-    if (!el) return;
-    const isHidden = el.classList.contains('hidden');
-    if (isHidden) {
-      el.classList.remove('hidden');
-      this.loadAutoBuyLedger();
-    } else {
-      el.classList.add('hidden');
-    }
-  }
-
-  async loadArbitrageRadar(forceRefresh = false) {
-    return this.loadTodaysArbitragePicks('all', forceRefresh);
-  }
-
-  async addArbitrageToSniper(searchId, keyword, brand, targetCap) {
-    if (searchId) {
-      this.sniperTargetsInitialized = true;
-      this.sniperTargets.add(Number(searchId));
-      this.showToast(`Locked Deal Sniper onto '${keyword}' (Target cap: £${targetCap})!`, 'success');
-      this.showSniperView();
-      await this.loadSniperTargetsInfo();
-      return;
-    }
-    return this.snipeArbitragePick(searchId);
-  }
-
-  // ── Auto-Checkout & Paper Trading Simulation Profile ───────────────────────
-
-  async openAutoBuyModal() {
-    const modal = document.getElementById('autobuy-modal');
-    if (modal) modal.classList.remove('hidden');
-    if (window.lucide) lucide.createIcons();
-    await this.loadAutoBuyProfile();
-    await this.loadAutoBuyLedger();
-  }
-
-  closeAutoBuyModal() {
-    const modal = document.getElementById('autobuy-modal');
-    if (modal) modal.classList.add('hidden');
-  }
-
-  switchAutoBuyTab(tabName) {
-    const tabProfile = document.getElementById('tab-autobuy-profile');
-    const tabLedger = document.getElementById('tab-autobuy-ledger');
-    const panelProfile = document.getElementById('autobuy-panel-profile');
-    const panelLedger = document.getElementById('autobuy-panel-ledger');
-
-    if (tabName === 'ledger') {
-      if (tabProfile) tabProfile.className = 'px-3 py-1.5 font-semibold rounded-lg text-slate-400 hover:text-white cursor-pointer';
-      if (tabLedger) tabLedger.className = 'px-3 py-1.5 font-bold rounded-lg bg-slate-800 text-cyan-300 border border-slate-700 cursor-pointer';
-      if (panelProfile) panelProfile.classList.add('hidden');
-      if (panelLedger) panelLedger.classList.remove('hidden');
-      this.loadAutoBuyLedger();
-    } else {
-      if (tabProfile) tabProfile.className = 'px-3 py-1.5 font-bold rounded-lg bg-slate-800 text-cyan-300 border border-slate-700 cursor-pointer';
-      if (tabLedger) tabLedger.className = 'px-3 py-1.5 font-semibold rounded-lg text-slate-400 hover:text-white cursor-pointer';
-      if (panelProfile) panelProfile.classList.remove('hidden');
-      if (panelLedger) panelLedger.classList.add('hidden');
-    }
-    if (window.lucide) lucide.createIcons();
-  }
-
-  async loadAutoBuyProfile() {
-    try {
-      const res = await fetch('/api/autobuy/profile');
-      if (!res.ok) throw new Error('Failed to load auto-buy profile');
-      const data = await res.json();
-
-      const simCb = document.getElementById('ab-simulation-mode');
-      if (simCb) simCb.checked = Boolean(data.simulation_mode ?? true);
-
-      const autoCb = document.getElementById('ab-autobuy-enabled');
-      if (autoCb) autoCb.checked = Boolean(data.auto_buy_enabled);
-
-      const setVal = (id, val) => {
-        const el = document.getElementById(id);
-        if (el) el.value = val != null ? val : '';
-      };
-
-      setVal('ab-ship-name', data.shipping_name || data.shipping_address?.full_name || '');
-      setVal('ab-ship-phone', data.phone || data.shipping_address?.phone || '');
-      setVal('ab-ship-addr1', data.address_line1 || data.shipping_address?.address_line1 || '');
-      setVal('ab-ship-city', data.city || data.shipping_address?.city || '');
-      setVal('ab-ship-postcode', data.postcode || data.shipping_address?.postcode || '');
-
-      setVal('ab-card-name', data.cardholder_name || data.payment_card?.cardholder_name || '');
-      setVal('ab-card-exp', data.card_expiry || data.payment_card?.expiry || '');
-
-      const cardNumEl = document.getElementById('ab-card-num');
-      if (cardNumEl) {
-        cardNumEl.value = '';
-        cardNumEl.placeholder = data.card_number_masked || data.payment_card?.masked_number || '•••• •••• •••• ••••';
-      }
-
-      const cvvEl = document.getElementById('ab-card-cvv');
-      if (cvvEl) cvvEl.value = '';
-
-      setVal('ab-max-price', data.max_price_per_item ?? 45);
-      setVal('ab-daily-cap', data.daily_spend_limit ?? 150);
-      setVal('ab-min-score', data.min_ai_resale_score ?? 65);
-      setVal('ab-min-profit', data.min_net_profit ?? 15);
-
-      // Update badge indicator
-      const pill = document.getElementById('autobuy-mode-pill');
-      if (pill) {
-        if (data.is_simulation_active) {
-          pill.textContent = 'SIMULATION MODE (PAPER TRADING)';
-          pill.className = 'ml-2 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30';
-        } else {
-          pill.textContent = 'LIVE AUTO-CHECKOUT ACTIVE';
-          pill.className = 'ml-2 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30';
-        }
-      }
-    } catch (err) {
-      console.warn('AutoBuy Profile load note:', err.message);
-    }
-  }
-
-  async saveAutoBuyProfile(event) {
-    if (event) event.preventDefault();
-
-    const simMode = document.getElementById('ab-simulation-mode')?.checked ?? true;
-    const autoEnabled = document.getElementById('ab-autobuy-enabled')?.checked ?? false;
-
-    const payload = {
-      simulation_mode: simMode,
-      auto_buy_enabled: autoEnabled,
-      shipping_name: document.getElementById('ab-ship-name')?.value || '',
-      phone: document.getElementById('ab-ship-phone')?.value || '',
-      address_line1: document.getElementById('ab-ship-addr1')?.value || '',
-      city: document.getElementById('ab-ship-city')?.value || '',
-      postcode: document.getElementById('ab-ship-postcode')?.value || '',
-      cardholder_name: document.getElementById('ab-card-name')?.value || '',
-      card_expiry: document.getElementById('ab-card-exp')?.value || '',
-      max_price_per_item: parseFloat(document.getElementById('ab-max-price')?.value || '45'),
-      daily_spend_limit: parseFloat(document.getElementById('ab-daily-cap')?.value || '150'),
-      min_ai_resale_score: parseInt(document.getElementById('ab-min-score')?.value || '65', 10),
-      min_net_profit: parseFloat(document.getElementById('ab-min-profit')?.value || '15')
-    };
-
-    const cardNum = (document.getElementById('ab-card-num')?.value || '').replace(/\s+/g, '');
-    if (cardNum) payload.card_number = cardNum;
-
-    const cvv = document.getElementById('ab-card-cvv')?.value || '';
-    if (cvv) payload.card_cvv = cvv;
-
-    try {
-      const res = await fetch('/api/autobuy/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to save auto-buy profile');
-
-      this.showToast(
-        data.is_simulation_active
-          ? 'Profile saved! Safe Paper Trading simulation mode is active.'
-          : 'Live auto-checkout credentials saved safely.',
-        'success'
-      );
-      await this.loadAutoBuyProfile();
-    } catch (err) {
-      this.showToast(err.message, 'error');
-    }
-  }
-
-  async simulateBuyDeal(dealId) {
-    if (!dealId) return;
-
-    try {
-      this.showToast('Evaluating item & simulating sniper auto-pick...', 'info');
-      const res = await fetch(`/api/autobuy/simulate/${dealId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Simulation execution failed');
-
-      const ord = data.order || {};
-      const profit = Number(ord.projected_net_profit || 0);
-      const roi = Number(ord.projected_roi_pct || 0);
-
-      this.showToast(
-        `🧪 Simulated Pick Recorded! Order #${ord.order_id} · Profit: +£${profit.toFixed(2)} (${roi.toFixed(0)}% ROI)`,
-        'success'
-      );
-
-      // Refresh deal card state if item is in current deals list
-      if (Array.isArray(this.sniperDeals)) {
-        const found = this.sniperDeals.find(d => String(d.id) === String(dealId));
-        if (found) {
-          found.autobuy_order = ord;
-          this.renderSniperDeals(this.sniperDeals);
-        }
-      }
-
-      await this.loadAutoBuyLedger();
-    } catch (err) {
-      this.showToast(err.message, 'error');
-    }
-  }
-
-  async loadAutoBuyLedger() {
-    try {
-      const res = await fetch('/api/autobuy/orders');
-      if (!res.ok) throw new Error('Failed to load simulated orders ledger');
-      const data = await res.json();
-
-      const metrics = data.metrics || {};
-      const orders = Array.isArray(data.orders) ? data.orders : [];
-
-      // Update Ledger badge
-      const badge = document.getElementById('autobuy-ledger-badge');
-      if (badge) badge.textContent = orders.length;
-
-      // Update metric cards
-      const elSpend = document.getElementById('ledger-stat-spend');
-      if (elSpend) elSpend.textContent = `£${Number(metrics.total_capital_deployed || 0).toFixed(2)}`;
-
-      const elResale = document.getElementById('ledger-stat-resale');
-      if (elResale) elResale.textContent = `£${Number(metrics.total_projected_resale || 0).toFixed(2)}`;
-
-      const elProfit = document.getElementById('ledger-stat-profit');
-      if (elProfit) {
-        const profit = Number(metrics.total_paper_profit || 0);
-        elProfit.textContent = `${profit >= 0 ? '+' : ''}£${profit.toFixed(2)}`;
-        elProfit.className = `text-lg font-black font-mono ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
-      }
-
-      const elRoi = document.getElementById('ledger-stat-roi');
-      if (elRoi) elRoi.textContent = `${Number(metrics.overall_roi_pct || 0).toFixed(0)}%`;
-
-      // Update Deal Sniper Top Real-Time Ticker
-      const tickCap = document.getElementById('ticker-capital');
-      if (tickCap) tickCap.textContent = `£${Number(metrics.total_capital_deployed || 0).toFixed(2)}`;
-
-      const tickRes = document.getElementById('ticker-resale');
-      if (tickRes) tickRes.textContent = `£${Number(metrics.total_projected_resale || 0).toFixed(2)}`;
-
-      const tickProf = document.getElementById('ticker-profit');
-      if (tickProf) {
-        const p = Number(metrics.total_paper_profit || 0);
-        tickProf.textContent = `${p >= 0 ? '+' : ''}£${p.toFixed(2)}`;
-        tickProf.className = p >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold';
-      }
-
-      const tickRoi = document.getElementById('ticker-roi');
-      if (tickRoi) tickRoi.textContent = `${Number(metrics.overall_roi_pct || 0).toFixed(0)}%`;
-
-      const tickCnt = document.getElementById('ticker-order-count');
-      if (tickCnt) tickCnt.textContent = orders.length;
-
-      // Populate inline ledger container inside Deal Sniper
-      const inlineContainer = document.getElementById('sniper-inline-ledger-container');
-      if (inlineContainer) {
-        if (orders.length === 0) {
-          inlineContainer.innerHTML = '<div class="py-4 text-center text-slate-500 text-xs">No simulated orders recorded yet. Click "Sim Pick" on any sniped deal to simulate.</div>';
-        } else {
-          inlineContainer.innerHTML = orders.slice(0, 10).map(ord => {
-            const profit = Number(ord.projected_net_profit || 0);
-            return `
-              <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between text-xs">
-                <div class="min-w-0 flex-1 pr-3">
-                  <div class="flex items-center gap-1.5 font-mono text-[10px] mb-0.5">
-                    <span class="text-cyan-400 font-bold">${ord.is_simulation ? 'SIM' : 'LIVE'} #${this.escapeHtmlAttr(ord.order_id)}</span>
-                    <span class="text-slate-500">•</span>
-                    <span class="text-teal-300">Score ${ord.ai_score || 0}/100</span>
-                  </div>
-                  <div class="text-white font-bold truncate">${this.escapeHtmlAttr(ord.title || ord.item_title || '')}</div>
-                  <div class="text-[10px] text-slate-400 font-mono">Landed: £${Number(ord.total_landed_cost || 0).toFixed(2)} → Resale: £${Number(ord.projected_resale_price || 0).toFixed(2)}</div>
-                </div>
-                <div class="text-right shrink-0 font-mono">
-                  <div class="${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'} font-bold">${profit >= 0 ? '+' : ''}£${profit.toFixed(2)}</div>
-                  <div class="text-[10px] text-cyan-300 font-semibold">${Number(ord.projected_roi_pct || 0).toFixed(0)}% ROI</div>
-                </div>
-              </div>
-            `;
-          }).join('');
-        }
-      }
-
-      // Render orders list
-      const container = document.getElementById('autobuy-orders-container');
-      if (!container) return;
-
-      if (orders.length === 0) {
-        container.innerHTML = `
-          <div class="py-12 text-center text-slate-500 text-xs space-y-1">
-            <i data-lucide="inbox" class="w-8 h-8 mx-auto text-slate-600 mb-2"></i>
-            <p class="font-semibold text-slate-400">No simulated orders recorded yet.</p>
-            <p>Click "Sim Pick" on any sniped deal to simulate paper purchases and track your projected ROI.</p>
-          </div>
-        `;
-        if (window.lucide) lucide.createIcons();
-        return;
-      }
-
-      container.innerHTML = orders.map(ord => {
-        const profit = Number(ord.projected_net_profit || 0);
-        const roi = Number(ord.projected_roi_pct || 0);
-        const createdDate = ord.created_at ? new Date(ord.created_at).toLocaleTimeString() : '';
-
-        return `
-          <div class="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-cyan-500/30 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div class="space-y-1 min-w-0 flex-1">
-              <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold ${ord.is_simulation ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}">
-                  ${ord.is_simulation ? 'SIMULATION' : 'LIVE'} #${this.escapeHtmlAttr(ord.order_id)}
-                </span>
-                <span class="text-[11px] font-mono text-slate-400">${createdDate}</span>
-                <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-slate-800 text-teal-300">Score ${ord.ai_score || 0}/100</span>
-              </div>
-              <h5 class="font-bold text-white truncate" title="${this.escapeHtmlAttr(ord.title || ord.item_title || '')}">
-                ${this.escapeHtmlAttr(ord.title || ord.item_title || `Item #${ord.vinted_item_id || ord.deal_id}`)}
-              </h5>
-              <div class="flex flex-wrap items-center gap-2.5 text-[11px] text-slate-400">
-                <span>Bought: <strong class="text-white font-mono">£${Number(ord.item_price != null ? ord.item_price : (ord.buy_price || 0)).toFixed(2)}</strong></span>
-                <span>Landed Cost: <strong class="text-slate-300 font-mono">£${Number(ord.total_landed_cost || 0).toFixed(2)}</strong></span>
-                <span>Projected Resale: <strong class="text-white font-mono">£${Number(ord.projected_resale_price || 0).toFixed(2)}</strong></span>
-              </div>
-            </div>
-
-            <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/80">
-              <div class="text-left sm:text-right">
-                <div class="text-sm font-black font-mono ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}">
-                  ${profit >= 0 ? '+' : ''}£${profit.toFixed(2)}
-                </div>
-                <div class="text-[10px] font-mono text-cyan-300 font-bold">
-                  ${roi.toFixed(0)}% ROI
-                </div>
-              </div>
-              <a href="${ord.item_url || ('https://www.vinted.co.uk/items/' + (ord.vinted_item_id || ord.deal_id))}" target="_blank" rel="noopener noreferrer" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="View original listing on Vinted">
-                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-              </a>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      if (window.lucide) lucide.createIcons();
-    } catch (err) {
-      console.warn('Ledger load error:', err.message);
-    }
-  }
-
-  async clearAutoBuyLedger() {
-    if (!confirm('Clear all simulated orders and reset paper trading metrics?')) return;
-
-    try {
-      const res = await fetch('/api/autobuy/orders/clear', { method: 'POST' });
-      if (!res.ok) throw new Error('Failed to clear ledger');
-      this.showToast('Paper trading ledger history cleared.', 'info');
-      await this.loadAutoBuyLedger();
-    } catch (err) {
-      this.showToast(err.message, 'error');
-    }
   }
 }
 
