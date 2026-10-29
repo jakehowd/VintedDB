@@ -16,13 +16,31 @@
             vinted: {
               DEFAULT: '#09b1ba',
               dark: '#078e95',
-              light: '#38cbd4',
-              soft: 'rgba(9, 177, 186, 0.15)'
+              light: '#30b0c7',
+              soft: 'rgba(9, 177, 186, 0.12)'
             },
             slate: {
-              850: '#151f32',
-              900: '#0f172a',
-              950: '#090d16'
+              750: '#2c2c32',
+              800: '#232328',
+              850: '#1c1c20',
+              900: '#141417',
+              950: '#000000'
+            },
+            apple: {
+              teal: '#09b1ba',
+              green: '#30d158',
+              red: '#ff453a',
+              blue: '#0a84ff',
+              orange: '#ff9f0a',
+              indigo: '#5e5ce6',
+              purple: '#bf5af2',
+              card: '#1c1c1e',
+              panel: '#2c2c2e',
+              surface: 'rgba(28, 28, 32, 0.82)',
+              bg: '#000000',
+              secondary: 'rgba(235, 235, 245, 0.60)',
+              tertiary: 'rgba(235, 235, 245, 0.35)',
+              border: 'rgba(255, 255, 255, 0.08)'
             }
           }
         }
@@ -77,13 +95,6 @@
     </nav>
 
     <div class="flex items-center space-x-2">
-      <!-- Live Scraper Terminal Toggle -->
-      <button id="btn-toggle-scraper-terminal" onclick="app.toggleScraperTerminal()" class="hidden sm:inline-flex items-center text-xs font-semibold text-emerald-400 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 rounded-xl px-2.5 sm:px-3 py-1.5 transition shadow-sm cursor-pointer" title="Toggle Live Scraper Terminal (Key: T)">
-        <span class="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 pulse-live" id="header-terminal-pulse"></span>
-        <i data-lucide="terminal" class="w-3.5 h-3.5 mr-1 text-emerald-400"></i>
-        <span class="hidden lg:inline">Terminal</span>
-      </button>
-
       <!-- Dedicated Proxy Settings Quick Button -->
       <button id="btn-header-proxy-settings" onclick="app.openAntiBanModal()" class="inline-flex items-center px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-950/80 hover:bg-slate-800 text-amber-300 hover:text-amber-200 border border-slate-800 hover:border-amber-500/40 transition shadow-sm cursor-pointer" title="Configure Rotating Proxies & Test Connection">
         <i data-lucide="shield" class="w-3.5 h-3.5 mr-1 sm:mr-1.5 text-amber-400"></i>
@@ -686,17 +697,20 @@
           </div>
         </div>
 
-        <!-- Radar Activity Terminal Logs -->
+        <!-- Radar Activity Live Logs -->
         <div class="glass-panel p-4 rounded-2xl space-y-2 border border-slate-800/80">
           <div class="flex items-center justify-between">
             <div class="flex items-center space-x-2">
-              <i data-lucide="terminal" class="w-4 h-4 text-teal-400"></i>
-              <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Live Activity Log</span>
+              <i data-lucide="radio" class="w-4 h-4 text-teal-400"></i>
+              <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Live Radar Activity</span>
             </div>
-            <span class="text-[10px] font-mono text-slate-500">Real-time scan audit</span>
+            <span class="text-[10px] font-mono text-slate-500 flex items-center">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 pulse-live"></span>
+              Real-time audit
+            </span>
           </div>
-          <div id="sniper-logs-terminal" class="bg-slate-950 p-3 rounded-xl border border-slate-900 font-mono text-[11px] text-slate-400 h-28 overflow-y-auto space-y-1">
-            <div class="text-slate-600">[System] Deal Sniper ready. Waiting to launch.</div>
+          <div id="sniper-logs-terminal" class="bg-black/60 p-3 rounded-xl border border-slate-800/60 font-mono text-[11px] text-slate-300 h-28 overflow-y-auto space-y-1">
+            <div class="text-slate-500">[System] Deal Sniper ready. Waiting to launch.</div>
           </div>
         </div>
 
@@ -1495,12 +1509,8 @@
         </button>
       </div>
 
-      <div class="flex items-center justify-between pt-1 border-t border-slate-800">
-        <button type="button" onclick="app.closeScraperModal(); app.openScraperTerminal();" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition cursor-pointer">
-          <i data-lucide="terminal" class="w-3.5 h-3.5 mr-1.5 text-emerald-400"></i>
-          <span>Open Live Scraper Terminal</span>
-        </button>
-        <button type="button" onclick="app.closeScraperModal()" class="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer">Close</button>
+      <div class="flex items-center justify-end pt-1 border-t border-slate-800">
+        <button type="button" onclick="app.closeScraperModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer">Close</button>
       </div>
     </div>
   </div>
@@ -1767,101 +1777,6 @@
     </div>
   </div>
 
-  <!-- Live Scraper Activity Terminal & Feed Window -->
-  <div id="scraper-terminal-drawer" class="fixed z-40 transition-all duration-300 hidden font-sans" style="bottom: 0; left: 0; right: 0;">
-    <!-- Backdrop for maximize mode (only visible when maximized) -->
-    <div id="scraper-terminal-backdrop" onclick="app.closeScraperTerminal()" class="fixed inset-0 bg-black/75 backdrop-blur-sm -z-10 hidden"></div>
-
-    <div id="scraper-terminal-container" class="bg-slate-950/98 border-t border-slate-700 shadow-2xl backdrop-blur-md flex flex-col transition-all duration-300 md:ml-72 h-[380px]">
-      
-      <!-- Terminal Header / Control Bar -->
-      <div class="px-4 py-2.5 bg-slate-900/95 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
-        <!-- Title & Status Dot -->
-        <div class="flex items-center space-x-3">
-          <div class="flex items-center space-x-2">
-            <span class="relative flex h-2.5 w-2.5">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
-            </span>
-            <span class="text-xs font-bold text-white uppercase tracking-wider flex items-center">
-              <i data-lucide="terminal" class="w-3.5 h-3.5 mr-1.5 text-emerald-400"></i>
-              Live Scraper Terminal
-            </span>
-          </div>
-
-          <!-- Active Search / State Indicator -->
-          <span id="terminal-live-status-pill" class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-slate-800 text-teal-300 border border-slate-700 truncate max-w-[220px]">
-            Ready
-          </span>
-        </div>
-
-        <!-- Filter Tabs -->
-        <div class="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-xs">
-          <button type="button" onclick="app.setTerminalFilter('all')" id="terminal-filter-all" class="px-2.5 py-1 rounded-md text-[11px] font-semibold text-white bg-slate-800 shadow-sm transition cursor-pointer">
-            All Activity
-          </button>
-          <button type="button" onclick="app.setTerminalFilter('db_added')" id="terminal-filter-db_added" class="px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-emerald-300 transition cursor-pointer flex items-center">
-            <i data-lucide="database" class="w-3 h-3 mr-1 text-emerald-400"></i>
-            ⭐ Added to DB Only
-          </button>
-          <button type="button" onclick="app.setTerminalFilter('scans')" id="terminal-filter-scans" class="px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-slate-200 transition cursor-pointer">
-            Scans & Cycles
-          </button>
-        </div>
-
-        <!-- Telemetry Counters & Window Controls -->
-        <div class="flex items-center space-x-2.5">
-          <div class="flex items-center space-x-1.5 text-[10px] font-mono">
-            <span id="terminal-stat-added-badge" class="px-2 py-0.5 rounded font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-              0 Added to DB
-            </span>
-            <span id="terminal-stat-inspected-badge" class="hidden sm:inline-block px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-              0 Inspected
-            </span>
-            <span id="terminal-stat-price-badge" class="hidden sm:inline-block px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
-              0 Drops
-            </span>
-          </div>
-
-          <div class="h-4 w-px bg-slate-800 hidden sm:block"></div>
-
-          <!-- Auto Scroll Toggle -->
-          <button type="button" id="btn-terminal-autoscroll" onclick="app.toggleTerminalAutoScroll()" class="px-2 py-1 rounded text-[11px] font-mono font-semibold text-emerald-400 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition cursor-pointer" title="Toggle automatic scrolling on new events">
-            Auto-Scroll: ON
-          </button>
-
-          <!-- Clear Feed -->
-          <button type="button" onclick="app.clearTerminalFeed()" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition cursor-pointer" title="Clear Terminal Feed">
-            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-          </button>
-
-          <!-- Maximize / Restore Toggle -->
-          <button type="button" id="btn-terminal-maximize" onclick="app.toggleTerminalMaximize()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer" title="Maximize / Restore Terminal Size">
-            <i data-lucide="maximize-2" class="w-3.5 h-3.5" id="terminal-max-icon"></i>
-          </button>
-
-          <!-- Close Button -->
-          <button type="button" onclick="app.closeScraperTerminal()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer" title="Close Terminal">
-            <i data-lucide="x" class="w-4 h-4"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- Terminal Output Scrollable Feed -->
-      <div id="scraper-terminal-output" class="flex-1 overflow-y-auto p-4 space-y-2.5 font-mono text-xs text-slate-300 selection:bg-emerald-500 selection:text-black">
-        <!-- Default Empty State -->
-        <div id="terminal-empty-placeholder" class="py-12 text-center text-slate-500 space-y-2">
-          <i data-lucide="terminal" class="w-8 h-8 mx-auto text-slate-700 mb-2"></i>
-          <p class="font-semibold text-slate-400 text-xs">Live Scraper Terminal Ready</p>
-          <p class="text-[11px] text-slate-600 max-w-sm mx-auto">
-            Listening for scrape events from Auto-Poll, Constant Scrape, and Deal Sniper. Newly scraped items added to the database will appear highlighted here in real-time.
-          </p>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
   <!-- Global Actionable Toast / Alert Notification -->
   <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 max-w-md p-4 rounded-2xl shadow-2xl border text-xs font-medium space-y-2 backdrop-blur-md">
     <div class="flex items-start justify-between gap-3">
@@ -2031,9 +1946,9 @@
       <i data-lucide="tag" class="w-5 h-5 mb-0.5"></i>
       <span class="text-[10px] font-semibold">Items</span>
     </button>
-    <button onclick="app.toggleScraperTerminal()" class="mobile-nav-btn flex flex-col items-center justify-center text-slate-400 hover:text-emerald-400 p-1 min-h-[44px] min-w-[56px] transition cursor-pointer" id="mob-nav-terminal">
-      <i data-lucide="terminal" class="w-5 h-5 mb-0.5"></i>
-      <span class="text-[10px] font-semibold">Terminal</span>
+    <button onclick="app.openAntiBanModal()" class="mobile-nav-btn flex flex-col items-center justify-center text-slate-400 hover:text-amber-300 p-1 min-h-[44px] min-w-[56px] transition cursor-pointer" id="mob-nav-antiban">
+      <i data-lucide="shield" class="w-5 h-5 mb-0.5 text-amber-400"></i>
+      <span class="text-[10px] font-semibold">Proxies</span>
     </button>
     <button onclick="app.openAddModal()" class="mobile-nav-btn flex flex-col items-center justify-center text-teal-400 p-1 min-h-[44px] min-w-[56px] transition cursor-pointer" id="mob-nav-add">
       <i data-lucide="plus-circle" class="w-5 h-5 mb-0.5"></i>
@@ -2090,12 +2005,8 @@
           <span class="text-slate-300">Snipe / Open Selected Deal</span>
           <kbd class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 font-mono text-emerald-400 font-bold">S</kbd>
         </div>
-        <div class="flex items-center justify-between py-1.5 border-b border-slate-800/80">
-          <span class="text-slate-300">Toggle Scraper Terminal</span>
-          <kbd class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 font-mono text-indigo-300 font-bold">T</kbd>
-        </div>
         <div class="flex items-center justify-between py-1.5 border-b border-slate-850">
-          <span class="text-slate-300">Close Modals / Terminal</span>
+          <span class="text-slate-300">Close Open Modals</span>
           <kbd class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 font-mono text-slate-300">Esc</kbd>
         </div>
         <div class="flex items-center justify-between py-1.5">

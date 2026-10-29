@@ -2,6 +2,122 @@
  * Vinted UK Sales & Price Tracker — Frontend Logic
  */
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * APPLE FLUID MOTION ENGINE — ANALYTICAL SPRING SOLVER & VELOCITY HANDOFF
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Damped harmonic oscillator calculating exact position & velocity at any frame.
+ * Critically damped (zeta = 1.0) by default; underdamped (zeta ~0.8) with momentum.
+ */
+class FluidSpring {
+  constructor({ dampingRatio = 1.0, response = 0.4, initialVelocity = 0, initialPosition = 0, targetPosition = 0 } = {}) {
+    this.zeta = dampingRatio;
+    this.response = Math.max(0.01, response);
+    this.omega0 = (2 * Math.PI) / this.response;
+    this.v0 = initialVelocity;
+    this.x0 = initialPosition;
+    this.xt = targetPosition;
+  }
+
+  solve(t) {
+    const delta = this.x0 - this.xt;
+    if (Math.abs(this.zeta - 1.0) < 1e-4) {
+      // Critically damped (no overshoot)
+      const c1 = delta;
+      const c2 = this.v0 + this.omega0 * delta;
+      const decay = Math.exp(-this.omega0 * t);
+      const pos = this.xt + (c1 + c2 * t) * decay;
+      const vel = (c2 - this.omega0 * (c1 + c2 * t)) * decay;
+      return { position: pos, velocity: vel };
+    } else if (this.zeta < 1.0) {
+      // Underdamped (Apple tactile settlement bounce)
+      const omegaD = this.omega0 * Math.sqrt(1 - this.zeta * this.zeta);
+      const decay = Math.exp(-this.zeta * this.omega0 * t);
+      const c1 = delta;
+      const c2 = (this.v0 + this.zeta * this.omega0 * delta) / omegaD;
+      const cosVal = Math.cos(omegaD * t);
+      const sinVal = Math.sin(omegaD * t);
+      const pos = this.xt + decay * (c1 * cosVal + c2 * sinVal);
+      const vel = decay * (
+        (c2 * omegaD - c1 * this.zeta * this.omega0) * cosVal -
+        (c1 * omegaD + c2 * this.zeta * this.omega0) * sinVal
+      );
+      return { position: pos, velocity: vel };
+    } else {
+      // Overdamped
+      const s1 = -this.omega0 * (this.zeta - Math.sqrt(this.zeta * this.zeta - 1));
+      const s2 = -this.omega0 * (this.zeta + Math.sqrt(this.zeta * this.zeta - 1));
+      const c2 = (this.v0 - s1 * delta) / (s2 - s1);
+      const c1 = delta - c2;
+      const pos = this.xt + c1 * Math.exp(s1 * t) + c2 * Math.exp(s2 * t);
+      const vel = c1 * s1 * Math.exp(s1 * t) + c2 * s2 * Math.exp(s2 * t);
+      return { position: pos, velocity: vel };
+    }
+  }
+
+  static animate({
+    from,
+    to,
+    velocity = 0,
+    dampingRatio = 1.0,
+    response = 0.4,
+    onUpdate,
+    onComplete
+  }) {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      onUpdate(to, 0);
+      if (onComplete) onComplete();
+      return { cancel: () => {} };
+    }
+
+    const spring = new FluidSpring({
+      dampingRatio,
+      response,
+      initialVelocity: velocity,
+      initialPosition: from,
+      targetPosition: to
+    });
+
+    let startTime = null;
+    let animId = null;
+    let isCancelled = false;
+
+    function step(timestamp) {
+      if (isCancelled) return;
+      if (!startTime) startTime = timestamp;
+      const t = (timestamp - startTime) / 1000;
+
+      const { position, velocity: curVel } = spring.solve(t);
+      onUpdate(position, curVel);
+
+      const posDiff = Math.abs(position - to);
+      const velMag = Math.abs(curVel);
+
+      if ((t > 0.05 && posDiff < 0.35 && velMag < 8) || t > response * 3.5) {
+        onUpdate(to, 0);
+        if (onComplete) onComplete();
+        return;
+      }
+
+      animId = requestAnimationFrame(step);
+    }
+
+    animId = requestAnimationFrame(step);
+
+    return {
+      cancel: () => {
+        isCancelled = true;
+        if (animId) cancelAnimationFrame(animId);
+      }
+    };
+  }
+
+  static rubberBand(offset, dimension, coefficient = 0.55) {
+    if (dimension <= 0) return 0;
+    return (offset * dimension * coefficient) / (dimension + coefficient * offset);
+  }
+}
+
 class VintedApp {
   constructor() {
     this.searches = [];
@@ -73,24 +189,11 @@ class VintedApp {
     this.dbExplorerDebounceTimer = null;
     this.isReplicaMgmtOpen = false;
 
-    // Scraper Live Activity Terminal state
-    this.terminalState = {
-      isOpen: false,
-      isMaximized: false,
-      autoScroll: true,
-      activeFilter: 'all', // 'all' | 'db_added' | 'scans'
-      pollTimer: null,
-      lastEventId: 0,
-      events: [],
-      totalAddedSession: 0,
-      totalInspectedSession: 0,
-      totalPriceDropsSession: 0,
-    };
-
     this.init();
   }
 
   async init() {
+    this.initTouchPressListeners();
     this.setupEventListeners();
     await Promise.all([
       this.loadAvailableCategories(),
@@ -102,10 +205,213 @@ class VintedApp {
       this.loadDatabaseSummaryBadges()
     ]);
     this.startSchedulerCountdownLoop();
-    this.startTerminalPolling();
     this.showSniperView();
     await this.checkExistingSniperStatus();
     if (window.lucide) lucide.createIcons();
+  }
+
+  // ── Apple Fluid Motion & Physics Engine Handlers ────────────────────────────
+
+  initTouchPressListeners() {
+    // Immediate pointerdown feedback on all interactive controls (buttons, cards, chips)
+    const selector = 'button, a[href], .tab-btn, .pill, [role="button"], .fluid-pressable, .deal-card, .btn-primary-glow, input[type="checkbox"], input[type="radio"], select';
+    
+    document.addEventListener('pointerdown', (e) => {
+      const target = e.target.closest(selector);
+      if (!target || target.disabled || target.getAttribute('aria-disabled') === 'true') return;
+      target.classList.add('is-pressed');
+    }, { passive: true });
+
+    const clearPressed = () => {
+      const pressedEls = document.querySelectorAll('.is-pressed');
+      pressedEls.forEach(el => el.classList.remove('is-pressed'));
+    };
+
+    document.addEventListener('pointerup', clearPressed, { passive: true });
+    document.addEventListener('pointercancel', clearPressed, { passive: true });
+    document.addEventListener('pointerleave', clearPressed, { passive: true });
+  }
+
+  attachCardSwipeGestures() {
+    const grid = document.getElementById('sniper-deals-grid');
+    if (!grid) return;
+    const cards = grid.querySelectorAll('.deal-card');
+
+    cards.forEach(card => {
+      if (card.dataset.swipeBound === 'true') return;
+      card.dataset.swipeBound = 'true';
+
+      let isDown = false;
+      let isDragging = false;
+      let startX = 0;
+      let startY = 0;
+      let lastX = 0;
+      let lastTime = 0;
+      let velocity = 0;
+      let currentX = 0;
+      let currentSpring = null;
+
+      card.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('button, a, input, select')) return;
+
+        isDown = true;
+        isDragging = false;
+        startX = e.clientX;
+        startY = e.clientY;
+        lastX = e.clientX;
+        lastTime = performance.now();
+        velocity = 0;
+        currentX = 0;
+
+        if (currentSpring) {
+          currentSpring.cancel();
+          currentSpring = null;
+        }
+      });
+
+      card.addEventListener('pointermove', (e) => {
+        if (!isDown) return;
+
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+
+        if (!isDragging) {
+          // Gesture hysteresis check (~10px): ensure horizontal intent before hijacking scroll
+          if (Math.hypot(dx, dy) > 10) {
+            if (Math.abs(dx) > Math.abs(dy) * 1.25) {
+              isDragging = true;
+              card.classList.add('is-swiping');
+              try {
+                card.setPointerCapture(e.pointerId);
+              } catch (err) {}
+            } else {
+              isDown = false;
+              return;
+            }
+          } else {
+            return;
+          }
+        }
+
+        const now = performance.now();
+        const dt = (now - lastTime) / 1000;
+        if (dt > 0.008) {
+          velocity = (e.clientX - lastX) / dt;
+          lastX = e.clientX;
+          lastTime = now;
+        }
+
+        currentX = dx;
+        const width = card.offsetWidth || 320;
+        const progress = Math.min(1, Math.abs(currentX) / (width * 0.75));
+        
+        const rotation = (currentX / width) * 12;
+        card.style.transform = `translateX(${currentX}px) rotate(${rotation}deg)`;
+        card.style.opacity = `${Math.max(0.2, 1 - progress * 0.65)}`;
+      });
+
+      const endGesture = (e) => {
+        if (!isDown && !isDragging) return;
+        const wasDragging = isDragging;
+        isDown = false;
+        isDragging = false;
+
+        try {
+          if (card.hasPointerCapture && card.hasPointerCapture(e.pointerId)) {
+            card.releasePointerCapture(e.pointerId);
+          }
+        } catch (err) {}
+
+        if (!wasDragging) return;
+
+        const width = card.offsetWidth || 320;
+        const projectedX = currentX + (velocity * 0.16);
+        const dismissThreshold = width * 0.35;
+        const dealId = card.dataset.dealId;
+
+        if (Math.abs(projectedX) > dismissThreshold || Math.abs(velocity) > 480) {
+          const exitDirection = (currentX !== 0 ? currentX : velocity) > 0 ? 1 : -1;
+          const exitTarget = exitDirection * (width + 100);
+
+          currentSpring = FluidSpring.animate({
+            from: currentX,
+            to: exitTarget,
+            velocity: velocity,
+            dampingRatio: 0.9,
+            response: 0.28,
+            onUpdate: (x) => {
+              const rot = (x / width) * 14;
+              card.style.transform = `translateX(${x}px) rotate(${rot}deg)`;
+              card.style.opacity = `${Math.max(0, 1 - Math.abs(x) / width)}`;
+            },
+            onComplete: () => {
+              if (dealId) {
+                this.dismissSniperDeal(dealId);
+              }
+            }
+          });
+        } else {
+          currentSpring = FluidSpring.animate({
+            from: currentX,
+            to: 0,
+            velocity: velocity,
+            dampingRatio: 0.86,
+            response: 0.38,
+            onUpdate: (x) => {
+              const rot = (x / width) * 10;
+              card.style.transform = `translateX(${x}px) rotate(${rot}deg)`;
+              card.style.opacity = `${Math.min(1, 0.35 + 0.65 * (1 - Math.abs(x) / width))}`;
+            },
+            onComplete: () => {
+              card.classList.remove('is-swiping');
+              card.style.transform = '';
+              card.style.opacity = '';
+              currentSpring = null;
+            }
+          });
+        }
+      };
+
+      card.addEventListener('pointerup', endGesture);
+      card.addEventListener('pointercancel', endGesture);
+    });
+  }
+
+  fluidOpenModal(modalId) {
+    const modal = typeof modalId === 'string' ? document.getElementById(modalId) : modalId;
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    const dialog = modal.querySelector('.glass-modal') || modal.firstElementChild;
+    if (dialog) {
+      dialog.classList.remove('modal-spring-exit');
+      dialog.classList.remove('animate-fade-in');
+      dialog.classList.add('modal-spring-enter');
+    }
+  }
+
+  fluidCloseModal(modalId, onClosed) {
+    const modal = typeof modalId === 'string' ? document.getElementById(modalId) : modalId;
+    if (!modal) return;
+    const dialog = modal.querySelector('.glass-modal') || modal.firstElementChild;
+    if (!dialog || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+      modal.classList.add('hidden');
+      if (onClosed) onClosed();
+      return;
+    }
+    dialog.classList.remove('modal-spring-enter');
+    dialog.classList.add('modal-spring-exit');
+    const handleAnimEnd = () => {
+      dialog.classList.remove('modal-spring-exit');
+      modal.classList.add('hidden');
+      dialog.removeEventListener('animationend', handleAnimEnd);
+      if (onClosed) onClosed();
+    };
+    dialog.addEventListener('animationend', handleAnimEnd, { once: true });
+    setTimeout(() => {
+      if (!modal.classList.contains('hidden') && dialog.classList.contains('modal-spring-exit')) {
+        handleAnimEnd();
+      }
+    }, 280);
   }
 
   setupEventListeners() {
@@ -212,9 +518,6 @@ class VintedApp {
       } else if (e.key === 's' || e.key === 'S') {
         e.preventDefault();
         this.snipeFocusedDeal();
-      } else if (e.key === 't' || e.key === 'T') {
-        e.preventDefault();
-        this.toggleScraperTerminal();
       } else if (e.key === 'Escape') {
         this.closeAllModals();
       } else if (e.key === '?') {
@@ -638,7 +941,7 @@ class VintedApp {
   openAddModal() {
     const modal = document.getElementById('add-modal');
     if (modal) {
-      modal.classList.remove('hidden');
+      this.fluidOpenModal(modal);
       const input = document.getElementById('input-search-text');
       const brandInput = document.getElementById('input-brand');
       const excludeInput = document.getElementById('input-must-exclude');
@@ -668,8 +971,7 @@ class VintedApp {
   }
 
   closeAddModal() {
-    const modal = document.getElementById('add-modal');
-    if (modal) modal.classList.add('hidden');
+    this.fluidCloseModal('add-modal');
   }
 
   openEditModal() {
@@ -739,7 +1041,7 @@ class VintedApp {
 
     this.toggleEditAntiRepFields(arc.antirep_enabled !== false);
 
-    document.getElementById('edit-modal').classList.remove('hidden');
+    this.fluidOpenModal('edit-modal');
     if (window.lucide) lucide.createIcons();
   }
 
@@ -848,8 +1150,7 @@ class VintedApp {
   }
 
   closeEditModal() {
-    const modal = document.getElementById('edit-modal');
-    if (modal) modal.classList.add('hidden');
+    this.fluidCloseModal('edit-modal');
   }
 
   async handleUpdateSearch(e) {
@@ -1341,7 +1642,6 @@ class VintedApp {
     btn.classList.add('opacity-75', 'cursor-wait');
     if (icon) icon.classList.add('animate-spin');
     if (textEl) textEl.textContent = 'Scraping Vinted…';
-    this.openScraperTerminal();
     this.showToast('Connecting to Vinted.co.uk and fetching listings…', 'info');
 
     try {
@@ -2748,6 +3048,7 @@ class VintedApp {
     }).join('');
 
     if (window.lucide) lucide.createIcons();
+    this.attachCardSwipeGestures();
   }
 
   renderSniperLogs(logs) {
@@ -2833,14 +3134,12 @@ class VintedApp {
     this.loadSchedulerStatus();
     this.updateSchedulerModalControls();
     this.renderSchedulerCountdownUI();
-    const modal = document.getElementById('scraper-modal');
-    if (modal) modal.classList.remove('hidden');
+    this.fluidOpenModal('scraper-modal');
     if (window.lucide) lucide.createIcons();
   }
 
   closeScraperModal() {
-    const modal = document.getElementById('scraper-modal');
-    if (modal) modal.classList.add('hidden');
+    this.fluidCloseModal('scraper-modal');
   }
 
   startSchedulerCountdownLoop() {
@@ -3113,7 +3412,6 @@ class VintedApp {
     if (icon) icon.classList.add('animate-spin');
     if (btnText) btnText.textContent = `Scraping ${targetIds.length} items…`;
     this.closeScraperModal();
-    this.openScraperTerminal();
     this.showToast(`Starting batch scrape across ${targetIds.length} tracked items...`, 'info');
 
     try {
@@ -3280,17 +3578,13 @@ class VintedApp {
   // ── Database Controls & Month Purging ──────────────────────────────────
 
   openDatabaseModal() {
-    const modal = document.getElementById('database-modal');
-    if (modal) {
-      modal.classList.remove('hidden');
-      this.loadDatabaseSummary();
-      if (window.lucide) lucide.createIcons();
-    }
+    this.fluidOpenModal('database-modal');
+    this.loadDatabaseSummary();
+    if (window.lucide) lucide.createIcons();
   }
 
   closeDatabaseModal() {
-    const modal = document.getElementById('database-modal');
-    if (modal) modal.classList.add('hidden');
+    this.fluidCloseModal('database-modal');
   }
 
   async loadDatabaseSummary() {
@@ -4837,17 +5131,13 @@ class VintedApp {
   // ── Anti-Ban Shield & Cloudflare Management ──────────────────────────────
 
   openAntiBanModal() {
-    const modal = document.getElementById('antiban-modal');
-    if (modal) {
-      modal.classList.remove('hidden');
-      this.loadAntiBanStatus(true);
-      if (window.lucide) lucide.createIcons();
-    }
+    this.fluidOpenModal('antiban-modal');
+    this.loadAntiBanStatus(true);
+    if (window.lucide) lucide.createIcons();
   }
 
   closeAntiBanModal() {
-    const modal = document.getElementById('antiban-modal');
-    if (modal) modal.classList.add('hidden');
+    this.fluidCloseModal('antiban-modal');
   }
 
   async loadAntiBanStatus(populateInputs = false) {
@@ -5138,419 +5428,6 @@ class VintedApp {
     }
   }
 
-  // ── Scraper Live Activity Terminal ──────────────────────────────────────────
-
-  toggleScraperTerminal() {
-    if (this.terminalState.isOpen) {
-      this.closeScraperTerminal();
-    } else {
-      this.openScraperTerminal();
-    }
-  }
-
-  openScraperTerminal() {
-    this.terminalState.isOpen = true;
-    const drawer = document.getElementById('scraper-terminal-drawer');
-    if (drawer) {
-      drawer.classList.remove('hidden');
-    }
-    const navBtn = document.getElementById('nav-scraper-terminal-btn');
-    if (navBtn) navBtn.classList.add('bg-slate-800', 'text-white');
-
-    // Instantly poll to refresh latest logs
-    this.pollTerminalFeed(true);
-
-    if (this.terminalState.autoScroll) {
-      this.scrollTerminalToBottom();
-    }
-    if (window.lucide) lucide.createIcons();
-  }
-
-  closeScraperTerminal() {
-    this.terminalState.isOpen = false;
-    const drawer = document.getElementById('scraper-terminal-drawer');
-    if (drawer) {
-      drawer.classList.add('hidden');
-    }
-    const navBtn = document.getElementById('nav-scraper-terminal-btn');
-    if (navBtn) navBtn.classList.remove('bg-slate-800', 'text-white');
-  }
-
-  toggleTerminalMaximize() {
-    this.terminalState.isMaximized = !this.terminalState.isMaximized;
-    const container = document.getElementById('scraper-terminal-container');
-    const backdrop = document.getElementById('scraper-terminal-backdrop');
-    const maxIcon = document.getElementById('terminal-max-icon');
-
-    if (!container) return;
-
-    if (this.terminalState.isMaximized) {
-      // Maximized modal layout
-      container.classList.remove('h-[380px]', 'md:ml-72');
-      container.classList.add('fixed', 'inset-4', 'md:inset-10', 'rounded-2xl', 'border', 'border-slate-700', 'z-50', 'max-w-6xl', 'mx-auto', 'shadow-2xl');
-      if (backdrop) backdrop.classList.remove('hidden');
-      if (maxIcon) maxIcon.setAttribute('data-lucide', 'minimize-2');
-    } else {
-      // Docked bottom layout
-      container.classList.remove('fixed', 'inset-4', 'md:inset-10', 'rounded-2xl', 'max-w-6xl', 'mx-auto', 'z-50');
-      container.classList.add('h-[380px]', 'md:ml-72');
-      if (backdrop) backdrop.classList.add('hidden');
-      if (maxIcon) maxIcon.setAttribute('data-lucide', 'maximize-2');
-    }
-    if (window.lucide) lucide.createIcons();
-    if (this.terminalState.autoScroll) {
-      this.scrollTerminalToBottom();
-    }
-  }
-
-  toggleTerminalAutoScroll() {
-    this.terminalState.autoScroll = !this.terminalState.autoScroll;
-    const btn = document.getElementById('btn-terminal-autoscroll');
-    if (btn) {
-      if (this.terminalState.autoScroll) {
-        btn.textContent = 'Auto-Scroll: ON';
-        btn.className = 'px-2 py-1 rounded text-[11px] font-mono font-semibold text-emerald-400 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition cursor-pointer';
-        this.scrollTerminalToBottom();
-      } else {
-        btn.textContent = 'Auto-Scroll: OFF';
-        btn.className = 'px-2 py-1 rounded text-[11px] font-mono font-semibold text-slate-400 bg-slate-900 hover:bg-slate-800 border border-slate-800 transition cursor-pointer';
-      }
-    }
-  }
-
-  setTerminalFilter(filterType) {
-    this.terminalState.activeFilter = filterType;
-    ['all', 'db_added', 'scans'].forEach(t => {
-      const btn = document.getElementById(`terminal-filter-${t}`);
-      if (!btn) return;
-      if (t === filterType) {
-        btn.className = 'px-2.5 py-1 rounded-md text-[11px] font-semibold text-white bg-slate-800 shadow-sm transition cursor-pointer flex items-center';
-      } else {
-        btn.className = 'px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-slate-200 transition cursor-pointer flex items-center';
-      }
-    });
-    this.renderAllTerminalEvents();
-  }
-
-  async clearTerminalFeed() {
-    try {
-      await fetch('/api/scraper/clear-feed', { method: 'POST' });
-      this.terminalState.events = [];
-      this.terminalState.lastEventId = 0;
-      this.terminalState.totalAddedSession = 0;
-      this.terminalState.totalInspectedSession = 0;
-      this.terminalState.totalPriceDropsSession = 0;
-      const output = document.getElementById('scraper-terminal-output');
-      if (output) {
-        output.innerHTML = `
-          <div id="terminal-empty-placeholder" class="py-12 text-center text-slate-500 space-y-2">
-            <i data-lucide="terminal" class="w-8 h-8 mx-auto text-slate-700 mb-2"></i>
-            <p class="font-semibold text-slate-400 text-xs">Live Scraper Terminal Ready</p>
-            <p class="text-[11px] text-slate-600 max-w-sm mx-auto">
-              Terminal buffer cleared. Newly scraped items added to the database will appear highlighted here in real-time.
-            </p>
-          </div>
-        `;
-        if (window.lucide) lucide.createIcons();
-      }
-      this.updateTerminalBadges({ total_added_to_db: 0, total_inspected: 0, total_price_updates: 0 });
-    } catch (err) {
-      console.error('Error clearing terminal feed:', err);
-    }
-  }
-
-  startTerminalPolling() {
-    if (this.terminalState.pollTimer) clearInterval(this.terminalState.pollTimer);
-    this.terminalState.pollTimer = setInterval(() => {
-      this.pollTerminalFeed();
-    }, 2500);
-    this.pollTerminalFeed();
-  }
-
-  async pollTerminalFeed(forceRender = false) {
-    try {
-      const since = forceRender ? 0 : this.terminalState.lastEventId;
-      const url = `/api/scraper/live-feed?since_id=${since}&limit=150`;
-      const res = await fetch(url);
-      if (!res.ok) return;
-      const data = await res.json();
-
-      const newEvents = data.events || [];
-      const stats = data.stats || {};
-      const scheduler = data.scheduler || {};
-
-      this.updateTerminalBadges(stats, scheduler);
-
-      if (newEvents.length > 0) {
-        if (forceRender) {
-          this.terminalState.events = newEvents;
-        } else {
-          const existingIds = new Set(this.terminalState.events.map(e => e.id));
-          for (const ev of newEvents) {
-            if (!existingIds.has(ev.id)) {
-              this.terminalState.events.push(ev);
-            }
-          }
-        }
-        if (data.latest_event_id) {
-          this.terminalState.lastEventId = data.latest_event_id;
-        }
-
-        this.renderAllTerminalEvents();
-
-        const hasDbAdded = newEvents.some(e => e.type === 'db_added');
-        if (hasDbAdded) {
-          this.loadDatabaseSummaryBadges();
-          if (this.isDbExplorerActive) {
-            this.loadDatabaseExplorerData();
-          }
-        }
-      } else if (forceRender) {
-        this.renderAllTerminalEvents();
-      }
-    } catch (err) {
-      // Quiet background poller
-    }
-  }
-
-  updateTerminalBadges(stats, scheduler) {
-    const totalAdded = stats?.total_added_to_db ?? 0;
-    const totalInspected = stats?.total_inspected ?? 0;
-    const totalPriceDrops = stats?.total_price_updates ?? 0;
-
-    // Header badge
-    const headerBadge = document.getElementById('header-terminal-db-badge');
-    if (headerBadge) {
-      headerBadge.textContent = totalAdded;
-      if (totalAdded > 0) {
-        headerBadge.className = 'ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse';
-      }
-    }
-
-    // Sidebar badge
-    const sidebarBadge = document.getElementById('sidebar-terminal-db-badge');
-    if (sidebarBadge) {
-      sidebarBadge.textContent = `${totalAdded} Added`;
-      if (totalAdded > 0) {
-        sidebarBadge.className = 'px-2 py-0.5 text-[11px] font-mono font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
-      }
-    }
-
-    // Terminal internal badges
-    const statAdded = document.getElementById('terminal-stat-added-badge');
-    if (statAdded) statAdded.textContent = `${totalAdded} Added to DB`;
-
-    const statInspected = document.getElementById('terminal-stat-inspected-badge');
-    if (statInspected) statInspected.textContent = `${totalInspected} Checked`;
-
-    const statPrice = document.getElementById('terminal-stat-price-badge');
-    if (statPrice) statPrice.textContent = `${totalPriceDrops} Drops`;
-
-    // Terminal live status pill
-    const statusPill = document.getElementById('terminal-live-status-pill');
-    if (statusPill && scheduler) {
-      if (scheduler.is_cycle_running && scheduler.current_search_text) {
-        statusPill.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 truncate max-w-[240px] flex items-center';
-        statusPill.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 pulse-live"></span> ${scheduler.current_search_text}`;
-      } else if (scheduler.constant_scrape_active) {
-        statusPill.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30 truncate max-w-[240px]';
-        statusPill.textContent = '24/7 Loop Standby';
-      } else {
-        statusPill.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-slate-800 text-teal-300 border border-slate-700 truncate max-w-[240px]';
-        statusPill.textContent = 'Standby (Auto-Poll)';
-      }
-    }
-  }
-
-  renderAllTerminalEvents() {
-    const output = document.getElementById('scraper-terminal-output');
-    if (!output) return;
-
-    let eventsToRender = this.terminalState.events || [];
-    const filter = this.terminalState.activeFilter;
-
-    if (filter === 'db_added') {
-      eventsToRender = eventsToRender.filter(e => e.type === 'db_added');
-    } else if (filter === 'scans') {
-      eventsToRender = eventsToRender.filter(e => ['scan_start', 'scan_summary', 'cycle_complete', 'status_audit'].includes(e.type));
-    }
-
-    if (eventsToRender.length === 0) {
-      if (filter === 'db_added') {
-        output.innerHTML = `
-          <div class="py-12 text-center text-slate-500 space-y-2">
-            <i data-lucide="database" class="w-8 h-8 mx-auto text-slate-700 mb-2"></i>
-            <p class="font-semibold text-slate-400 text-xs">No Items Added To DB Yet</p>
-            <p class="text-[11px] text-slate-600 max-w-sm mx-auto">
-              Whenever the scraper finds and inserts a new listing into the database, it will appear highlighted right here.
-            </p>
-          </div>
-        `;
-      } else {
-        output.innerHTML = `
-          <div id="terminal-empty-placeholder" class="py-12 text-center text-slate-500 space-y-2">
-            <i data-lucide="terminal" class="w-8 h-8 mx-auto text-slate-700 mb-2"></i>
-            <p class="font-semibold text-slate-400 text-xs">Live Scraper Terminal Ready</p>
-            <p class="text-[11px] text-slate-600 max-w-sm mx-auto">
-              Listening for scrape events from Auto-Poll, Constant Scrape, and Deal Sniper. Newly scraped items added to the database will appear highlighted here in real-time.
-            </p>
-          </div>
-        `;
-      }
-      if (window.lucide) lucide.createIcons();
-      return;
-    }
-
-    const html = eventsToRender.map(ev => this.renderTerminalEventHTML(ev)).join('');
-    output.innerHTML = html;
-
-    if (window.lucide) lucide.createIcons();
-
-    if (this.terminalState.autoScroll) {
-      this.scrollTerminalToBottom();
-    }
-  }
-
-  renderTerminalEventHTML(ev) {
-    if (ev.type === 'db_added') {
-      // PROMINENTLY HIGHLIGHTED CARD
-      const priceFormatted = Number(ev.price || 0).toFixed(2);
-      const discountPill = ev.discount_pct && ev.discount_pct > 0
-        ? `<span class="text-[10px] font-bold text-emerald-300 bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/30">-${ev.discount_pct}%</span>`
-        : '';
-      const photoHtml = ev.photo_url
-        ? `<img src="${ev.photo_url}" class="w-12 h-12 object-cover rounded-lg border border-emerald-500/40 shrink-0 bg-slate-900" alt="Item photo" loading="lazy">`
-        : `<div class="w-12 h-12 rounded-lg border border-emerald-500/30 bg-slate-900 flex items-center justify-center text-emerald-400 shrink-0"><i data-lucide="tag" class="w-5 h-5"></i></div>`;
-
-      return `
-        <div class="terminal-item-card p-3 rounded-xl border border-emerald-500/50 bg-gradient-to-r from-emerald-950/30 via-slate-900/90 to-slate-900/80 shadow-md shadow-emerald-950/20 hover:border-emerald-400 transition space-y-2">
-          <div class="flex items-center justify-between text-[11px]">
-            <div class="flex items-center space-x-2">
-              <span class="px-2 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center">
-                <i data-lucide="database" class="w-3 h-3 mr-1 text-emerald-400"></i>
-                ADDED TO DB
-              </span>
-              <span class="px-1.5 py-0.5 rounded font-semibold bg-slate-800 text-teal-300 border border-slate-700">
-                ${ev.search_text || 'General Scrape'}
-              </span>
-              <span class="text-slate-500 font-mono">[${ev.time || ''}]</span>
-            </div>
-            <div class="flex items-center space-x-1.5 font-mono">
-              ${discountPill}
-              <span class="text-sm font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
-                £${priceFormatted}
-              </span>
-            </div>
-          </div>
-
-          <div class="flex items-center space-x-3">
-            ${photoHtml}
-            <div class="flex-1 min-w-0">
-              <a href="${ev.url || '#'}" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-white hover:text-emerald-300 truncate block transition flex items-center">
-                <span class="truncate">${ev.title || 'Untitled Listing'}</span>
-                <i data-lucide="external-link" class="w-3.5 h-3.5 ml-1.5 text-slate-400 shrink-0"></i>
-              </a>
-              <div class="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400 mt-1 font-sans">
-                ${ev.variant_name ? `<span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-500/20 text-purple-200 border border-purple-500/35">✨ ${this.escapeHtmlAttr(ev.variant_name)}</span>` : ''}
-                ${ev.brand ? `<span class="text-slate-300 font-medium">${ev.brand}</span>` : ''}
-                ${ev.brand && ev.size ? `<span>•</span>` : ''}
-                ${ev.size ? `<span class="bg-slate-800 px-1.5 py-0.2 rounded text-[10px] text-slate-300">Size: ${ev.size}</span>` : ''}
-                ${ev.source ? `<span class="text-[10px] text-slate-500">via ${ev.source}</span>` : ''}
-              </div>
-            </div>
-            <a href="${ev.url || '#'}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition shrink-0 flex items-center">
-              <span>View</span>
-              <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 ml-1"></i>
-            </a>
-          </div>
-        </div>
-      `;
-    }
-
-    if (ev.type === 'price_updated') {
-      const oldP = Number(ev.old_price || 0).toFixed(2);
-      const newP = Number(ev.new_price || 0).toFixed(2);
-      return `
-        <div class="p-2.5 rounded-lg bg-amber-500/10 border-l-2 border-amber-400 text-xs font-mono flex items-center justify-between text-amber-200">
-          <div class="flex items-center space-x-2 truncate">
-            <span class="text-slate-500">[${ev.time || ''}]</span>
-            <span class="px-1.5 py-0.2 rounded text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">PRICE SYNC</span>
-            <span class="text-slate-400">[${ev.search_text || ''}]</span>
-            <span class="text-white font-medium truncate">${ev.title || ''}</span>
-          </div>
-          <div class="font-bold text-amber-300 shrink-0 ml-2">
-            £${oldP} ➔ £${newP}
-          </div>
-        </div>
-      `;
-    }
-
-    if (ev.type === 'scan_start') {
-      return `
-        <div class="py-1 px-2 text-[11px] font-mono text-slate-400 flex items-center space-x-2">
-          <span class="text-slate-600">[${ev.time || ''}]</span>
-          <span class="text-teal-400">🔍 Scanning '${ev.search_text || ''}' on Vinted UK...</span>
-        </div>
-      `;
-    }
-
-    if (ev.type === 'scan_summary') {
-      const newBadge = ev.new_count > 0
-        ? `<span class="text-emerald-400 font-bold">+${ev.new_count} to DB</span>`
-        : `<span class="text-slate-500">0 new</span>`;
-      return `
-        <div class="py-1.5 px-2.5 rounded bg-slate-900/60 text-[11px] font-mono text-slate-300 flex items-center justify-between">
-          <div class="flex items-center space-x-2">
-            <span class="text-slate-600">[${ev.time || ''}]</span>
-            <span class="text-indigo-400 font-semibold">[${ev.search_text || ''}]</span>
-            <span>Found ${ev.total_found || 0} listings</span>
-          </div>
-          <div class="flex items-center space-x-2">
-            ${newBadge}
-            <span class="text-slate-500">(${(ev.spam_blocked || 0) + (ev.rep_blocked || 0)} filtered)</span>
-          </div>
-        </div>
-      `;
-    }
-
-    if (ev.type === 'cycle_complete') {
-      return `
-        <div class="p-2 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-mono text-teal-300 flex items-center justify-between">
-          <div class="flex items-center space-x-2">
-            <span class="text-slate-500">[${ev.time || ''}]</span>
-            <span class="font-bold">🏁 Scrape Cycle Finished</span>
-            <span class="text-slate-400">• ${ev.total_searches || 0} searches</span>
-          </div>
-          <span class="text-emerald-400 font-bold">+${ev.total_new || 0} added to DB</span>
-        </div>
-      `;
-    }
-
-    if (ev.type === 'status_audit') {
-      return `
-        <div class="py-1 px-2 text-[11px] font-mono text-cyan-400 flex items-center space-x-2">
-          <span class="text-slate-600">[${ev.time || ''}]</span>
-          <span>🛡️ Status audit: ${ev.sold_count || 0} confirmed sold, ${ev.active_count || 0} active verified, ${ev.price_updates || 0} prices synced</span>
-        </div>
-      `;
-    }
-
-    // Generic fallback event
-    return `
-      <div class="py-1 px-2 text-[11px] font-mono text-slate-400 flex items-center space-x-2">
-        <span class="text-slate-600">[${ev.time || ''}]</span>
-        <span>${ev.message || ''}</span>
-      </div>
-    `;
-  }
-
-  scrollTerminalToBottom() {
-    const output = document.getElementById('scraper-terminal-output');
-    if (output) {
-      output.scrollTop = output.scrollHeight;
-    }
-  }
-
   // ── Power Trader Keyboard Navigation & Unified Modes ──────────────────────
 
   navigateDealCards(direction) {
@@ -5601,14 +5478,12 @@ class VintedApp {
   }
 
   showKeyboardShortcutsModal() {
-    const modal = document.getElementById('shortcuts-modal');
-    if (modal) modal.classList.remove('hidden');
+    this.fluidOpenModal('shortcuts-modal');
     if (window.lucide) lucide.createIcons();
   }
 
   closeShortcutsModal() {
-    const modal = document.getElementById('shortcuts-modal');
-    if (modal) modal.classList.add('hidden');
+    this.fluidCloseModal('shortcuts-modal');
   }
 
   closeAllModals() {
@@ -5619,7 +5494,6 @@ class VintedApp {
     this.closeAntiBanModal();
     this.closeAIModal();
     this.closeShortcutsModal();
-    this.closeScraperTerminal();
     const mobDrawer = document.getElementById('mobile-items-drawer');
     if (mobDrawer) mobDrawer.classList.add('hidden');
   }
@@ -5708,8 +5582,7 @@ class VintedApp {
   }
 
   async openAIModal() {
-    const modal = document.getElementById('ai-modal');
-    if (modal) modal.classList.remove('hidden');
+    this.fluidOpenModal('ai-modal');
     const testBox = document.getElementById('ai-test-result-box');
     if (testBox) testBox.classList.add('hidden');
     await this.loadAIStatus(true);
@@ -5717,8 +5590,7 @@ class VintedApp {
   }
 
   closeAIModal() {
-    const modal = document.getElementById('ai-modal');
-    if (modal) modal.classList.add('hidden');
+    this.fluidCloseModal('ai-modal');
   }
 
   toggleAISecretMasking() {
@@ -6486,16 +6358,15 @@ class VintedApp {
       opts += `<option value="${m.id}" ${sel}>Exclusive Style under: ${this.escapeHtmlAttr(m.variant_name)}</option>`;
     });
     parentSelect.innerHTML = opts;
-    this.handleCustomVariantParentChange(parentSelect.value);
+    this.handleCustomVariantParentChange(parentVal);
 
-    modal.classList.remove('hidden');
+    this.fluidOpenModal('custom-variant-modal');
     if (window.lucide) lucide.createIcons();
     setTimeout(() => document.getElementById('cv-name')?.focus(), 40);
   }
 
   closeCustomVariantModal() {
-    const modal = document.getElementById('custom-variant-modal');
-    if (modal) modal.classList.add('hidden');
+    this.fluidCloseModal('custom-variant-modal');
   }
 
   handleCustomVariantParentChange(parentVal) {
