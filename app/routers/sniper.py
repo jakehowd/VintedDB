@@ -1,6 +1,6 @@
 """Endpoints for Deal Sniper live monitoring."""
 
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import func
@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from ..auth import get_current_user
 from ..database import get_db
 from ..models import SoldItem, TrackedSearch, User
-from ..services.sniper import deal_sniper
+from ..services.sniper import get_user_sniper
 
 router = APIRouter(prefix="/api/sniper", tags=["sniper"])
 
@@ -25,25 +25,13 @@ class SniperStartRequest(BaseModel):
     min_roi_pct: Optional[float] = Field(30.0, description="Minimum projected ROI (%) threshold")
 
 
-class SniperScheduleRequest(BaseModel):
-    interval_minutes: Optional[int] = None
-    constant_scrape: Optional[bool] = None
-
-
 @router.get("/status")
 def get_sniper_status(
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
-    """Return live sniper state, current target IDs, sniped deals stream, and activity logs scoped to user."""
-    status = deal_sniper.get_status()
-    user_search_ids = {s_id for (s_id,) in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()}
-    if "sniped_deals" in status and isinstance(status["sniped_deals"], list):
-        status["sniped_deals"] = [
-            deal for deal in status["sniped_deals"]
-            if deal.get("tracked_search_id") in user_search_ids
-        ]
-    return status
+    """Return live sniper state, current target IDs, sniped deals stream, and activity logs strictly scoped to the current user."""
+    user_sniper = get_user_sniper(current_user.id)
+    return user_sniper.get_status()
 
 
 @router.get("/targets-info")
@@ -161,7 +149,8 @@ def start_sniper(
             if s_id in user_ids
         }
 
-    status = deal_sniper.start(
+    user_sniper = get_user_sniper(current_user.id)
+    status = user_sniper.start(
         search_ids=valid_ids,
         max_price=data.max_price,
         max_age_minutes=data.max_age_minutes,
@@ -175,22 +164,22 @@ def start_sniper(
 
 
 @router.post("/stop")
-def stop_sniper():
-    """Stop active live sniper."""
-    return deal_sniper.stop()
+def stop_sniper(current_user: User = Depends(get_current_user)):
+    """Stop active live sniper for the current user."""
+    return get_user_sniper(current_user.id).stop()
 
 
 @router.post("/clear")
-def clear_sniper_deals():
-    """Clear sniped deals buffer."""
-    deal_sniper.clear_deals()
+def clear_sniper_deals(current_user: User = Depends(get_current_user)):
+    """Clear sniped deals buffer for the current user."""
+    get_user_sniper(current_user.id).clear_deals()
     return {"ok": True}
 
 
 @router.post("/deals/{deal_id}/dismiss")
-def dismiss_sniper_deal(deal_id: str):
-    """Dismiss a single deal from the sniper stream and prevent it from reappearing."""
-    removed = deal_sniper.dismiss_deal(deal_id)
+def dismiss_sniper_deal(deal_id: str, current_user: User = Depends(get_current_user)):
+    """Dismiss a single deal from the current user's sniper stream and prevent it from reappearing."""
+    removed = get_user_sniper(current_user.id).dismiss_deal(deal_id)
     return {"ok": True, "deal_id": deal_id, "dismissed": removed}
 
 

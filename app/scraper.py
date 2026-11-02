@@ -320,7 +320,11 @@ def scrape_and_store(
     Enforces all configured brand, category, exclusion, and anti-rep filters.
     Returns new_count (int), or a detailed dictionary if return_details=True.
     """
+    from .auth import set_active_user_id
     from .services.scraper_logger import scraper_logger
+
+    if getattr(tracked_search, "user_id", None) is not None:
+        set_active_user_id(tracked_search.user_id)
 
     scraper_logger.log_scan_start(tracked_search.search_text, source="scraper")
     items = fetch_items(tracked_search.search_text)
@@ -351,10 +355,13 @@ def scrape_and_store(
             continue
         seen_ids.add(vinted_id)
 
-        # If item already exists in DB, keep its current price, seller metadata, and active status synced
+        # If item already exists in DB for this tracked search, keep its current price, seller metadata, and active status synced
         existing_item = (
             db.query(SoldItem)
-            .filter(SoldItem.vinted_item_id == vinted_id)
+            .filter(
+                SoldItem.tracked_search_id == tracked_search.id,
+                SoldItem.vinted_item_id == vinted_id,
+            )
             .first()
         )
         if existing_item:

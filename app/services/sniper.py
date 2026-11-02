@@ -20,14 +20,13 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..config import CLEARED_DEALS_PATH, VINTED_BASE_URL
+from ..config import VINTED_BASE_URL
 from ..database import SessionLocal
 from ..models import ProductVariant, SoldItem, TrackedSearch
 from ..scraper import _extract_item, _get_vinted_scraper, _search_vinted
 from ..services.antirep import (
     evaluate_antirep_rules,
     get_item_description,
-    get_item_upload_age_minutes,
     get_item_uploaded_at,
 )
 from ..services.item_classifier import is_child_size, is_item_relevant, normalize_categories
@@ -38,9 +37,10 @@ logger = logging.getLogger(__name__)
 
 
 class DealSniperService:
-    """Manages active live sniping across selected tracked searches."""
+    """Manages active live sniping across selected tracked searches isolated per user profile."""
 
-    def __init__(self):
+    def __init__(self, user_id: Optional[int] = None):
+        self.user_id: Optional[int] = user_id
         self._lock = threading.RLock()
         self._stop_event = threading.Event()
         self._worker_thread: Optional[threading.Thread] = None
@@ -74,33 +74,38 @@ class DealSniperService:
         self._load_cleared_deals()
 
     def _load_cleared_deals(self) -> None:
-        """Load previously cleared deal IDs from persistent storage."""
-        if os.path.exists(CLEARED_DEALS_PATH) and os.path.getsize(CLEARED_DEALS_PATH) > 0:
+        """Load previously cleared deal IDs strictly for self.user_id."""
+        if self.user_id is not None:
             try:
-                with open(CLEARED_DEALS_PATH, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if isinstance(data, dict):
-                        ids = data.get("cleared_deal_ids", [])
-                    elif isinstance(data, list):
-                        ids = data
-                    else:
-                        ids = []
-                    self._cleared_deal_ids = {str(i) for i in ids}
-                    self._seen_deal_ids.update(self._cleared_deal_ids)
+                from ..models import User
+                db = SessionLocal()
+                try:
+                    user = db.query(User).filter(User.id == self.user_id).first()
+                    if user and user.sniper_cleared_deals_json:
+                        ids = json.loads(user.sniper_cleared_deals_json)
+                        if isinstance(ids, list):
+                            self._cleared_deal_ids = {str(i) for i in ids}
+                            self._seen_deal_ids.update(self._cleared_deal_ids)
+                finally:
+                    db.close()
             except Exception as e:
-                logger.warning("Could not read cleared_deals.json: %s", e)
+                logger.warning("Could not load user %s cleared deals from DB: %s", self.user_id, e)
 
     def _save_cleared_deals(self) -> None:
-        """Persist cleared deal IDs to disk."""
-        try:
-            os.makedirs(os.path.dirname(CLEARED_DEALS_PATH), exist_ok=True)
-            with open(CLEARED_DEALS_PATH, "w", encoding="utf-8") as f:
-                json.dump({
-                    "cleared_deal_ids": list(self._cleared_deal_ids),
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                }, f, indent=2)
-        except Exception as e:
-            logger.warning("Could not save cleared_deals.json: %s", e)
+        """Persist cleared deal IDs strictly for self.user_id."""
+        if self.user_id is not None:
+            try:
+                from ..models import User
+                db = SessionLocal()
+                try:
+                    user = db.query(User).filter(User.id == self.user_id).first()
+                    if user:
+                        user.sniper_cleared_deals_json = json.dumps(list(self._cleared_deal_ids))
+                        db.commit()
+                finally:
+                    db.close()
+            except Exception as e:
+                logger.warning("Could not save user %s cleared deals: %s", self.user_id, e)
 
     def start(
         self,
@@ -172,6 +177,9 @@ class DealSniperService:
 
     def revalidate_deals(self, search_id: Optional[int] = None) -> int:
         """Audit all currently sniped deals against max_age_minutes, price limits, and anti-rep / seller review filters."""
+        from ..auth import set_active_user_id
+        set_active_user_id(self.user_id)
+
         with self._lock:
             if not self.sniped_deals:
                 return 0
@@ -181,12 +189,16 @@ class DealSniperService:
         removed_ids: set[str] = set()
         now_utc = datetime.now(timezone.utc)
         try:
+            search_query = db.query(TrackedSearch)
+            if self.user_id is not None:
+                search_query = search_query.filter(TrackedSearch.user_id == self.user_id)
             searches_map: Dict[int, TrackedSearch] = {
-                s.id: s for s in db.query(TrackedSearch).all()
+                s.id: s for s in search_query.all()
             }
             variants_by_search: Dict[int, List[ProductVariant]] = {}
-            for pv in db.query(ProductVariant).order_by(ProductVariant.id).all():
-                variants_by_search.setdefault(pv.tracked_search_id, []).append(pv)
+            if searches_map:
+                for pv in db.query(ProductVariant).filter(ProductVariant.tracked_search_id.in_(list(searches_map.keys()))).order_by(ProductVariant.id).all():
+                    variants_by_search.setdefault(pv.tracked_search_id, []).append(pv)
 
             scraper = _get_vinted_scraper()
             db_dirty = False
@@ -221,7 +233,10 @@ class DealSniperService:
 
                 db_item = (
                     db.query(SoldItem)
-                    .filter(SoldItem.vinted_item_id == vinted_id)
+                    .filter(
+                        SoldItem.tracked_search_id == search.id,
+                        SoldItem.vinted_item_id == vinted_id,
+                    )
                     .first()
                 )
 
@@ -412,13 +427,18 @@ class DealSniperService:
             return removed
 
     def get_status(self) -> dict:
-        """Return full live status dictionary, refreshing live deal ages and pruning expired deals."""
+        """Return full live status dictionary scoped strictly to self.user_id."""
         now_utc = datetime.now(timezone.utc)
         total_db_items = 0
         try:
             db_stat = SessionLocal()
             try:
-                total_db_items = db_stat.query(func.count(SoldItem.id)).scalar() or 0
+                q_stat = db_stat.query(func.count(SoldItem.id))
+                if self.user_id is not None:
+                    q_stat = q_stat.join(TrackedSearch, SoldItem.tracked_search_id == TrackedSearch.id).filter(
+                        TrackedSearch.user_id == self.user_id
+                    )
+                total_db_items = q_stat.scalar() or 0
             finally:
                 db_stat.close()
         except Exception:
@@ -446,6 +466,7 @@ class DealSniperService:
                 self.sniped_deals = valid_deals
                 self.total_snipes_found = max(0, len(self.sniped_deals))
 
+            from ..services.http_client import get_antiban_client
             return {
                 "is_running": self.is_running,
                 "selected_search_ids": list(self.selected_search_ids),
@@ -466,7 +487,7 @@ class DealSniperService:
                 "deals_count": len(self.sniped_deals),
                 "deals": list(self.sniped_deals[:50]),  # Latest 50
                 "logs": list(self.activity_logs[:40]),    # Latest 40
-                "antiban": (lambda: (__import__('app.services.http_client', fromlist=['antiban_client']).antiban_client.get_status()))(),
+                "antiban": get_antiban_client(self.user_id).get_status(),
             }
 
     def _add_log(self, category: str, message: str) -> None:
@@ -481,11 +502,14 @@ class DealSniperService:
             self.activity_logs = self.activity_logs[:100]
 
     def _run_sniper_loop(self) -> None:
-        """High-frequency continuous polling loop running in worker thread with anti-ban defenses."""
+        """High-frequency continuous polling loop running in worker thread with per-user anti-ban defenses."""
         import random
-        from ..services.http_client import antiban_client, VintedBlockedException, VintedRateLimitException
+        from ..auth import set_active_user_id
+        from ..services.http_client import get_antiban_client, VintedBlockedException, VintedRateLimitException
 
-        logger.info("Deal Sniper background worker started with Anti-Ban Shield active.")
+        set_active_user_id(self.user_id)
+        user_antiban = get_antiban_client(self.user_id)
+        logger.info("Deal Sniper background worker started for user %s with Anti-Ban Shield active.", self.user_id)
         last_cooldown_log = 0
 
         while not self._stop_event.is_set():
@@ -494,7 +518,7 @@ class DealSniperService:
                 continue
 
             # 1. Circuit Breaker Check: if Cloudflare or rate-limit tripped, sleep through cooldown
-            is_blocked, remaining_secs, reason = antiban_client.check_circuit_breaker()
+            is_blocked, remaining_secs, reason = user_antiban.check_circuit_breaker()
             if is_blocked:
                 now_t = time.time()
                 if now_t - last_cooldown_log > 15:
@@ -509,14 +533,14 @@ class DealSniperService:
                     break
 
                 # Re-check circuit breaker before each target
-                is_blocked, remaining_secs, _ = antiban_client.check_circuit_breaker()
+                is_blocked, remaining_secs, _ = user_antiban.check_circuit_breaker()
                 if is_blocked:
                     break
 
                 try:
                     self._poll_single_search(search_id)
                 except VintedBlockedException as exc:
-                    self._add_log("SHIELD", f"⚠️ Cloudflare challenge detected! Circuit breaker entered {antiban_client.cooldown_remaining_seconds if hasattr(antiban_client, 'cooldown_remaining_seconds') else 60}s protection cooldown.")
+                    self._add_log("SHIELD", f"⚠️ Cloudflare challenge detected! Circuit breaker entered {user_antiban.cooldown_remaining_seconds if hasattr(user_antiban, 'cooldown_remaining_seconds') else 60}s protection cooldown.")
                     break
                 except VintedRateLimitException as exc:
                     self._add_log("SHIELD", f"⚠️ Vinted rate limit (429) hit. Pausing radar for {exc.retry_after}s.")
@@ -534,13 +558,19 @@ class DealSniperService:
             base_delay = max(4.0, self.poll_delay_seconds * cycle_jitter)
             self._stop_event.wait(base_delay)
 
-        logger.info("Deal Sniper background worker exited.")
+        logger.info("Deal Sniper background worker exited for user %s.", self.user_id)
 
     def _poll_single_search(self, search_id: int) -> None:
         """Perform a rapid page 1 scrape for search_id."""
+        from ..auth import set_active_user_id
+        set_active_user_id(self.user_id)
+
         db: Session = SessionLocal()
         try:
-            search = db.query(TrackedSearch).filter(TrackedSearch.id == search_id).first()
+            search_q = db.query(TrackedSearch).filter(TrackedSearch.id == search_id)
+            if self.user_id is not None:
+                search_q = search_q.filter(TrackedSearch.user_id == self.user_id)
+            search = search_q.first()
             if not search or not search.is_active:
                 return
 
@@ -650,10 +680,13 @@ class DealSniperService:
                 item_desc = str(item_data.get("description", "") or "").strip()
                 item_url = str(item_data.get("url", "") or "").strip()
 
-                # Check if item is already in DB
+                # Check if item is already in DB for this tracked search
                 existing_item = (
                     db.query(SoldItem)
-                    .filter(SoldItem.vinted_item_id == vinted_id)
+                    .filter(
+                        SoldItem.tracked_search_id == search.id,
+                        SoldItem.vinted_item_id == vinted_id,
+                    )
                     .first()
                 )
 
@@ -1052,6 +1085,36 @@ class DealSniperService:
             db.close()
 
 
-# Singleton instance
-deal_sniper = DealSniperService()
+# Per-user DealSniperService registry
+_user_snipers: Dict[int, DealSniperService] = {}
+_user_snipers_lock = threading.Lock()
+_fallback_sniper: Optional[DealSniperService] = None
+
+
+def get_user_sniper(user_id: Optional[int] = None) -> DealSniperService:
+    """Return the isolated DealSniperService instance for the given user_id."""
+    global _fallback_sniper
+    if user_id is None:
+        from ..auth import get_active_user_id
+        user_id = get_active_user_id()
+
+    with _user_snipers_lock:
+        if user_id is None:
+            if _fallback_sniper is None:
+                _fallback_sniper = DealSniperService(user_id=None)
+            return _fallback_sniper
+        if user_id not in _user_snipers:
+            _user_snipers[user_id] = DealSniperService(user_id=user_id)
+        return _user_snipers[user_id]
+
+
+class _ContextualDealSniperProxy:
+    """Routes deal_sniper calls to the active user's isolated DealSniperService."""
+
+    def __getattr__(self, name: str):
+        return getattr(get_user_sniper(), name)
+
+
+deal_sniper = _ContextualDealSniperProxy()
+
 

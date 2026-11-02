@@ -29,7 +29,7 @@ router = APIRouter(prefix="/api", tags=["searches"])
 
 
 @router.get("/searches/categories")
-def get_categories():
+def get_categories(current_user: User = Depends(get_current_user)):
     """Return available Vinted category taxonomy for hierarchical multi-selection."""
     return [
         {
@@ -48,7 +48,10 @@ def get_categories():
 
 
 @router.post("/searches/suggest-classification", response_model=SuggestClassificationResponse)
-def suggest_classification(data: SuggestClassificationRequest):
+def suggest_classification(
+    data: SuggestClassificationRequest,
+    current_user: User = Depends(get_current_user),
+):
     """Auto-suggest brand and Vinted categories from search query using local classifier."""
     return suggest_brand_and_category(data.query)
 

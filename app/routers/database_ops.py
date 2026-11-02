@@ -1,19 +1,15 @@
 """Endpoints for Database Management, Advanced Explorer, and Historical Data Pruning."""
 
-from datetime import datetime, timezone, timedelta
-import os
-import re
-import time
-from typing import Optional, List, Dict, Any
+from datetime import datetime
+from typing import Optional, List, Dict
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_, and_, desc, asc, case
+from sqlalchemy import func, or_, desc, asc, case
 
 from ..auth import get_current_user
 from ..database import get_db
 from ..models import ProductVariant, SoldItem, TrackedSearch, ScrapedPhotoRecord, User
-from ..config import DB_PATH
 from ..services.antirep import extract_photo_key, is_new_with_tags, record_photo_fingerprint
 from ..services.item_classifier import is_child_size
 
@@ -22,23 +18,9 @@ router = APIRouter(prefix="/api/database", tags=["database"])
 
 # ── Pydantic Request Models ─────────────────────────────────────────────────
 
-class DeleteMonthRequest(BaseModel):
-    month: str = Field(..., description="Month identifier in YYYY-MM format, e.g. '2026-10'")
-    search_id: Optional[int] = Field(None, description="Optional search ID to restrict deletion to")
-
-
 class DeleteReplicaMonthRequest(BaseModel):
     month: str = Field(..., description="Month identifier in YYYY-MM format, e.g. '2026-10'")
     search_id: Optional[int] = Field(None, description="Optional search ID to restrict deletion to")
-
-
-class PruneOlderRequest(BaseModel):
-    older_than_days: int = Field(..., ge=1, description="Delete records older than this many days")
-    search_id: Optional[int] = Field(None, description="Optional search ID to restrict deletion to")
-
-
-class ClearSearchDataRequest(BaseModel):
-    search_id: int = Field(..., description="Search ID whose items should be cleared")
 
 
 # ── Specialized Database Analytics ──────────────────────────────────────────
@@ -387,7 +369,10 @@ def get_database_items(
         scraped_vinted_ids = [
             r.vinted_item_id
             for r in db.query(ScrapedPhotoRecord.vinted_item_id)
-            .filter(ScrapedPhotoRecord.photo_key == normalized_photo_key)
+            .filter(
+                ScrapedPhotoRecord.photo_key == normalized_photo_key,
+                ScrapedPhotoRecord.tracked_search_id.in_(user_search_ids),
+            )
             .all()
             if r.vinted_item_id
         ]
@@ -519,8 +504,15 @@ def get_database_items(
     offset = (page - 1) * page_size
     rows = query.offset(offset).limit(page_size).all()
 
-    # Pre-count photo keys across the entire database so each item knows if its image repeats
-    all_photo_rows = db.query(SoldItem.photo_url).filter(SoldItem.photo_url != None).all()
+    # Pre-count photo keys across the user's database so each item knows if its image repeats
+    all_photo_rows = (
+        db.query(SoldItem.photo_url)
+        .filter(
+            SoldItem.tracked_search_id.in_(user_search_ids),
+            SoldItem.photo_url != None,
+        )
+        .all()
+    )
     db_photo_counts: Dict[str, int] = {}
     for (p_url,) in all_photo_rows:
         pk_val = extract_photo_key(None, p_url)
@@ -587,8 +579,17 @@ def get_database_items(
 # ── Replica Monthly Management & Pruning ────────────────────────────────────
 
 @router.get("/replicas/monthly")
-def get_replica_monthly_breakdown(db: Session = Depends(get_db)):
-    """Return month-by-month replica counts for the database management cleanup section."""
+def get_replica_monthly_breakdown(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return month-by-month replica counts for the database management cleanup section belonging to the current user."""
+    user_search_ids = [
+        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
+    ]
+    if not user_search_ids:
+        return {"months": [], "total_replicas": 0}
+
     rows = (
         db.query(
             func.strftime("%Y-%m", SoldItem.captured_at).label("month_key"),
@@ -597,7 +598,10 @@ def get_replica_monthly_breakdown(db: Session = Depends(get_db)):
             func.sum(case((SoldItem.is_replica.isnot(True), 1), else_=0)).label("clean_count"),
             func.round(func.avg(SoldItem.price), 2).label("avg_price"),
         )
-        .filter(SoldItem.captured_at != None)
+        .filter(
+            SoldItem.tracked_search_id.in_(user_search_ids),
+            SoldItem.captured_at != None,
+        )
         .group_by("month_key")
         .order_by(func.strftime("%Y-%m", SoldItem.captured_at).desc())
         .all()
@@ -624,25 +628,53 @@ def get_replica_monthly_breakdown(db: Session = Depends(get_db)):
 
     return {
         "months": months,
-        "total_replicas": db.query(SoldItem).filter(SoldItem.is_replica == True).count(),
+        "total_replicas": (
+            db.query(SoldItem)
+            .filter(SoldItem.tracked_search_id.in_(user_search_ids), SoldItem.is_replica == True)
+            .count()
+        ),
     }
 
 
 @router.post("/replicas/delete-month")
-def delete_replica_month_data(data: DeleteReplicaMonthRequest, db: Session = Depends(get_db)):
-    """Permanently delete ONLY replica items belonging to a specific month, preserving legitimate sales."""
+def delete_replica_month_data(
+    data: DeleteReplicaMonthRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Permanently delete ONLY replica items belonging to a specific month for the current user, preserving legitimate sales."""
+    user_search_ids = [
+        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
+    ]
+    if not user_search_ids:
+        return {
+            "ok": True,
+            "deleted_count": 0,
+            "remaining_replicas": 0,
+            "remaining_total": 0,
+            "month": data.month,
+            "message": "No replicas found to delete.",
+        }
+
     query = db.query(SoldItem).filter(
+        SoldItem.tracked_search_id.in_(user_search_ids),
         func.strftime("%Y-%m", SoldItem.captured_at) == data.month,
         SoldItem.is_replica == True,
     )
     if data.search_id:
+        if data.search_id not in user_search_ids:
+            raise HTTPException(status_code=403, detail="Search does not belong to your profile")
         query = query.filter(SoldItem.tracked_search_id == data.search_id)
 
     deleted_count = query.delete(synchronize_session=False)
     db.commit()
 
-    remaining_replicas = db.query(SoldItem).filter(SoldItem.is_replica == True).count()
-    remaining_total = db.query(SoldItem).count()
+    remaining_replicas = (
+        db.query(SoldItem)
+        .filter(SoldItem.tracked_search_id.in_(user_search_ids), SoldItem.is_replica == True)
+        .count()
+    )
+    remaining_total = db.query(SoldItem).filter(SoldItem.tracked_search_id.in_(user_search_ids)).count()
 
     try:
         dt = datetime.strptime(data.month, "%Y-%m")
@@ -661,37 +693,66 @@ def delete_replica_month_data(data: DeleteReplicaMonthRequest, db: Session = Dep
 
 
 @router.post("/replicas/purge-all")
-def purge_all_replicas(db: Session = Depends(get_db)):
-    """Permanently delete all caught replica items across all searches and dates."""
+def purge_all_replicas(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Permanently delete all caught replica items across all searches belonging to the current user."""
+    user_search_ids = [
+        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
+    ]
+    if not user_search_ids:
+        return {
+            "ok": True,
+            "deleted_count": 0,
+            "remaining_total": 0,
+            "message": "No replicas found in your database.",
+        }
+
     deleted_count = (
         db.query(SoldItem)
-        .filter(SoldItem.is_replica == True)
+        .filter(SoldItem.tracked_search_id.in_(user_search_ids), SoldItem.is_replica == True)
         .delete(synchronize_session=False)
     )
     db.commit()
 
-    remaining_total = db.query(SoldItem).count()
+    remaining_total = db.query(SoldItem).filter(SoldItem.tracked_search_id.in_(user_search_ids)).count()
     return {
         "ok": True,
         "deleted_count": deleted_count,
         "remaining_total": remaining_total,
-        "message": f"Purged all {deleted_count} caught replicas from database.",
+        "message": f"Purged all {deleted_count} caught replicas from your database.",
     }
 
 
 @router.post("/rescan-replicas")
-def rescan_database_replicas(db: Session = Depends(get_db)):
-    """Audit all stored items against anti-rep detection heuristics (duplicate photos, BNWT keywords, multiple listings)."""
-    items = db.query(SoldItem).all()
+def rescan_database_replicas(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Audit stored items belonging to the current user against anti-rep detection heuristics."""
+    user_searches = db.query(TrackedSearch).filter(TrackedSearch.user_id == current_user.id).all()
+    user_search_ids = [s.id for s in user_searches]
+    if not user_search_ids:
+        return {
+            "ok": True,
+            "total_inspected": 0,
+            "newly_flagged": 0,
+            "cleared": 0,
+            "total_replicas": 0,
+            "message": "No items in your database to rescan.",
+        }
+
+    items = db.query(SoldItem).filter(SoldItem.tracked_search_id.in_(user_search_ids)).all()
     total_inspected = len(items)
     newly_flagged = 0
     now_clean = 0
 
     searches_map: Dict[int, dict] = {
-        s.id: s.antirep_config for s in db.query(TrackedSearch).all()
+        s.id: s.antirep_config for s in user_searches
     }
 
-    # Build map of seller item counts per search and photo fingerprint clusters across entire DB
+    # Build map of seller item counts per search and photo fingerprint clusters across user's DB
     seller_counts: Dict[tuple, int] = {}
     photo_clusters: Dict[str, List[str]] = {}
     item_photo_keys: Dict[int, Optional[str]] = {}
@@ -725,7 +786,7 @@ def rescan_database_replicas(db: Session = Depends(get_db)):
 
         is_bnwt, bnwt_reason = is_new_with_tags(item.condition, item.title or "")
 
-        # Check duplicate photo across SoldItem and ScrapedPhotoRecord
+        # Check duplicate photo across user's SoldItem and ScrapedPhotoRecord
         pk = item_photo_keys.get(item.id)
         is_dup_photo = False
         dup_reason = ""
@@ -739,6 +800,7 @@ def rescan_database_replicas(db: Session = Depends(get_db)):
                 dup_rec = (
                     db.query(ScrapedPhotoRecord)
                     .filter(
+                        ScrapedPhotoRecord.tracked_search_id.in_(user_search_ids),
                         ScrapedPhotoRecord.photo_key == pk,
                         ScrapedPhotoRecord.vinted_item_id != str(item.vinted_item_id),
                     )
@@ -785,7 +847,11 @@ def rescan_database_replicas(db: Session = Depends(get_db)):
         item.child_size_reason = child_reason
 
     db.commit()
-    total_replicas = db.query(SoldItem).filter(SoldItem.is_replica == True).count()
+    total_replicas = (
+        db.query(SoldItem)
+        .filter(SoldItem.tracked_search_id.in_(user_search_ids), SoldItem.is_replica == True)
+        .count()
+    )
 
     return {
         "ok": True,
@@ -798,9 +864,21 @@ def rescan_database_replicas(db: Session = Depends(get_db)):
 
 
 @router.delete("/items/{item_id}")
-def delete_single_item(item_id: int, db: Session = Depends(get_db)):
-    """Delete a single individual item entry from the database."""
-    item = db.query(SoldItem).filter(SoldItem.id == item_id).first()
+def delete_single_item(
+    item_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete a single individual item entry from the current user's database."""
+    user_search_ids = [
+        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
+    ]
+    item = (
+        db.query(SoldItem)
+        .filter(SoldItem.id == item_id, SoldItem.tracked_search_id.in_(user_search_ids))
+        .first()
+        if user_search_ids else None
+    )
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
@@ -819,12 +897,21 @@ def delete_single_item(item_id: int, db: Session = Depends(get_db)):
 def toggle_item_sold(
     item_id: int,
     sold_price: Optional[float] = Query(None, description="Optional final sale price override"),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Toggle the is_sold status of an individual item between True and False, ensuring exact final sale price."""
     from ..services.status_checker import fetch_live_item_price
 
-    item = db.query(SoldItem).filter(SoldItem.id == item_id).first()
+    user_search_ids = [
+        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
+    ]
+    item = (
+        db.query(SoldItem)
+        .filter(SoldItem.id == item_id, SoldItem.tracked_search_id.in_(user_search_ids))
+        .first()
+        if user_search_ids else None
+    )
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
@@ -863,10 +950,19 @@ def toggle_item_sold(
 def update_item_price(
     item_id: int,
     price: float = Query(..., ge=0.01, description="New price in GBP"),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Update or mark down an item's exact listed or sold price."""
-    item = db.query(SoldItem).filter(SoldItem.id == item_id).first()
+    user_search_ids = [
+        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
+    ]
+    item = (
+        db.query(SoldItem)
+        .filter(SoldItem.id == item_id, SoldItem.tracked_search_id.in_(user_search_ids))
+        .first()
+        if user_search_ids else None
+    )
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
@@ -884,11 +980,18 @@ def update_item_price(
 
 
 @router.post("/items/{item_id}/verify-status")
-def verify_item_status_endpoint(item_id: int, db: Session = Depends(get_db)):
+def verify_item_status_endpoint(
+    item_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Perform a live diagnostic check against Vinted to verify if item is actively available or sold."""
     from ..services.status_checker import audit_and_sync_item_status
 
-    res = audit_and_sync_item_status(db, item_id)
+    user_search_ids = [
+        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
+    ]
+    res = audit_and_sync_item_status(db, item_id, allowed_search_ids=user_search_ids)
     if not res.get("ok"):
         raise HTTPException(status_code=404, detail=res.get("error", "Item not found"))
     return res
@@ -899,10 +1002,17 @@ def batch_verify_sold_statuses(
     batch_size: int = Query(0, ge=0, le=10000, description="Max items to audit (0 = all items)"),
     search_id: Optional[int] = Query(None, description="Optional search ID to restrict audit to"),
     only_active: bool = Query(True, description="Only audit items currently marked active"),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Verify live sold/active status and exact listed/sold prices against Vinted UK."""
+    """Verify live sold/active status and exact listed/sold prices against Vinted UK for the current user's items."""
     from ..services.status_checker import batch_audit_and_sync_statuses
+
+    user_search_ids = [
+        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
+    ]
+    if search_id is not None and search_id not in user_search_ids:
+        raise HTTPException(status_code=403, detail="Search does not belong to your profile")
 
     effective_batch = batch_size if batch_size and batch_size > 0 else None
     return batch_audit_and_sync_statuses(
@@ -911,13 +1021,26 @@ def batch_verify_sold_statuses(
         search_id=search_id,
         only_unverified_or_active=only_active,
         max_workers=8,
+        allowed_search_ids=user_search_ids,
     )
 
 
 @router.post("/items/{item_id}/toggle-replica")
-def toggle_item_replica(item_id: int, db: Session = Depends(get_db)):
+def toggle_item_replica(
+    item_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Manually toggle an item's replica verification status."""
-    item = db.query(SoldItem).filter(SoldItem.id == item_id).first()
+    user_search_ids = [
+        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
+    ]
+    item = (
+        db.query(SoldItem)
+        .filter(SoldItem.id == item_id, SoldItem.tracked_search_id.in_(user_search_ids))
+        .first()
+        if user_search_ids else None
+    )
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
@@ -937,184 +1060,4 @@ def toggle_item_replica(item_id: int, db: Session = Depends(get_db)):
     }
 
 
-# ── General Database Maintenance & Summary ──────────────────────────────────
-
-@router.get("/summary")
-def get_database_summary(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Return comprehensive database health metrics, monthly slices, and file statistics belonging to the user."""
-    user_search_ids = [
-        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
-    ]
-    if not user_search_ids:
-        return {
-            "total_items": 0,
-            "total_searches": 0,
-            "db_size_mb": 0.0,
-            "months": [],
-            "searches": [],
-        }
-
-    total_items = db.query(SoldItem).filter(SoldItem.tracked_search_id.in_(user_search_ids)).count()
-    total_searches = len(user_search_ids)
-
-    # Size on disk
-    db_size_mb = 0.0
-    try:
-        if os.path.exists(DB_PATH):
-            db_size_mb = round(os.path.getsize(DB_PATH) / (1024 * 1024), 2)
-    except Exception:
-        pass
-
-    # Monthly breakdown using SQLite strftime
-    monthly_rows = (
-        db.query(
-            func.strftime("%Y-%m", SoldItem.captured_at).label("month_key"),
-            func.count(SoldItem.id).label("count"),
-            func.avg(SoldItem.price).label("avg_price"),
-            func.count(func.distinct(SoldItem.tracked_search_id)).label("searches_count"),
-        )
-        .filter(SoldItem.tracked_search_id.in_(user_search_ids), SoldItem.captured_at != None)
-        .group_by("month_key")
-        .order_by(func.strftime("%Y-%m", SoldItem.captured_at).desc())
-        .all()
-    )
-
-    months = []
-    for row in monthly_rows:
-        if not row.month_key:
-            continue
-        try:
-            dt = datetime.strptime(row.month_key, "%Y-%m")
-            label = dt.strftime("%B %Y")
-        except Exception:
-            label = row.month_key
-
-        months.append({
-            "month_key": row.month_key,
-            "label": label,
-            "count": row.count or 0,
-            "avg_price": round(float(row.avg_price or 0.0), 2),
-            "searches_count": row.searches_count or 0,
-        })
-
-    # Search breakdown
-    searches = db.query(TrackedSearch).filter(TrackedSearch.is_active == True, TrackedSearch.user_id == current_user.id).all()
-    search_stats = []
-    for s in searches:
-        count = db.query(SoldItem).filter(SoldItem.tracked_search_id == s.id).count()
-        search_stats.append({
-            "id": s.id,
-            "search_text": s.search_text,
-            "count": count,
-        })
-
-    return {
-        "total_items": total_items,
-        "total_searches": total_searches,
-        "db_size_mb": db_size_mb,
-        "months": months,
-        "searches": search_stats,
-    }
-
-
-@router.post("/delete-month")
-def delete_month_data(
-    data: DeleteMonthRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Delete all recorded items belonging to a specific month for the current user."""
-    user_search_ids = [
-        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
-    ]
-    query = db.query(SoldItem).filter(
-        SoldItem.tracked_search_id.in_(user_search_ids),
-        func.strftime("%Y-%m", SoldItem.captured_at) == data.month,
-    )
-    if data.search_id:
-        if data.search_id not in user_search_ids:
-            raise HTTPException(status_code=403, detail="Search does not belong to your profile")
-        query = query.filter(SoldItem.tracked_search_id == data.search_id)
-
-    deleted_count = query.delete(synchronize_session=False)
-    db.commit()
-
-    remaining_total = db.query(SoldItem).filter(SoldItem.tracked_search_id.in_(user_search_ids)).count()
-
-    try:
-        dt = datetime.strptime(data.month, "%Y-%m")
-        month_label = dt.strftime("%B %Y")
-    except Exception:
-        month_label = data.month
-
-    return {
-        "ok": True,
-        "deleted_count": deleted_count,
-        "remaining_total": remaining_total,
-        "month": data.month,
-        "message": f"Successfully purged {deleted_count} recorded items from {month_label}.",
-    }
-
-
-@router.post("/prune-older-than")
-def prune_older_data(
-    data: PruneOlderRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Delete all records older than a specified number of days for the current user."""
-    user_search_ids = [
-        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
-    ]
-    cutoff = datetime.now(timezone.utc) - timedelta(days=data.older_than_days)
-    query = db.query(SoldItem).filter(
-        SoldItem.tracked_search_id.in_(user_search_ids),
-        SoldItem.captured_at < cutoff,
-    )
-    if data.search_id:
-        if data.search_id not in user_search_ids:
-            raise HTTPException(status_code=403, detail="Search does not belong to your profile")
-        query = query.filter(SoldItem.tracked_search_id == data.search_id)
-
-    deleted_count = query.delete(synchronize_session=False)
-    db.commit()
-
-    remaining_total = db.query(SoldItem).filter(SoldItem.tracked_search_id.in_(user_search_ids)).count()
-    return {
-        "ok": True,
-        "deleted_count": deleted_count,
-        "remaining_total": remaining_total,
-        "message": f"Purged {deleted_count} items older than {data.older_than_days} days.",
-    }
-
-
-@router.post("/clear-search-data")
-def clear_search_data(
-    data: ClearSearchDataRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Clear all recorded items for a specific tracked search belonging to the user."""
-    user_search_ids = [
-        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
-    ]
-    if data.search_id not in user_search_ids:
-        raise HTTPException(status_code=403, detail="Search does not belong to your profile")
-
-    deleted_count = (
-        db.query(SoldItem)
-        .filter(SoldItem.tracked_search_id == data.search_id)
-        .delete(synchronize_session=False)
-    )
-    db.commit()
-    remaining_total = db.query(SoldItem).filter(SoldItem.tracked_search_id.in_(user_search_ids)).count()
-    return {
-        "ok": True,
-        "deleted_count": deleted_count,
-        "remaining_total": remaining_total,
-        "message": f"Cleared {deleted_count} records for search ID {data.search_id}.",
-    }
 

@@ -60,13 +60,16 @@ def run_batch_scrape(
 
 
 @router.get("/schedule")
-def get_schedule():
+def get_schedule(current_user: User = Depends(get_current_user)):
     """Get current scheduler configuration, interval, and constant scrape state."""
     return get_scheduler_status()
 
 
 @router.post("/schedule")
-def update_schedule(data: ScheduleUpdateRequest):
+def update_schedule(
+    data: ScheduleUpdateRequest,
+    current_user: User = Depends(get_current_user),
+):
     """Update auto-poll interval or toggle constant continuous scrape."""
     new_status = update_scheduler_settings(
         interval_minutes=data.interval_minutes,
@@ -80,13 +83,15 @@ def get_live_scraper_feed(
     since_id: Optional[int] = None,
     filter_type: Optional[str] = "all",
     limit: Optional[int] = 150,
+    current_user: User = Depends(get_current_user),
 ):
-    """Return recent scraper and sniper activity events with highlight metadata."""
+    """Return recent scraper and sniper activity events with highlight metadata scoped to user."""
     from ..services.scraper_logger import scraper_logger
     feed_data = scraper_logger.get_feed(
         since_id=since_id,
         filter_type=filter_type,
         limit=min(300, max(10, limit or 150)),
+        user_id=current_user.id,
     )
     # Include current scheduler telemetry for the terminal header
     scheduler_status = get_scheduler_status()
@@ -103,10 +108,10 @@ def get_live_scraper_feed(
 
 
 @router.post("/clear-feed")
-def clear_live_scraper_feed():
-    """Clear in-memory activity events and reset session counters."""
+def clear_live_scraper_feed(current_user: User = Depends(get_current_user)):
+    """Clear in-memory activity events and reset session counters for current user."""
     from ..services.scraper_logger import scraper_logger
-    scraper_logger.clear()
+    scraper_logger.clear(user_id=current_user.id)
     return {"status": "ok", "message": "Scraper terminal feed cleared"}
 
 

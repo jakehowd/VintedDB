@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from bs4 import BeautifulSoup
 from curl_cffi import requests
-from ..config import ANTIBAN_CONFIG_PATH, DEFAULT_COOKIE, DEFAULT_PROXIES, VINTED_BASE_URL
+from ..config import DEFAULT_COOKIE, DEFAULT_PROXIES, VINTED_BASE_URL
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +49,10 @@ class VintedRateLimitException(Exception):
 
 
 class AntiBanVintedClient:
-    """Manages secure, fingerprint-spoofed communication with Vinted UK."""
+    """Manages secure, fingerprint-spoofed communication with Vinted UK isolated per user profile."""
 
-    def __init__(self):
+    def __init__(self, user_id: Optional[int] = None):
+        self.user_id: Optional[int] = user_id
         self._lock = threading.RLock()
         self._session: Optional[requests.Session] = None
         self._proxy_list: List[str] = []
@@ -70,37 +71,53 @@ class AntiBanVintedClient:
         self.last_latency_ms: Optional[float] = None
         self.last_tested_at: Optional[datetime] = None
 
-        # Load persisted settings or environment defaults
+        # Load persisted settings for this user profile
         self._load_config()
         self._reinit_session()
 
     def _load_config(self) -> None:
-        """Load anti-ban proxy and cookie configuration from storage or env."""
-        proxy_str = DEFAULT_PROXIES
-        cookie_str = DEFAULT_COOKIE
+        """Load anti-ban proxy and cookie configuration strictly isolated for self.user_id."""
+        proxy_str = ""
+        cookie_str = ""
         saved_ua = None
 
-        if os.path.exists(ANTIBAN_CONFIG_PATH):
+        if self.user_id is not None:
             try:
-                with open(ANTIBAN_CONFIG_PATH, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                    if isinstance(cfg, dict):
-                        if "proxies" in cfg or "proxy_url" in cfg:
-                            proxy_str = cfg.get("proxies") if "proxies" in cfg else cfg.get("proxy_url", "")
-                        if "cookies" in cfg or "cookie_str" in cfg:
-                            cookie_str = cfg.get("cookies") if "cookies" in cfg else cfg.get("cookie_str", "")
-                        saved_ua = cfg.get("user_agent")
+                from ..database import SessionLocal
+                from ..models import User
+                db = SessionLocal()
+                try:
+                    user = db.query(User).filter(User.id == self.user_id).first()
+                    if user:
+                        if user.antiban_config_json:
+                            cfg = json.loads(user.antiban_config_json)
+                            if isinstance(cfg, dict):
+                                proxy_str = cfg.get("proxies") if "proxies" in cfg else cfg.get("proxy_url", "")
+                                cookie_str = cfg.get("cookies") if "cookies" in cfg else cfg.get("cookie_str", "")
+                                saved_ua = cfg.get("user_agent")
+                        elif user.is_admin:
+                            proxy_str = DEFAULT_PROXIES
+                            cookie_str = DEFAULT_COOKIE
+                            user.antiban_config_json = json.dumps({
+                                "proxies": proxy_str or "",
+                                "cookies": cookie_str or "",
+                                "user_agent": self._user_agent,
+                                "updated_at": datetime.now(timezone.utc).isoformat(),
+                            })
+                            db.commit()
+                finally:
+                    db.close()
             except Exception as e:
-                logger.warning("Could not read antiban_config.json: %s", e)
+                logger.warning("Could not load user %s antiban_config from DB: %s", self.user_id, e)
 
         if saved_ua:
             self._custom_user_agent = saved_ua
             self._user_agent = saved_ua
-        self._set_proxies_internal(proxy_str)
-        self._set_cookies_internal(cookie_str)
+        self._set_proxies_internal(proxy_str or "")
+        self._set_cookies_internal(cookie_str or "")
 
     def save_config(self, proxy_str: str, cookie_str: str, user_agent: Optional[str] = None) -> None:
-        """Persist updated proxy, cookie, and User-Agent configuration."""
+        """Persist updated proxy, cookie, and User-Agent configuration strictly for this user profile."""
         with self._lock:
             if user_agent:
                 self._custom_user_agent = user_agent
@@ -110,17 +127,27 @@ class AntiBanVintedClient:
             self.reset_circuit_breaker()
             self._reinit_session()
 
-            try:
-                os.makedirs(os.path.dirname(ANTIBAN_CONFIG_PATH), exist_ok=True)
-                with open(ANTIBAN_CONFIG_PATH, "w", encoding="utf-8") as f:
-                    json.dump({
-                        "proxies": proxy_str,
-                        "cookies": cookie_str,
-                        "user_agent": self._user_agent,
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
-                    }, f, indent=2)
-            except Exception as e:
-                logger.error("Failed to save antiban_config.json: %s", e)
+            payload_dict = {
+                "proxies": proxy_str,
+                "cookies": cookie_str,
+                "user_agent": self._user_agent,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+
+            if self.user_id is not None:
+                try:
+                    from ..database import SessionLocal
+                    from ..models import User
+                    db = SessionLocal()
+                    try:
+                        user = db.query(User).filter(User.id == self.user_id).first()
+                        if user:
+                            user.antiban_config_json = json.dumps(payload_dict)
+                            db.commit()
+                    finally:
+                        db.close()
+                except Exception as e:
+                    logger.error("Failed to save user %s antiban config to DB: %s", self.user_id, e)
 
     def _set_proxies_internal(self, proxy_input: str) -> None:
         """Parse proxy list from newline or comma separated string, stripping quotes and extra tokens."""
@@ -673,6 +700,31 @@ class AntiBanVintedClient:
         }
 
 
-# Global singleton instance
-antiban_client = AntiBanVintedClient()
+_user_antiban_lock = threading.RLock()
+_user_antiban_clients: Dict[Optional[int], AntiBanVintedClient] = {}
+
+
+def get_antiban_client(user_id: Optional[int] = None) -> AntiBanVintedClient:
+    """Return the isolated AntiBanVintedClient instance for the given user_id (or active context user)."""
+    if user_id is None:
+        from ..auth import get_active_user_id
+        user_id = get_active_user_id()
+    with _user_antiban_lock:
+        if user_id not in _user_antiban_clients:
+            _user_antiban_clients[user_id] = AntiBanVintedClient(user_id=user_id)
+        return _user_antiban_clients[user_id]
+
+
+class _ContextualAntiBanClientProxy:
+    """Transparent proxy routing all attribute and method accesses to the active user's AntiBanVintedClient."""
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(get_antiban_client(), name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        setattr(get_antiban_client(), name, value)
+
+
+# Context-aware proxy instance (auto-isolates per user_id)
+antiban_client = _ContextualAntiBanClientProxy()
 

@@ -592,9 +592,18 @@ def sweep_active_catalog_for_searches(
     return active_map
 
 
-def audit_and_sync_item_status(db: Session, item_id: int) -> Dict[str, Any]:
+def audit_and_sync_item_status(
+    db: Session,
+    item_id: int,
+    allowed_search_ids: Optional[List[int]] = None,
+) -> Dict[str, Any]:
     """Verify live status and exact price for a single database item and synchronize its record."""
-    item = db.query(SoldItem).filter(SoldItem.id == item_id).first()
+    q = db.query(SoldItem).filter(SoldItem.id == item_id)
+    if allowed_search_ids is not None:
+        if not allowed_search_ids:
+            return {"ok": False, "error": "Item not found"}
+        q = q.filter(SoldItem.tracked_search_id.in_(allowed_search_ids))
+    item = q.first()
     if not item:
         return {"ok": False, "error": "Item not found"}
 
@@ -652,9 +661,24 @@ def batch_audit_and_sync_statuses(
     search_id: Optional[int] = None,
     only_unverified_or_active: bool = False,
     max_workers: int = 8,
+    allowed_search_ids: Optional[List[int]] = None,
 ) -> Dict[str, Any]:
-    """Verify live sold/active statuses and exact prices across a batch or the entire database."""
+    """Verify live sold/active statuses and exact prices across a batch or the user's database."""
+    if allowed_search_ids is not None and not allowed_search_ids:
+        return {
+            "ok": True,
+            "checked": 0,
+            "marked_sold": 0,
+            "still_active": 0,
+            "prices_updated": 0,
+            "total_sold_in_db": 0,
+            "total_active_in_db": 0,
+            "message": "No items to verify.",
+        }
+
     query = db.query(SoldItem)
+    if allowed_search_ids is not None:
+        query = query.filter(SoldItem.tracked_search_id.in_(allowed_search_ids))
     if search_id is not None:
         query = query.filter(SoldItem.tracked_search_id == search_id)
     if only_unverified_or_active:
@@ -679,7 +703,10 @@ def batch_audit_and_sync_statuses(
     # Phase 1: Fast bulk catalog sweep if checking >= 25 items
     active_catalog_map: Dict[str, Dict[str, Any]] = {}
     if len(items) >= 25:
-        searches = db.query(TrackedSearch).all()
+        s_query = db.query(TrackedSearch)
+        if allowed_search_ids is not None:
+            s_query = s_query.filter(TrackedSearch.id.in_(allowed_search_ids))
+        searches = s_query.all()
         search_phrases = [s.search_text for s in searches if s.search_text]
         brands = sorted({it.brand.strip() for it in items if it.brand and it.brand.strip()})
         for b in brands[:6]:
@@ -794,8 +821,13 @@ def batch_audit_and_sync_statuses(
         if completed_since_commit > 0:
             db.commit()
 
-    total_sold_db = db.query(SoldItem).filter(SoldItem.is_sold == True).count()
-    total_active_db = db.query(SoldItem).filter(SoldItem.is_sold == False).count()
+    q_sold_total = db.query(SoldItem).filter(SoldItem.is_sold == True)
+    q_active_total = db.query(SoldItem).filter(SoldItem.is_sold == False)
+    if allowed_search_ids is not None:
+        q_sold_total = q_sold_total.filter(SoldItem.tracked_search_id.in_(allowed_search_ids))
+        q_active_total = q_active_total.filter(SoldItem.tracked_search_id.in_(allowed_search_ids))
+    total_sold_db = q_sold_total.count()
+    total_active_db = q_active_total.count()
 
     return {
         "ok": True,

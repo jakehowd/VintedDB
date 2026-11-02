@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from ..auth import get_current_user
 from ..database import get_db
 from ..models import ProductVariant, SoldItem, TrackedSearch, User
-from ..services.llm_router import llm_router
+from ..services.llm_router import get_llm_router, llm_router
 from ..services.variant_vision import _build_stop_tokens, variant_vision_service
 
 logger = logging.getLogger(__name__)
@@ -631,25 +631,28 @@ def _batch_classify_stored_items(
 # ── AI Configuration & Engine Health Endpoints ──────────────────────────────
 
 @router.get("/ai/status")
-def get_ai_status():
-    """Return multi-LLM provider pool status, cooldowns, and local Vision/OCR engine health."""
-    return llm_router.get_public_status()
+def get_ai_status(current_user: User = Depends(get_current_user)):
+    """Return multi-LLM provider pool status, cooldowns, and local Vision/OCR engine health for current user."""
+    return get_llm_router(current_user.id).get_public_status()
 
 
 @router.post("/ai/config")
-def update_ai_config(data: AIConfigUpdateRequest):
-    """Save LLM API keys, load-balancing strategy, and local Ollama settings."""
+def update_ai_config(
+    data: AIConfigUpdateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Save LLM API keys, load-balancing strategy, and local Ollama settings isolated to current user."""
     payload = {k: v for k, v in data.model_dump().items() if v is not None}
-    return llm_router.save_config(payload)
+    return get_llm_router(current_user.id).save_config(payload)
 
 
 @router.post("/ai/test")
-def test_ai_pipeline():
+def test_ai_pipeline(current_user: User = Depends(get_current_user)):
     """Verify Cloud LLM Router connectivity (if keys configured) + Local Vision CLIP & Apple Neural OCR."""
     clip_ok = variant_vision_service._ensure_clip_loaded()
     vision_status = variant_vision_service.get_engine_status()
 
-    parsed, provider_badge = llm_router.generate_json(
+    parsed, provider_badge = get_llm_router(current_user.id).generate_json(
         system_prompt="Respond strictly with JSON: {\"status\": \"ok\", \"message\": \"Cloud LLM connected\"}",
         user_prompt="Ping test.",
         allow_grounding=False,

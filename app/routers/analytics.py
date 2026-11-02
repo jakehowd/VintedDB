@@ -208,7 +208,11 @@ def recent_sales(
         .scalar()
     )
 
-    all_photo_rows = db.query(SoldItem.photo_url).filter(SoldItem.photo_url != None).all()
+    all_photo_rows = (
+        db.query(SoldItem.photo_url)
+        .filter(SoldItem.tracked_search_id == search_id, SoldItem.photo_url != None)
+        .all()
+    )
     db_photo_counts: dict[str, int] = {}
     for (p_url,) in all_photo_rows:
         pk_val = extract_photo_key(None, p_url)
@@ -265,41 +269,3 @@ def recent_sales(
         "items": out_items,
     }
 
-
-
-@router.get("/overview")
-def get_overview(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Dashboard overview — summary stats for every active tracked search belonging to the user."""
-    searches = (
-        db.query(TrackedSearch)
-        .filter(TrackedSearch.is_active.is_(True), TrackedSearch.user_id == current_user.id)
-        .all()
-    )
-
-    overview = []
-    for search in searches:
-        stats = (
-            db.query(
-                func.count(SoldItem.id),
-                func.round(func.avg(SoldItem.price), 2),
-                func.min(SoldItem.price),
-                func.max(SoldItem.price),
-            )
-            .filter(SoldItem.tracked_search_id == search.id, SoldItem.is_replica.isnot(True))
-            .first()
-        )
-        overview.append(
-            {
-                "search_id": search.id,
-                "search_text": search.search_text,
-                "total_items": stats[0] or 0,
-                "avg_price": stats[1] or 0,
-                "min_price": stats[2] or 0,
-                "max_price": stats[3] or 0,
-            }
-        )
-
-    return overview

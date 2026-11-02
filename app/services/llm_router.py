@@ -23,8 +23,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 
-from ..config import AI_CONFIG_PATH
-
 logger = logging.getLogger(__name__)
 
 
@@ -1321,9 +1319,10 @@ SPECIALIST_CATALOGUES: List[Tuple[List[str], Dict[str, Any]]] = [
 
 
 class MultiLLMRouter:
-    """Manages API credentials, provider load-balancing, cooldowns, and structured JSON Deep Research."""
+    """Manages API credentials, provider load-balancing, cooldowns, and structured JSON Deep Research per user profile."""
 
-    def __init__(self) -> None:
+    def __init__(self, user_id: Optional[int] = None) -> None:
+        self.user_id: Optional[int] = user_id
         self._lock = threading.RLock()
         self.config: Dict[str, Any] = dict(DEFAULT_AI_CONFIG)
         self._rr_cursor: int = 0
@@ -1348,30 +1347,42 @@ class MultiLLMRouter:
     def _load_config(self) -> None:
         with self._lock:
             cfg = dict(DEFAULT_AI_CONFIG)
-            if os.path.exists(AI_CONFIG_PATH) and os.path.getsize(AI_CONFIG_PATH) > 0:
-                try:
-                    with open(AI_CONFIG_PATH, "r", encoding="utf-8") as f:
-                        saved = json.load(f)
-                        if isinstance(saved, dict):
-                            cfg.update(saved)
-                except Exception as exc:
-                    logger.warning("Could not read ai_config.json: %s", exc)
+            is_admin_user = False
 
-            # Merge environment variables if present
-            for env_name, target_key in [
-                ("GEMINI_API_KEY", "gemini_api_keys"),
-                ("GOOGLE_API_KEY", "gemini_api_keys"),
-                ("GROQ_API_KEY", "groq_api_keys"),
-                ("OPENROUTER_API_KEY", "openrouter_api_keys"),
-                ("MISTRAL_API_KEY", "mistral_api_keys"),
-            ]:
-                env_val = os.environ.get(env_name, "").strip()
-                if env_val:
-                    existing = self._parse_key_list(cfg.get(target_key))
-                    for k in self._parse_key_list(env_val):
-                        if k not in existing:
-                            existing.append(k)
-                    cfg[target_key] = existing
+            if self.user_id is not None:
+                try:
+                    from ..database import SessionLocal
+                    from ..models import User
+                    db = SessionLocal()
+                    try:
+                        user = db.query(User).filter(User.id == self.user_id).first()
+                        if user:
+                            is_admin_user = bool(user.is_admin)
+                            if user.ai_config_json:
+                                saved = json.loads(user.ai_config_json)
+                                if isinstance(saved, dict):
+                                    cfg.update(saved)
+                    finally:
+                        db.close()
+                except Exception as exc:
+                    logger.warning("Could not load user %s ai_config from DB: %s", self.user_id, exc)
+
+            # Merge environment variables ONLY for the admin account
+            if is_admin_user:
+                for env_name, target_key in [
+                    ("GEMINI_API_KEY", "gemini_api_keys"),
+                    ("GOOGLE_API_KEY", "gemini_api_keys"),
+                    ("GROQ_API_KEY", "groq_api_keys"),
+                    ("OPENROUTER_API_KEY", "openrouter_api_keys"),
+                    ("MISTRAL_API_KEY", "mistral_api_keys"),
+                ]:
+                    env_val = os.environ.get(env_name, "").strip()
+                    if env_val:
+                        existing = self._parse_key_list(cfg.get(target_key))
+                        for k in self._parse_key_list(env_val):
+                            if k not in existing:
+                                existing.append(k)
+                        cfg[target_key] = existing
 
             for list_field in ("gemini_api_keys", "groq_api_keys", "openrouter_api_keys", "mistral_api_keys"):
                 cfg[list_field] = self._parse_key_list(cfg.get(list_field))
@@ -1397,12 +1408,20 @@ class MultiLLMRouter:
                 else:
                     self.config[key] = val
 
-            try:
-                os.makedirs(os.path.dirname(AI_CONFIG_PATH), exist_ok=True)
-                with open(AI_CONFIG_PATH, "w", encoding="utf-8") as f:
-                    json.dump(self.config, f, indent=2)
-            except Exception as exc:
-                logger.warning("Failed to save ai_config.json: %s", exc)
+            if self.user_id is not None:
+                try:
+                    from ..database import SessionLocal
+                    from ..models import User
+                    db = SessionLocal()
+                    try:
+                        user = db.query(User).filter(User.id == self.user_id).first()
+                        if user:
+                            user.ai_config_json = json.dumps(self.config)
+                            db.commit()
+                    finally:
+                        db.close()
+                except Exception as exc:
+                    logger.warning("Failed to save user %s ai_config to DB: %s", self.user_id, exc)
 
             return self.get_public_status()
 
@@ -2214,5 +2233,30 @@ class MultiLLMRouter:
         return norm_res
 
 
-llm_router = MultiLLMRouter()
+_user_llm_lock = threading.RLock()
+_user_llm_routers: Dict[Optional[int], MultiLLMRouter] = {}
+
+
+def get_llm_router(user_id: Optional[int] = None) -> MultiLLMRouter:
+    """Return the isolated MultiLLMRouter instance for the given user_id (or active context user)."""
+    if user_id is None:
+        from ..auth import get_active_user_id
+        user_id = get_active_user_id()
+    with _user_llm_lock:
+        if user_id not in _user_llm_routers:
+            _user_llm_routers[user_id] = MultiLLMRouter(user_id=user_id)
+        return _user_llm_routers[user_id]
+
+
+class _ContextualLLMRouterProxy:
+    """Transparent proxy routing all attribute and method accesses to the active user's MultiLLMRouter."""
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(get_llm_router(), name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        setattr(get_llm_router(), name, value)
+
+
+llm_router = _ContextualLLMRouterProxy()
 

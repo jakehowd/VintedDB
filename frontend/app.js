@@ -178,7 +178,6 @@ class VintedApp {
     this.sniperTargetInfo = new Map();
     this.itemMaxPrices = new Map();
     this.focusedDealIndex = -1;
-    this.scanningMode = 'poll';
 
     // Scraper Hub & Batch state
     this.batchTargets = new Set();
@@ -237,13 +236,14 @@ class VintedApp {
   }
 
   async initAuthenticatedSession() {
+    this.hideAuthModal();
     await Promise.all([
       this.loadAvailableCategories(),
       this.loadSearches(),
       this.loadSchedulerStatus(),
       this.loadSniperTargetsInfo(),
-      this.loadAntiBanStatus(),
-      this.loadAIStatus(),
+      this.loadAntiBanStatus(true),
+      this.loadAIStatus(true),
       this.loadDatabaseSummaryBadges()
     ]);
     this.startSchedulerCountdownLoop();
@@ -253,6 +253,51 @@ class VintedApp {
   }
 
   // ── Authentication & User Profile Management ──────────────────────────────
+
+  resetIsolatedAccountState() {
+    this.searches = [];
+    this.currentSearchId = null;
+    this.currentVariantsData = null;
+    this.sniperActive = false;
+    if (this.sniperPollTimer) {
+      clearInterval(this.sniperPollTimer);
+      this.sniperPollTimer = null;
+    }
+    if (this.schedulerTickTimer) {
+      clearInterval(this.schedulerTickTimer);
+      this.schedulerTickTimer = null;
+    }
+    this.sniperDeals = [];
+    this.sniperTargets.clear();
+    this.sniperTargetsInitialized = false;
+    this.sniperTargetInfo.clear();
+    this.itemMaxPrices.clear();
+    this.clearedDealIds.clear();
+    this.batchTargets.clear();
+    this.batchTargetsInitialized = false;
+    this.dbAnalyticsData = null;
+
+    // Clear sensitive inputs so zero values linger across sessions
+    const sensitiveInputIds = [
+      'antiban-proxies-input',
+      'antiban-cookies-input',
+      'ai-gemini-keys',
+      'ai-groq-keys',
+      'ai-openrouter-keys',
+      'ai-mistral-keys',
+      'sec-current-password',
+      'sec-new-password',
+      'sec-confirm-password',
+    ];
+    for (const id of sensitiveInputIds) {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    }
+
+    this.renderSidebar();
+    this.renderSniperTargets();
+    this.renderSniperDeals();
+  }
 
   async checkAuth() {
     try {
@@ -294,18 +339,25 @@ class VintedApp {
           adminBadge.className = 'text-[8px] font-mono font-bold text-teal-400 tracking-wider leading-none';
           adminBadge.classList.remove('hidden');
         } else {
-          adminBadge.textContent = 'PROFILE';
+          adminBadge.textContent = 'ISOLATED';
           adminBadge.className = 'text-[8px] font-mono font-bold text-slate-400 tracking-wider leading-none';
           adminBadge.classList.remove('hidden');
         }
       }
     } else {
       profileWidget.classList.add('hidden');
+      if (usernameLabel) usernameLabel.textContent = '';
+      if (avatarInitials) avatarInitials.textContent = '';
+      if (adminBadge) adminBadge.textContent = '';
     }
   }
 
   showAuthModal() {
     const modal = document.getElementById('auth-modal');
+    const header = document.getElementById('app-top-header');
+    const mainLayout = document.getElementById('app-main-layout');
+    if (header) header.classList.add('hidden');
+    if (mainLayout) mainLayout.classList.add('hidden');
     if (!modal) return;
     modal.classList.remove('hidden');
     this.clearAuthError();
@@ -318,7 +370,11 @@ class VintedApp {
 
   hideAuthModal() {
     const modal = document.getElementById('auth-modal');
+    const header = document.getElementById('app-top-header');
+    const mainLayout = document.getElementById('app-main-layout');
     if (modal) modal.classList.add('hidden');
+    if (header) header.classList.remove('hidden');
+    if (mainLayout) mainLayout.classList.remove('hidden');
   }
 
   switchAuthMode(mode) {
@@ -329,44 +385,74 @@ class VintedApp {
     const tabRegister = document.getElementById('auth-tab-register');
     const modalTitle = document.getElementById('auth-modal-title');
     const modalSubtitle = document.getElementById('auth-modal-subtitle');
-    const submitBtn = document.getElementById('auth-submit-btn');
     const submitLabel = document.getElementById('auth-submit-label');
     const submitIcon = document.getElementById('auth-submit-icon');
+    const confirmGroup = document.getElementById('auth-confirm-password-group');
+    const strengthContainer = document.getElementById('auth-strength-container');
+    const passwordHint = document.getElementById('auth-password-hint');
+    const passwordInput = document.getElementById('auth-password');
 
     if (mode === 'login') {
       if (tabLogin) {
-        tabLogin.className = 'py-1.5 rounded-lg text-xs font-bold transition text-center bg-teal-500/20 text-teal-300 border border-teal-500/30 cursor-pointer';
+        tabLogin.className = 'py-2 rounded-lg text-xs font-bold transition text-center bg-teal-500/20 text-teal-300 border border-teal-500/30 shadow-sm cursor-pointer';
       }
       if (tabRegister) {
-        tabRegister.className = 'py-1.5 rounded-lg text-xs font-bold transition text-center text-slate-400 hover:text-white cursor-pointer';
+        tabRegister.className = 'py-2 rounded-lg text-xs font-bold transition text-center text-slate-400 hover:text-white cursor-pointer';
       }
       if (modalTitle) modalTitle.textContent = 'Sign In to Vinted Tracker';
-      if (modalSubtitle) modalSubtitle.textContent = 'Secure profile access & isolated workspace';
-      if (submitLabel) submitLabel.textContent = 'Sign In';
+      if (modalSubtitle) modalSubtitle.textContent = 'Access your isolated market analytics, deal sniper radar, and private proxy vault.';
+      if (submitLabel) submitLabel.textContent = 'Sign In to Workspace';
       if (submitIcon) submitIcon.setAttribute('data-lucide', 'log-in');
+      if (confirmGroup) confirmGroup.classList.add('hidden');
+      if (strengthContainer) strengthContainer.classList.add('hidden');
+      if (passwordHint) passwordHint.classList.add('hidden');
+      if (passwordInput) passwordInput.setAttribute('autocomplete', 'current-password');
     } else {
       if (tabLogin) {
-        tabLogin.className = 'py-1.5 rounded-lg text-xs font-bold transition text-center text-slate-400 hover:text-white cursor-pointer';
+        tabLogin.className = 'py-2 rounded-lg text-xs font-bold transition text-center text-slate-400 hover:text-white cursor-pointer';
       }
       if (tabRegister) {
-        tabRegister.className = 'py-1.5 rounded-lg text-xs font-bold transition text-center bg-teal-500/20 text-teal-300 border border-teal-500/30 cursor-pointer';
+        tabRegister.className = 'py-2 rounded-lg text-xs font-bold transition text-center bg-teal-500/20 text-teal-300 border border-teal-500/30 shadow-sm cursor-pointer';
       }
-      if (modalTitle) modalTitle.textContent = 'Create New Profile';
-      if (modalSubtitle) modalSubtitle.textContent = 'Your own isolated searches, items & sniper targets';
-      if (submitLabel) submitLabel.textContent = 'Create Profile & Sign In';
+      if (modalTitle) modalTitle.textContent = 'Create Isolated Account';
+      if (modalSubtitle) modalSubtitle.textContent = 'Provision a dedicated workspace with private proxies, AI keys, and zero data crossover.';
+      if (submitLabel) submitLabel.textContent = 'Create Account & Launch';
       if (submitIcon) submitIcon.setAttribute('data-lucide', 'user-plus');
+      if (confirmGroup) confirmGroup.classList.remove('hidden');
+      if (strengthContainer) strengthContainer.classList.remove('hidden');
+      if (passwordHint) passwordHint.classList.remove('hidden');
+      if (passwordInput) {
+        passwordInput.setAttribute('autocomplete', 'new-password');
+        this.updatePasswordStrength(passwordInput.value || '');
+      }
     }
     if (window.lucide) lucide.createIcons();
   }
 
-  fillAdminCredentials() {
-    this.switchAuthMode('login');
-    const u = document.getElementById('auth-username');
-    const p = document.getElementById('auth-password');
-    if (u) u.value = 'ADMIN';
-    if (p) p.value = 'ADMIN';
-    this.clearAuthError();
-    this.showToast('ADMIN credentials auto-filled', 'info');
+  updatePasswordStrength(val) {
+    if (this.authMode !== 'register') return;
+    const pwd = String(val || '');
+    let score = 0;
+    if (pwd.length >= 4) score += 1;
+    if (pwd.length >= 8) score += 1;
+    if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score += 1;
+    if (/[0-9]/.test(pwd) || /[^A-Za-z0-9]/.test(pwd)) score += 1;
+
+    const colors = ['bg-slate-800', 'bg-rose-500', 'bg-amber-400', 'bg-cyan-400', 'bg-emerald-400'];
+    const labels = ['Too short', 'Weak', 'Fair', 'Good', 'Strong'];
+    const textColors = ['text-slate-400', 'text-rose-400', 'text-amber-300', 'text-cyan-300', 'text-emerald-400'];
+
+    for (let i = 1; i <= 4; i++) {
+      const bar = document.getElementById(`auth-strength-bar-${i}`);
+      if (bar) {
+        bar.className = `rounded-full transition-colors ${i <= score ? colors[score] : 'bg-slate-800'}`;
+      }
+    }
+    const labelEl = document.getElementById('auth-strength-label');
+    if (labelEl) {
+      labelEl.textContent = pwd.length === 0 ? '—' : labels[score];
+      labelEl.className = `font-semibold ${pwd.length === 0 ? 'text-slate-400' : textColors[score]}`;
+    }
   }
 
   togglePasswordVisibility() {
@@ -403,12 +489,31 @@ class VintedApp {
 
     const usernameInput = document.getElementById('auth-username');
     const passwordInput = document.getElementById('auth-password');
+    const confirmInput = document.getElementById('auth-confirm-password');
+    const rememberInput = document.getElementById('auth-remember-me');
     const username = (usernameInput ? usernameInput.value : '').trim();
     const password = (passwordInput ? passwordInput.value : '').trim();
+    const confirmPassword = (confirmInput ? confirmInput.value : '').trim();
+    const rememberMe = rememberInput ? Boolean(rememberInput.checked) : true;
 
     if (!username || !password) {
       this.showAuthError('Please enter both username and password.');
       return;
+    }
+
+    if (this.authMode === 'register') {
+      if (username.length < 2) {
+        this.showAuthError('Username must be at least 2 characters.');
+        return;
+      }
+      if (password.length < 4) {
+        this.showAuthError('Password must be at least 4 characters.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        this.showAuthError('Passwords do not match. Please re-enter your password.');
+        return;
+      }
     }
 
     this.authSubmitting = true;
@@ -416,15 +521,22 @@ class VintedApp {
     const originalText = submitBtn ? submitBtn.innerHTML : '';
     if (submitBtn) {
       submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="inline-block animate-spin mr-2">◌</span> Processing…';
+      submitBtn.innerHTML = '<span class="inline-block animate-spin mr-2">◌</span> Authenticating…';
     }
 
     try {
+      // Clear any previous account state before authenticating
+      this.resetIsolatedAccountState();
+
       const endpoint = this.authMode === 'register' ? '/api/auth/register' : '/api/auth/login';
+      const payload = this.authMode === 'register'
+        ? { username, password }
+        : { username, password, remember_me: rememberMe };
+
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
 
@@ -438,6 +550,8 @@ class VintedApp {
       this.currentUser = data.user;
       this.updateUserProfileUI();
       this.hideAuthModal();
+      if (passwordInput) passwordInput.value = '';
+      if (confirmInput) confirmInput.value = '';
       this.showToast(`Signed in as ${this.currentUser.username}`, 'success');
 
       // Initialize workspace with user's isolated data
@@ -454,17 +568,86 @@ class VintedApp {
     }
   }
 
+  openAccountSecurityModal() {
+    const modal = document.getElementById('account-security-modal');
+    const userSpan = document.getElementById('security-modal-username');
+    const alertEl = document.getElementById('security-modal-alert');
+    if (userSpan && this.currentUser) userSpan.textContent = this.currentUser.username;
+    if (alertEl) alertEl.classList.add('hidden');
+    if (modal) modal.classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+  }
+
+  closeAccountSecurityModal() {
+    const modal = document.getElementById('account-security-modal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  async handleChangePassword(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const curEl = document.getElementById('sec-current-password');
+    const newEl = document.getElementById('sec-new-password');
+    const confEl = document.getElementById('sec-confirm-password');
+    const alertEl = document.getElementById('security-modal-alert');
+
+    const currentPassword = (curEl ? curEl.value : '').trim();
+    const newPassword = (newEl ? newEl.value : '').trim();
+    const confirmPassword = (confEl ? confEl.value : '').trim();
+
+    const showAlert = (msg, isErr = true) => {
+      if (!alertEl) return;
+      alertEl.textContent = msg;
+      alertEl.className = isErr
+        ? 'p-2.5 rounded-xl text-xs bg-rose-500/10 border border-rose-500/30 text-rose-300'
+        : 'p-2.5 rounded-xl text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-300';
+      alertEl.classList.remove('hidden');
+    };
+
+    if (!currentPassword || !newPassword) {
+      showAlert('Please fill in both your current and new password.');
+      return;
+    }
+    if (newPassword.length < 4) {
+      showAlert('New password must be at least 4 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showAlert('New passwords do not match.');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to update password');
+      if (data.token) localStorage.setItem('vinted_auth_token', data.token);
+      if (curEl) curEl.value = '';
+      if (newEl) newEl.value = '';
+      if (confEl) confEl.value = '';
+      showAlert(data.message || 'Password updated successfully.', false);
+      this.showToast('Password updated and other sessions revoked', 'success');
+    } catch (err) {
+      showAlert(err.message || 'Could not update password');
+    }
+  }
+
+  async handleLogoutAllSessions() {
+    try {
+      await fetch('/api/auth/logout-all', { method: 'POST' });
+    } catch (e) {}
+    this.closeAccountSecurityModal();
+    await this.handleLogout();
+  }
+
   async handleLogout() {
     try {
-      // Stop live activities
       if (this.sniperActive) {
         await this.stopSniper();
       }
-      if (this.schedulerTickTimer) {
-        clearInterval(this.schedulerTickTimer);
-        this.schedulerTickTimer = null;
-      }
-
       await fetch('/api/auth/logout', { method: 'POST' });
     } catch (e) {
       console.warn('Logout network error:', e);
@@ -473,23 +656,17 @@ class VintedApp {
     localStorage.removeItem('vinted_auth_token');
     this.currentUser = null;
     this.updateUserProfileUI();
-
-    // Reset isolated state
-    this.searches = [];
-    this.currentSearchId = null;
-    this.sniperDeals = [];
-    this.sniperTargets.clear();
-    this.batchTargets.clear();
-    this.renderSidebar();
-    this.renderSniperTargets();
-    this.renderSniperDeals();
+    this.closeAccountSecurityModal();
+    this.resetIsolatedAccountState();
 
     const uInput = document.getElementById('auth-username');
     const pInput = document.getElementById('auth-password');
+    const cInput = document.getElementById('auth-confirm-password');
     if (uInput) uInput.value = '';
     if (pInput) pInput.value = '';
+    if (cInput) cInput.value = '';
 
-    this.showToast('Signed out successfully', 'info');
+    this.showToast('Signed out securely', 'info');
     this.showAuthModal();
   }
 
@@ -497,12 +674,9 @@ class VintedApp {
     if (this.sniperActive) {
       try { this.stopSniper(); } catch (e) {}
     }
-    if (this.schedulerTickTimer) {
-      clearInterval(this.schedulerTickTimer);
-      this.schedulerTickTimer = null;
-    }
     this.currentUser = null;
     this.updateUserProfileUI();
+    this.resetIsolatedAccountState();
     this.showAuthError('Your session has expired. Please sign in again.');
     this.showAuthModal();
   }
@@ -2835,21 +3009,6 @@ class VintedApp {
     }
   }
 
-  handleHeaderSniperClick() {
-    this.showSniperView();
-    if (!this.sniperActive) {
-      if (this.sniperTargets.size === 0 && this.searches && this.searches.length > 0) {
-        this.searches.forEach(s => this.sniperTargets.add(s.id));
-        this.renderSniperTargets();
-      }
-      if (this.sniperTargets.size > 0) {
-        this.startSniper();
-      } else {
-        this.showToast('Please add at least one tracked item before starting Deal Sniper.', 'info');
-      }
-    }
-  }
-
   toggleSniper() {
     if (this.sniperActive) {
       this.stopSniper();
@@ -3867,139 +4026,6 @@ class VintedApp {
           : 'Constant continuous scrape deactivated.',
         checked ? 'success' : 'info'
       );
-    } catch (err) {
-      this.showToast(err.message, 'error');
-    }
-  }
-
-  // ── Database Controls & Month Purging ──────────────────────────────────
-
-  openDatabaseModal() {
-    this.fluidOpenModal('database-modal');
-    this.loadDatabaseSummary();
-    if (window.lucide) lucide.createIcons();
-  }
-
-  closeDatabaseModal() {
-    this.fluidCloseModal('database-modal');
-  }
-
-  async loadDatabaseSummary() {
-    const listContainer = document.getElementById('db-monthly-list');
-    if (listContainer) {
-      listContainer.innerHTML = '<div class="text-xs text-slate-500 py-4 text-center">Loading database health & monthly records…</div>';
-    }
-
-    try {
-      const res = await fetch('/api/database/summary');
-      if (!res.ok) throw new Error('Failed to load database summary');
-      const data = await res.json();
-
-      const totalItemsEl = document.getElementById('db-stat-total-items');
-      const sizeEl = document.getElementById('db-stat-size');
-      const searchesEl = document.getElementById('db-stat-searches');
-
-      if (totalItemsEl) totalItemsEl.textContent = (data.total_items || 0).toLocaleString();
-      if (sizeEl) sizeEl.textContent = `${data.db_size_mb || 0} MB`;
-      if (searchesEl) searchesEl.textContent = data.total_searches || 0;
-
-      if (!listContainer) return;
-
-      if (!data.months || data.months.length === 0) {
-        listContainer.innerHTML = '<div class="text-xs text-slate-500 py-4 text-center">No monthly historical sales data found.</div>';
-        return;
-      }
-
-      listContainer.innerHTML = data.months.map(m => {
-        return `
-          <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition">
-            <div>
-              <div class="flex items-center space-x-2">
-                <span class="text-xs font-bold text-white">${m.label}</span>
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-teal-400 border border-slate-700">${m.count} sales</span>
-              </div>
-              <div class="text-[11px] text-slate-400 mt-0.5">
-                Average Sold: <strong class="text-emerald-400 font-mono">£${m.avg_price.toFixed(2)}</strong> across ${m.searches_count} tracked items
-              </div>
-            </div>
-
-            <button type="button" 
-                    onclick="app.deleteMonthData('${m.month_key}', '${m.label}', ${m.count})"
-                    class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition cursor-pointer"
-                    title="Delete all ${m.count} records from ${m.label}">
-              <i data-lucide="trash-2" class="w-3.5 h-3.5 mr-1.5"></i>
-              Delete Month
-            </button>
-          </div>
-        `;
-      }).join('');
-
-      if (window.lucide) lucide.createIcons();
-    } catch (err) {
-      console.error('Failed to load database summary:', err);
-      if (listContainer) {
-        listContainer.innerHTML = `<div class="text-xs text-rose-400 py-4 text-center">${err.message}</div>`;
-      }
-    }
-  }
-
-  async deleteMonthData(monthKey, label, count) {
-    if (!confirm(`Are you sure you want to permanently delete ALL ${count} recorded sales from ${label}?\n\nThis cannot be undone and will remove these items from your analytics.`)) {
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/database/delete-month', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month: monthKey })
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || 'Failed to delete month data');
-      }
-
-      const result = await res.json();
-      this.showToast(result.message || `Deleted month ${label}`, 'success');
-
-      await this.loadDatabaseSummary();
-      await this.loadSearches();
-      await this.loadSniperTargetsInfo();
-      if (this.currentSearchId) {
-        await this.loadItemDetail();
-      }
-    } catch (err) {
-      this.showToast(err.message, 'error');
-    }
-  }
-
-  async pruneOlderData(days) {
-    if (!confirm(`Are you sure you want to delete all recorded listings older than ${days} days across ALL tracked items?\n\nThis action is permanent.`)) {
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/database/prune-older-than', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ older_than_days: days })
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || 'Failed to prune older records');
-      }
-
-      const result = await res.json();
-      this.showToast(result.message || `Pruned records older than ${days} days`, 'success');
-
-      await this.loadDatabaseSummary();
-      await this.loadSearches();
-      await this.loadSniperTargetsInfo();
-      if (this.currentSearchId) {
-        await this.loadItemDetail();
-      }
     } catch (err) {
       this.showToast(err.message, 'error');
     }
@@ -5787,10 +5813,10 @@ class VintedApp {
     this.closeAddModal();
     this.closeEditModal();
     this.closeScraperModal();
-    this.closeDatabaseModal();
     this.closeAntiBanModal();
     this.closeAIModal();
     this.closeShortcutsModal();
+    this.closeAccountSecurityModal();
     const mobDrawer = document.getElementById('mobile-items-drawer');
     if (mobDrawer) mobDrawer.classList.add('hidden');
   }
@@ -5835,26 +5861,6 @@ class VintedApp {
       if (cookieInput) cookieInput.classList.remove('unmasked');
       if (textEl) textEl.textContent = 'Show Secrets';
       if (iconEl) iconEl.setAttribute('data-lucide', 'eye');
-    }
-    if (window.lucide) lucide.createIcons();
-  }
-
-  async setScanningMode(mode) {
-    if (mode === 'sniper') {
-      this.showSniperView();
-      if (!this.sniperActive) {
-        await this.startSniper();
-      }
-    } else if (mode === 'poll') {
-      if (this.sniperActive) {
-        await this.stopSniper();
-      }
-      this.openScraperModal();
-    } else if (mode === 'paused') {
-      if (this.sniperActive) {
-        await this.stopSniper();
-      }
-      this.showToast('Market Scanner Paused.', 'info');
     }
     if (window.lucide) lucide.createIcons();
   }
@@ -7107,31 +7113,7 @@ class VintedApp {
     }
   }
 
-  async assignItemVariant(itemId, variantVal) {
-    const ids = (variantVal !== '' && variantVal != null) ? [Number(variantVal)] : [];
-    await this.saveItemVariantTags(itemId, ids);
-  }
-
   // ── Utility & Settings Hub ───────────────────────────────────────────────
-
-  copyToClipboard(text, label = 'Content') {
-    if (!text) return;
-    if (!navigator.clipboard) {
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-      this.showToast(`📋 ${label} copied to clipboard!`, 'success');
-      return;
-    }
-    navigator.clipboard.writeText(text).then(() => {
-      this.showToast(`📋 ${label} copied to clipboard!`, 'success');
-    }).catch(() => {
-      this.showToast('Could not copy to clipboard', 'error');
-    });
-  }
 
   openSettingsModal(tab = 'antiban') {
     if (tab === 'antiban') {
@@ -7142,14 +7124,9 @@ class VintedApp {
       this.openScraperModal();
     }
   }
-
-  closeSettingsModal() {
-    this.closeAntiBanModal();
-    this.closeAIModal();
-    this.closeScraperModal();
-  }
 }
 
 // Instantiate global app
 window.app = new VintedApp();
+
 

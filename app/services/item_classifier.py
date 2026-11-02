@@ -1374,19 +1374,6 @@ def normalize_categories(raw: Any) -> List[str]:
     return canonical
 
 
-def get_vinted_catalog_ids_for_categories(target_categories: Any) -> List[int]:
-    """Return deduplicated list of official Vinted UK numeric catalog_ids for the given categories."""
-    normalized_cats = normalize_categories(target_categories)
-    catalog_ids: List[int] = []
-    for cid in normalized_cats:
-        cinfo = VINTED_CATEGORIES.get(cid)
-        if cinfo:
-            for vid in cinfo.get("vinted_catalog_ids", []):
-                if int(vid) not in catalog_ids:
-                    catalog_ids.append(int(vid))
-    return catalog_ids
-
-
 def is_category_match(
     target_categories: List[str],
     item_title: str,

@@ -19,11 +19,8 @@ DEFAULT_SEARCHES = [
     "Patagonia Synchilla fleece",
 ]
 
-# Anti-Ban & IP Shield configuration storage
-ANTIBAN_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "antiban_config.json")
-CLEARED_DEALS_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "cleared_deals.json")
+# Storage & local vision paths
 SCHEDULER_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "scheduler_config.json")
-AI_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "ai_config.json")
 VISION_CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "vision_cache")
 VISION_MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "vision_models")
 MAC_OCR_BIN_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "bin", "mac_vision_ocr")

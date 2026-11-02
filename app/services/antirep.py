@@ -16,12 +16,12 @@ import logging
 import re
 import threading
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
 from ..config import VINTED_BASE_URL
-from ..models import DEFAULT_ANTIREP_CONFIG, ScrapedPhotoRecord, SoldItem
+from ..models import ScrapedPhotoRecord, SoldItem
 
 logger = logging.getLogger(__name__)
 
@@ -147,30 +147,29 @@ def check_duplicate_photo(
     db: Session,
     photo_key: str,
     current_item_id: str,
+    tracked_search_id: Optional[int] = None,
 ) -> Optional[ScrapedPhotoRecord]:
-    """Check if photo_key has been previously recorded from another item."""
+    """Check if photo_key has been previously recorded from another item within the user's tracked searches."""
     if not photo_key:
         return None
-    rec = (
-        db.query(ScrapedPhotoRecord)
-        .filter(
-            ScrapedPhotoRecord.photo_key == photo_key,
-            ScrapedPhotoRecord.vinted_item_id != current_item_id,
-        )
-        .first()
+    q_photo = db.query(ScrapedPhotoRecord).filter(
+        ScrapedPhotoRecord.photo_key == photo_key,
+        ScrapedPhotoRecord.vinted_item_id != current_item_id,
     )
+    if tracked_search_id is not None:
+        q_photo = q_photo.filter(ScrapedPhotoRecord.tracked_search_id == tracked_search_id)
+    rec = q_photo.first()
     if rec:
         return rec
 
     # Also check SoldItem.photo_url directly in case an older item wasn't in scraped_photos
-    existing_sold = (
-        db.query(SoldItem)
-        .filter(
-            SoldItem.vinted_item_id != current_item_id,
-            SoldItem.photo_url.ilike(f"%{photo_key}%"),
-        )
-        .first()
+    q_sold = db.query(SoldItem).filter(
+        SoldItem.vinted_item_id != current_item_id,
+        SoldItem.photo_url.ilike(f"%{photo_key}%"),
     )
+    if tracked_search_id is not None:
+        q_sold = q_sold.filter(SoldItem.tracked_search_id == tracked_search_id)
+    existing_sold = q_sold.first()
     if existing_sold:
         return record_photo_fingerprint(
             db=db,
@@ -402,17 +401,6 @@ def get_item_uploaded_at(vinted_item_id: str) -> Optional[datetime]:
     return None
 
 
-def get_item_upload_age_minutes(vinted_item_id: str) -> Optional[int]:
-    """Return how many minutes ago a Vinted item was actually uploaded to Vinted."""
-    uploaded_at = get_item_uploaded_at(vinted_item_id)
-    if not uploaded_at:
-        return None
-    now_utc = datetime.now(timezone.utc)
-    if uploaded_at.tzinfo is None:
-        uploaded_at = uploaded_at.replace(tzinfo=timezone.utc)
-    return max(0, int((now_utc - uploaded_at).total_seconds() // 60))
-
-
 def get_seller_profile(
     scraper: Any = None,
     seller_id: Optional[str] = None,
@@ -638,12 +626,13 @@ def evaluate_antirep_rules(
 
     # 1. Stock / Duplicate Photo Filter
     if antirep_config.get("block_duplicate_photos", True) and photo_key:
-        duplicate = check_duplicate_photo(db, photo_key, vinted_id)
+        duplicate = check_duplicate_photo(db, photo_key, vinted_id, tracked_search_id=tracked_search_id)
         if duplicate:
-            # Also ensure any existing SoldItem sharing this photo_key is flagged in DB
+            # Also ensure any existing SoldItem sharing this photo_key in this search is flagged in DB
             prior_items = (
                 db.query(SoldItem)
                 .filter(
+                    SoldItem.tracked_search_id == tracked_search_id,
                     SoldItem.vinted_item_id != vinted_id,
                     SoldItem.photo_url.ilike(f"%{photo_key}%"),
                     SoldItem.is_replica == False,
@@ -735,12 +724,13 @@ def is_existing_item_compliant(
     if antirep_config.get("block_duplicate_photos", True) and item.photo_url:
         pk = extract_photo_key(None, item.photo_url)
         if pk:
-            dup = check_duplicate_photo(db, pk, str(item.vinted_item_id))
+            dup = check_duplicate_photo(db, pk, str(item.vinted_item_id), tracked_search_id=item.tracked_search_id)
             if dup:
                 return False, f"Duplicate / stock photo detected (previously seen in item #{dup.vinted_item_id})"
             other_sold = (
                 db.query(SoldItem)
                 .filter(
+                    SoldItem.tracked_search_id == item.tracked_search_id,
                     SoldItem.vinted_item_id != str(item.vinted_item_id),
                     SoldItem.photo_url.ilike(f"%{pk}%"),
                 )
@@ -800,86 +790,3 @@ def is_existing_item_compliant(
 
     return True, "Item is compliant"
 
-
-# ---------------------------------------------------------------------------
-# High-Yield Cross-Market Arbitrage Authenticity Validator
-# ---------------------------------------------------------------------------
-
-REWORK_AND_FAKE_BLACKLIST_PATTERNS = [
-    # Rework & Franken-garment markers (very common scam with Carhartt and Ralph Lauren)
-    r"\b(?:rework|reworked|re-work|re-worked|upcycled|up-cycled|remade|re-made)\b",
-    r"\b(?:customized?|custom\s+made|custom\s+piece|diy|frankenstein)\b",
-    
-    # Replica / Fake / Bootleg markers
-    r"\b(?:replica|rep|reps|1:1|aaa\+?|ua\b|unauthorized\s+authentic)\b",
-    r"\b(?:bootleg|fantasy\s+piece|homage\s+piece|reprint|screenprint)\b",
-    r"\b(?:dhgate|pandabuy|cssbuy|sugargoo|hago|taobao|weidian)\b",
-    r"\b(?:mirror\s+quality|top\s+batch|pk\s+batch|god\s+batch|og\s+batch)\b",
-    r"\b(?:print\s+on\s+demand|gildan\s+heavy|printed\s+on\s+gildan)\b",
-    
-    # "Style" / "lookalike" evasions (sellers admitting it's not the real brand/model)
-    r"\b(?:carhartt\s+style|detroit\s+style|nuptse\s+style|bape\s+style)\b",
-    r"\b(?:arcteryx\s+style|stussy\s+style|corteiz\s+style)\b",
-    r"\b(?:inspired\s+by|dupe|dupes|lookalike|look-alike)\b",
-]
-
-COMPILED_FAKE_BLACKLIST = [re.compile(p, re.IGNORECASE) for p in REWORK_AND_FAKE_BLACKLIST_PATTERNS]
-
-HYPE_HIGH_FAKE_RISK_BRANDS = [
-    "arc'teryx", "arcteryx", "bape", "a bathing ape", "corteiz", "crtz",
-    "sp5der", "stone island", "supreme", "trapstar", "gallery dept",
-]
-
-
-def verify_arbitrage_item_authenticity(
-    item_data: Dict[str, Any],
-    db: Optional[Session] = None,
-) -> Tuple[bool, str]:
-    """Strict anti-counterfeit & authenticity check for cross-market arbitrage candidates.
-    
-    Ensures:
-    1. Items are NOT 'reworked' / upcycled thrift scraps sold as authentic grails.
-    2. Items are NOT replicas, 1:1 fakes, bootlegs, or DHgate/Taobao reps.
-    3. High-risk hype brands listed as BNWT at suspiciously cheap prices are screened.
-    4. Stock photos / duplicate stolen photos are detected.
-    5. Accessory/mismatched listings using grail keyword spam are excluded.
-    """
-    title = str(item_data.get("title") or "")
-    desc = str(item_data.get("description") or "")
-    brand = str(item_data.get("brand") or "").lower()
-    condition = str(item_data.get("condition") or "")
-    price = float(item_data.get("price") or item_data.get("vinted_asking_price") or 0.0)
-    raw_text = f"{title} {desc}".lower()
-
-    # 1. Rework / Replica / Bootleg Blacklist
-    for pat in COMPILED_FAKE_BLACKLIST:
-        m = pat.search(raw_text)
-        if m:
-            return False, f"Blacklisted counterfeit / rework token: '{m.group(0)}'"
-
-    # 2. Hype Brand Counterfeit Trap Detection
-    # If a hype brand is claimed as 'New with tags' and priced under £45, it is 99.9% a rep
-    is_hype = any(hb in brand or hb in raw_text for hb in HYPE_HIGH_FAKE_RISK_BRANDS)
-    is_bnwt, _ = is_new_with_tags(condition, title, desc)
-    if is_hype and is_bnwt and price > 0 and price < 45.0:
-        return False, f"High counterfeit risk: {brand.title()} claimed as Brand New with Tags for £{price:.0f} (typical DHgate/Pandabuy replica)"
-
-    # 3. Duplicate / Stolen Stock Photo Check (if db provided)
-    if db:
-        photo_key = extract_photo_key(item_data.get("raw_photo"), item_data.get("photo_url"))
-        vinted_id = str(item_data.get("id") or item_data.get("vinted_item_id") or "")
-        if photo_key and vinted_id:
-            dup = check_duplicate_photo(db, photo_key, vinted_id)
-            if dup:
-                return False, f"Duplicate / stock photo detected (reused image #{dup.vinted_item_id})"
-
-    # 4. Model Category Sanity Check
-    # Avoid mismatched items claiming to be grails (e.g. Carhartt beanie or socks claiming to be Detroit)
-    if "detroit" in raw_text:
-        if any(w in raw_text for w in ["beanie", "hat", "cap", "t-shirt", "tee", "socks", "keyring", "trouser", "pants", "vest", "gilet"]):
-            return False, "Not an outerwear jacket (mismatched accessory/apparel)"
-    if "beta" in raw_text and ("arcteryx" in raw_text or "arc'teryx" in raw_text):
-        if any(w in raw_text for w in ["beanie", "hat", "cap", "t-shirt", "tee", "glove", "gloves", "bag", "waistpack"]):
-            return False, "Not a technical shell (mismatched accessory)"
-
-    return True, "Authenticity verified"

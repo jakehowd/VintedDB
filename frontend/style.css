@@ -478,15 +478,6 @@ input[type="number"]::-webkit-inner-spin-button {
   transform: scale(0.98);
 }
 
-/* ── Modern Frosted Glass Modals ─────────────────────────────────────────── */
-.glass-modal {
-  background: linear-gradient(145deg, rgba(15, 23, 42, 0.96) 0%, rgba(9, 13, 24, 0.98) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05), inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
 /* ── Fade In Animation ───────────────────────────────────────────────────── */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
@@ -507,27 +498,6 @@ input[type="number"]::-webkit-inner-spin-button {
   animation: spin 1s linear infinite !important;
   transform-origin: center center !important;
   display: inline-block !important;
-}
-
-/* ── Unified Engine Mode Selector ────────────────────────────────────────── */
-.engine-mode-active-sniper {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.3) 0%, rgba(6, 182, 212, 0.25) 100%) !important;
-  color: #ffffff !important;
-  border: 1px solid rgba(16, 185, 129, 0.65) !important;
-  box-shadow: 0 0 16px rgba(16, 185, 129, 0.35) !important;
-}
-
-.engine-mode-active-poll {
-  background: linear-gradient(135deg, rgba(9, 177, 186, 0.3) 0%, rgba(99, 102, 241, 0.25) 100%) !important;
-  color: #ffffff !important;
-  border: 1px solid rgba(9, 177, 186, 0.65) !important;
-  box-shadow: 0 0 16px rgba(9, 177, 186, 0.35) !important;
-}
-
-.engine-mode-active-paused {
-  background: rgba(51, 65, 85, 0.45) !important;
-  color: #e2e8f0 !important;
-  border: 1px solid rgba(100, 116, 139, 0.5) !important;
 }
 
 /* ── Power Trader Keyboard Navigation Focus ──────────────────────────────── */
@@ -776,11 +746,6 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 /* ── 4. Apple Dark Vibrancy & Glass Materials Hierarchy ─────────────────── */
-/* Canvas background */
-body {
-  background-color: #060912;
-}
-
 /* Level 1 Material: Toolbars, Headers, Persistent Navbars */
 header, #mobile-bottom-bar, #mobile-items-drawer > div:last-child {
   background: rgba(18, 18, 22, 0.82) !important;

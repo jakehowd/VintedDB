@@ -9,7 +9,7 @@ from __future__ import annotations
 import threading
 from collections import deque
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 
 class ScraperActivityLogger:
@@ -28,6 +28,12 @@ class ScraperActivityLogger:
         self.total_scans_completed: int = 0
         self.last_activity_at: Optional[datetime] = None
 
+    def _resolve_user_id(self, user_id: Optional[int] = None) -> Optional[int]:
+        if user_id is not None:
+            return user_id
+        from ..auth import get_active_user_id
+        return get_active_user_id()
+
     def _format_time(self, dt: datetime) -> str:
         return dt.strftime("%H:%M:%S")
 
@@ -38,8 +44,10 @@ class ScraperActivityLogger:
         source: str = "scraper",
         is_deal: bool = False,
         discount_pct: float = 0.0,
+        user_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Record an item newly scraped and saved to the database (High Priority Highlight)."""
+        uid = self._resolve_user_id(user_id)
         now = datetime.now(timezone.utc)
         title = str(item_data.get("title") or "Unknown Item").strip()
         price = float(item_data.get("price") or 0.0)
@@ -54,6 +62,7 @@ class ScraperActivityLogger:
 
         clean_event = {
             "id": 0,  # assigned under lock
+            "user_id": uid,
             "type": "db_added",
             "time": self._format_time(now),
             "iso_time": now.isoformat(),
@@ -99,6 +108,7 @@ class ScraperActivityLogger:
 
         event = {
             "id": 0,
+            "user_id": self._resolve_user_id(),
             "type": "price_updated",
             "time": self._format_time(now),
             "iso_time": now.isoformat(),
@@ -125,6 +135,7 @@ class ScraperActivityLogger:
         now = datetime.now(timezone.utc)
         event = {
             "id": 0,
+            "user_id": self._resolve_user_id(),
             "type": "scan_start",
             "time": self._format_time(now),
             "iso_time": now.isoformat(),
@@ -153,6 +164,7 @@ class ScraperActivityLogger:
         filtered = spam_blocked + rep_blocked
         event = {
             "id": 0,
+            "user_id": self._resolve_user_id(),
             "type": "scan_summary",
             "time": self._format_time(now),
             "iso_time": now.isoformat(),
@@ -185,6 +197,7 @@ class ScraperActivityLogger:
         mode_label = "Continuous 24/7 loop" if is_constant else "Auto-poll cycle"
         event = {
             "id": 0,
+            "user_id": self._resolve_user_id(),
             "type": "cycle_complete",
             "time": self._format_time(now),
             "iso_time": now.isoformat(),
@@ -210,6 +223,7 @@ class ScraperActivityLogger:
         now = datetime.now(timezone.utc)
         event = {
             "id": 0,
+            "user_id": self._resolve_user_id(),
             "type": "status_audit",
             "time": self._format_time(now),
             "iso_time": now.isoformat(),
@@ -230,16 +244,21 @@ class ScraperActivityLogger:
         since_id: Optional[int] = None,
         filter_type: Optional[str] = None,
         limit: int = 150,
+        user_id: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Retrieve recent events, optionally filtered by ID and type."""
+        """Retrieve recent events scoped to user_id, optionally filtered by ID and type."""
+        uid = self._resolve_user_id(user_id)
         with self._lock:
-            all_events = list(self._events)
+            all_events = [
+                e for e in self._events
+                if uid is None or e.get("user_id") == uid
+            ]
             stats = {
-                "total_added_to_db": self.total_added_to_db,
-                "total_inspected": self.total_inspected,
-                "total_price_updates": self.total_price_updates,
-                "total_scans_completed": self.total_scans_completed,
-                "last_activity_at": self.last_activity_at.isoformat() if self.last_activity_at else None,
+                "total_added_to_db": sum(1 for e in all_events if e.get("type") == "db_added"),
+                "total_inspected": sum(int(e.get("total_found", 0) or 0) for e in all_events if e.get("type") == "scan_summary"),
+                "total_price_updates": sum(1 for e in all_events if e.get("type") == "price_updated"),
+                "total_scans_completed": sum(1 for e in all_events if e.get("type") == "scan_summary"),
+                "last_activity_at": all_events[-1].get("iso_time") if all_events else None,
             }
 
         # Apply since_id filter
@@ -261,15 +280,21 @@ class ScraperActivityLogger:
             "latest_event_id": self._counter,
         }
 
-    def clear(self) -> None:
-        """Clear the in-memory events buffer and reset current session metrics."""
+    def clear(self, user_id: Optional[int] = None) -> None:
+        """Clear the in-memory events buffer for the given user (or all if None)."""
+        uid = self._resolve_user_id(user_id)
         with self._lock:
-            self._events.clear()
-            self.total_added_to_db = 0
-            self.total_price_updates = 0
-            self.total_inspected = 0
-            self.total_scans_completed = 0
-            self.last_activity_at = None
+            if uid is None:
+                self._events.clear()
+                self.total_added_to_db = 0
+                self.total_price_updates = 0
+                self.total_inspected = 0
+                self.total_scans_completed = 0
+                self.last_activity_at = None
+            else:
+                kept = [e for e in self._events if e.get("user_id") != uid]
+                self._events.clear()
+                self._events.extend(kept)
 
 
 # Global singleton instance

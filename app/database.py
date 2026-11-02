@@ -52,10 +52,25 @@ def ensure_db_schema(target_engine=engine):
                 username TEXT NOT NULL UNIQUE,
                 password_hash TEXT NOT NULL,
                 is_admin BOOLEAN DEFAULT 0 NOT NULL,
+                antiban_config_json TEXT,
+                ai_config_json TEXT,
+                scheduler_config_json TEXT,
+                sniper_cleared_deals_json TEXT,
                 created_at DATETIME
             );
         """)
         cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_username ON users (username);")
+
+        user_cols = [c[1] for c in cursor.execute("PRAGMA table_info(users)").fetchall()]
+        if user_cols:
+            if "antiban_config_json" not in user_cols:
+                cursor.execute("ALTER TABLE users ADD COLUMN antiban_config_json TEXT;")
+            if "ai_config_json" not in user_cols:
+                cursor.execute("ALTER TABLE users ADD COLUMN ai_config_json TEXT;")
+            if "scheduler_config_json" not in user_cols:
+                cursor.execute("ALTER TABLE users ADD COLUMN scheduler_config_json TEXT;")
+            if "sniper_cleared_deals_json" not in user_cols:
+                cursor.execute("ALTER TABLE users ADD COLUMN sniper_cleared_deals_json TEXT;")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS user_sessions (
@@ -71,7 +86,9 @@ def ensure_db_schema(target_engine=engine):
 
         # Seed ADMIN user if not present (Username: ADMIN, Password: ADMIN)
         from .auth import hash_password
-        admin_row = cursor.execute("SELECT id FROM users WHERE username = 'ADMIN' OR username = 'admin'").fetchone()
+        admin_row = cursor.execute(
+            "SELECT id FROM users WHERE username = 'ADMIN' OR username = 'admin'"
+        ).fetchone()
         if not admin_row:
             admin_hash = hash_password("ADMIN")
             cursor.execute(
@@ -175,45 +192,22 @@ def ensure_db_schema(target_engine=engine):
                 cursor.execute("ALTER TABLE sold_items ADD COLUMN variant_evidence TEXT;")
 
             # 3. High-performance indexes for search, status, replica, child size, and variant lookups
+            # Replace global single-column unique index on vinted_item_id with per-search uniqueness so different users never collide
+            idx_list = cursor.execute("PRAGMA index_list(sold_items)").fetchall()
+            for idx_row in idx_list:
+                idx_name = idx_row[1]
+                is_unique = idx_row[2]
+                if idx_name == "ix_sold_items_vinted_item_id" and is_unique:
+                    cursor.execute("DROP INDEX IF EXISTS ix_sold_items_vinted_item_id;")
+
+            cursor.execute("CREATE INDEX IF NOT EXISTS ix_sold_items_vinted_id ON sold_items (vinted_item_id);")
+            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_sold_items_search_vinted_unique ON sold_items (tracked_search_id, vinted_item_id);")
             cursor.execute("CREATE INDEX IF NOT EXISTS ix_sold_items_search_captured ON sold_items (tracked_search_id, captured_at DESC);")
             cursor.execute("CREATE INDEX IF NOT EXISTS ix_sold_items_replica ON sold_items (is_replica);")
             cursor.execute("CREATE INDEX IF NOT EXISTS ix_sold_items_sold ON sold_items (is_sold);")
             cursor.execute("CREATE INDEX IF NOT EXISTS ix_sold_items_child ON sold_items (is_child_size);")
             cursor.execute("CREATE INDEX IF NOT EXISTS ix_sold_items_variant ON sold_items (variant_id);")
 
-        # 4. autobuy_orders table for simulated paper trading and automated snipes
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS autobuy_orders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                order_id TEXT NOT NULL UNIQUE,
-                deal_id TEXT NOT NULL,
-                vinted_item_id TEXT NOT NULL,
-                tracked_search_id INTEGER REFERENCES tracked_searches(id) ON DELETE SET NULL,
-                title TEXT NOT NULL,
-                brand TEXT,
-                variant_name TEXT,
-                item_price REAL NOT NULL,
-                buyer_fee REAL NOT NULL,
-                shipping_cost REAL NOT NULL,
-                total_landed_cost REAL NOT NULL,
-                projected_resale_price REAL NOT NULL,
-                projected_net_profit REAL NOT NULL,
-                projected_roi_pct REAL NOT NULL,
-                ai_score INTEGER,
-                ai_verdict TEXT,
-                is_simulation BOOLEAN DEFAULT 1 NOT NULL,
-                status TEXT DEFAULT 'SIMULATED_SUCCESS' NOT NULL,
-                execution_notes TEXT,
-                shipping_name TEXT,
-                shipping_postcode TEXT,
-                card_last4 TEXT,
-                photo_url TEXT,
-                item_url TEXT,
-                created_at DATETIME
-            );
-        """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS ix_autobuy_orders_deal ON autobuy_orders (deal_id);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS ix_autobuy_orders_created ON autobuy_orders (created_at DESC);")
-                
         conn.connection.commit()
+
 
