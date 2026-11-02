@@ -11,8 +11,8 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import DEFAULT_SEARCHES
 from .database import Base, SessionLocal, engine, ensure_db_schema
-from .models import TrackedSearch
-from .routers import analytics, antiban, database_ops, scraper_ops, searches, sniper, variants
+from .models import TrackedSearch, User
+from .routers import analytics, antiban, auth, database_ops, scraper_ops, searches, sniper, variants
 from .scheduler import start_scheduler, stop_scheduler
 
 logging.basicConfig(
@@ -30,11 +30,13 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 def _seed_defaults() -> None:
     db = SessionLocal()
     try:
-        if db.query(TrackedSearch).count() == 0:
+        admin = db.query(User).filter(User.username == "ADMIN").first()
+        admin_id = admin.id if admin else None
+        if db.query(TrackedSearch).count() == 0 and admin_id:
             for text in DEFAULT_SEARCHES:
-                db.add(TrackedSearch(search_text=text))
+                db.add(TrackedSearch(search_text=text, user_id=admin_id))
             db.commit()
-            logger.info("Seeded %d default searches.", len(DEFAULT_SEARCHES))
+            logger.info("Seeded %d default searches for ADMIN.", len(DEFAULT_SEARCHES))
     finally:
         db.close()
 
@@ -72,6 +74,7 @@ app.add_middleware(
 )
 
 # API routers
+app.include_router(auth.router)
 app.include_router(searches.router)
 app.include_router(analytics.router)
 app.include_router(sniper.router)

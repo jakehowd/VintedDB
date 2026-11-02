@@ -36,13 +36,56 @@ DEFAULT_ANTIREP_CONFIG = {
 }
 
 
+class User(Base):
+    """User account profile for multi-tenant data storage."""
+
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, nullable=False, index=True)
+    password_hash = Column(String, nullable=False)
+    is_admin = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=_utcnow)
+
+    searches = relationship(
+        "TrackedSearch",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="TrackedSearch.id",
+    )
+    sessions = relationship(
+        "UserSession",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+
+class UserSession(Base):
+    """Active session tokens for authenticated user profiles."""
+
+    __tablename__ = "user_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    session_token = Column(String, unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=_utcnow)
+    expires_at = Column(DateTime, nullable=False)
+
+    user = relationship("User", back_populates="sessions")
+
+
 class TrackedSearch(Base):
     """A search term the user wants to monitor on Vinted."""
 
     __tablename__ = "tracked_searches"
 
     id = Column(Integer, primary_key=True, index=True)
-    search_text = Column(String, nullable=False, unique=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    search_text = Column(String, nullable=False)
     brand = Column(String, nullable=True)
     category = Column(String, nullable=True)
     must_exclude = Column(String, nullable=True)
@@ -53,6 +96,7 @@ class TrackedSearch(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=_utcnow)
 
+    user = relationship("User", back_populates="searches")
     items = relationship(
         "SoldItem",
         back_populates="tracked_search",

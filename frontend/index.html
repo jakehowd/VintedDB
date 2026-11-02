@@ -121,6 +121,20 @@
         <span class="hidden sm:inline">Track New Item</span>
         <span class="sm:hidden">Track</span>
       </button>
+
+      <!-- User Profile Pill & Sign Out Widget -->
+      <div id="header-user-profile-widget" class="flex items-center space-x-2 bg-slate-950/90 pl-2.5 pr-1.5 py-1 rounded-xl border border-slate-800 text-xs shadow-sm">
+        <div class="flex items-center space-x-1.5">
+          <span class="w-6 h-6 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center font-bold text-[11px] border border-teal-500/30" id="user-avatar-initials">A</span>
+          <div class="flex flex-col">
+            <span id="header-username-label" class="font-bold text-slate-200 leading-tight text-[11px] max-w-[90px] truncate">ADMIN</span>
+            <span id="header-admin-badge" class="text-[8px] font-mono font-bold text-teal-400 tracking-wider leading-none">ADMIN</span>
+          </div>
+        </div>
+        <button id="btn-header-logout" onclick="app.handleLogout()" class="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer" title="Sign Out">
+          <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -2102,6 +2116,85 @@
           </button>
           <button type="submit" id="cv-submit-btn" class="btn-primary-glow px-4 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer">
             Save & Train Local AI
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Secure Authentication Modal (Sign In / Register Profile) -->
+  <div id="auth-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md transition-opacity duration-300 hidden">
+    <div class="glass-modal w-full max-w-md bg-slate-900/95 border border-slate-700/80 rounded-2xl shadow-2xl p-6 relative overflow-hidden backdrop-blur-xl modal-spring-enter">
+      <!-- Glow backdrop decoration -->
+      <div class="absolute -top-16 -right-16 w-36 h-36 bg-teal-500/15 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-16 -left-16 w-36 h-36 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none"></div>
+
+      <!-- Modal Header -->
+      <div class="flex items-center space-x-3 mb-5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-500 via-vinted to-cyan-400 flex items-center justify-center shadow-lg shadow-vinted/25">
+          <i data-lucide="shield-check" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-black text-white tracking-tight" id="auth-modal-title">Sign In to Vinted Tracker</h3>
+          <p class="text-[11px] text-slate-400" id="auth-modal-subtitle">Secure profile access & isolated workspace</p>
+        </div>
+      </div>
+
+      <!-- Admin Quick-Fill Banner -->
+      <div class="mb-4 p-3 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="key" class="w-4 h-4 text-teal-400 shrink-0"></i>
+          <div class="text-[11px] text-slate-300">
+            <span class="font-bold text-teal-300">Admin Account:</span>
+            <code class="px-1 py-0.5 bg-slate-950/70 rounded text-teal-200 font-mono text-[10px]">ADMIN</code> / <code class="px-1 py-0.5 bg-slate-950/70 rounded text-teal-200 font-mono text-[10px]">ADMIN</code>
+          </div>
+        </div>
+        <button type="button" onclick="app.fillAdminCredentials()" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/40 transition cursor-pointer">
+          Auto-Fill
+        </button>
+      </div>
+
+      <!-- Auth Mode Switcher (Sign In vs Create Profile) -->
+      <div class="grid grid-cols-2 gap-1 p-1 bg-slate-950/80 rounded-xl border border-slate-800 mb-4">
+        <button id="auth-tab-login" type="button" onclick="app.switchAuthMode('login')" class="py-1.5 rounded-lg text-xs font-bold transition text-center bg-teal-500/20 text-teal-300 border border-teal-500/30 cursor-pointer">
+          Sign In
+        </button>
+        <button id="auth-tab-register" type="button" onclick="app.switchAuthMode('register')" class="py-1.5 rounded-lg text-xs font-bold transition text-center text-slate-400 hover:text-white cursor-pointer">
+          New Profile
+        </button>
+      </div>
+
+      <!-- Auth Error Alert -->
+      <div id="auth-error-alert" class="hidden mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center space-x-2">
+        <i data-lucide="alert-circle" class="w-4 h-4 text-rose-400 shrink-0"></i>
+        <span id="auth-error-message">Invalid credentials.</span>
+      </div>
+
+      <!-- Auth Form -->
+      <form id="auth-form" onsubmit="app.handleAuthSubmit(event)" class="space-y-3.5">
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-300 mb-1">Username</label>
+          <div class="relative">
+            <i data-lucide="user" class="w-4 h-4 text-slate-500 absolute left-3 top-2.5"></i>
+            <input type="text" id="auth-username" required placeholder="Enter username" autocomplete="username" class="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-vinted focus:ring-1 focus:ring-vinted transition">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-300 mb-1">Password</label>
+          <div class="relative">
+            <i data-lucide="lock" class="w-4 h-4 text-slate-500 absolute left-3 top-2.5"></i>
+            <input type="password" id="auth-password" required placeholder="Enter password" autocomplete="current-password" class="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-9 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-vinted focus:ring-1 focus:ring-vinted transition">
+            <button type="button" onclick="app.togglePasswordVisibility()" class="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300 cursor-pointer">
+              <i data-lucide="eye" id="auth-password-eye-icon" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="pt-2">
+          <button type="submit" id="auth-submit-btn" class="btn-primary-glow w-full py-2.5 rounded-xl text-xs font-bold text-white flex items-center justify-center space-x-2 cursor-pointer shadow-lg shadow-vinted/20">
+            <i data-lucide="log-in" class="w-4 h-4" id="auth-submit-icon"></i>
+            <span id="auth-submit-label">Sign In</span>
           </button>
         </div>
       </form>

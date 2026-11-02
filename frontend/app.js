@@ -2,6 +2,34 @@
  * Vinted UK Sales & Price Tracker — Frontend Logic
  */
 
+// Install global Bearer token & session-expiration interceptor
+const _originalFetch = window.fetch;
+window.fetch = async function(input, init = {}) {
+  const token = localStorage.getItem('vinted_auth_token');
+  const headers = new Headers(init.headers || {});
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  const config = {
+    ...init,
+    headers,
+    credentials: init.credentials || 'same-origin',
+  };
+  const response = await _originalFetch(input, config);
+  if (
+    response.status === 401 &&
+    typeof input === 'string' &&
+    !input.includes('/api/auth/login') &&
+    !input.includes('/api/auth/register') &&
+    !input.includes('/api/auth/me')
+  ) {
+    if (window.app && typeof window.app.handleSessionExpired === 'function') {
+      window.app.handleSessionExpired();
+    }
+  }
+  return response;
+};
+
 /**
  * ═══════════════════════════════════════════════════════════════════════════
  * APPLE FLUID MOTION ENGINE — ANALYTICAL SPRING SOLVER & VELOCITY HANDOFF
@@ -189,12 +217,26 @@ class VintedApp {
     this.dbExplorerDebounceTimer = null;
     this.isReplicaMgmtOpen = false;
 
+    // Auth state & User Profile isolation
+    this.currentUser = null;
+    this.authMode = 'login'; // 'login' | 'register'
+    this.authSubmitting = false;
+
     this.init();
   }
 
   async init() {
     this.initTouchPressListeners();
     this.setupEventListeners();
+    const authenticated = await this.checkAuth();
+    if (!authenticated) {
+      this.showAuthModal();
+      return;
+    }
+    await this.initAuthenticatedSession();
+  }
+
+  async initAuthenticatedSession() {
     await Promise.all([
       this.loadAvailableCategories(),
       this.loadSearches(),
@@ -208,6 +250,261 @@ class VintedApp {
     this.showSniperView();
     await this.checkExistingSniperStatus();
     if (window.lucide) lucide.createIcons();
+  }
+
+  // ── Authentication & User Profile Management ──────────────────────────────
+
+  async checkAuth() {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (!res.ok) {
+        this.currentUser = null;
+        this.updateUserProfileUI();
+        return false;
+      }
+      const data = await res.json();
+      if (data && data.ok && data.user) {
+        this.currentUser = data.user;
+        this.updateUserProfileUI();
+        return true;
+      }
+    } catch (e) {
+      console.warn('Auth check error:', e);
+    }
+    this.currentUser = null;
+    this.updateUserProfileUI();
+    return false;
+  }
+
+  updateUserProfileUI() {
+    const profileWidget = document.getElementById('header-user-profile-widget');
+    const usernameLabel = document.getElementById('header-username-label');
+    const avatarInitials = document.getElementById('user-avatar-initials');
+    const adminBadge = document.getElementById('header-admin-badge');
+
+    if (!profileWidget) return;
+
+    if (this.currentUser) {
+      profileWidget.classList.remove('hidden');
+      if (usernameLabel) usernameLabel.textContent = this.currentUser.username;
+      if (avatarInitials) avatarInitials.textContent = (this.currentUser.username || 'U').charAt(0).toUpperCase();
+      if (adminBadge) {
+        if (this.currentUser.is_admin) {
+          adminBadge.textContent = 'ADMIN';
+          adminBadge.className = 'text-[8px] font-mono font-bold text-teal-400 tracking-wider leading-none';
+          adminBadge.classList.remove('hidden');
+        } else {
+          adminBadge.textContent = 'PROFILE';
+          adminBadge.className = 'text-[8px] font-mono font-bold text-slate-400 tracking-wider leading-none';
+          adminBadge.classList.remove('hidden');
+        }
+      }
+    } else {
+      profileWidget.classList.add('hidden');
+    }
+  }
+
+  showAuthModal() {
+    const modal = document.getElementById('auth-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    this.clearAuthError();
+    const usernameInput = document.getElementById('auth-username');
+    if (usernameInput) {
+      setTimeout(() => usernameInput.focus(), 60);
+    }
+    if (window.lucide) lucide.createIcons();
+  }
+
+  hideAuthModal() {
+    const modal = document.getElementById('auth-modal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  switchAuthMode(mode) {
+    this.authMode = mode;
+    this.clearAuthError();
+
+    const tabLogin = document.getElementById('auth-tab-login');
+    const tabRegister = document.getElementById('auth-tab-register');
+    const modalTitle = document.getElementById('auth-modal-title');
+    const modalSubtitle = document.getElementById('auth-modal-subtitle');
+    const submitBtn = document.getElementById('auth-submit-btn');
+    const submitLabel = document.getElementById('auth-submit-label');
+    const submitIcon = document.getElementById('auth-submit-icon');
+
+    if (mode === 'login') {
+      if (tabLogin) {
+        tabLogin.className = 'py-1.5 rounded-lg text-xs font-bold transition text-center bg-teal-500/20 text-teal-300 border border-teal-500/30 cursor-pointer';
+      }
+      if (tabRegister) {
+        tabRegister.className = 'py-1.5 rounded-lg text-xs font-bold transition text-center text-slate-400 hover:text-white cursor-pointer';
+      }
+      if (modalTitle) modalTitle.textContent = 'Sign In to Vinted Tracker';
+      if (modalSubtitle) modalSubtitle.textContent = 'Secure profile access & isolated workspace';
+      if (submitLabel) submitLabel.textContent = 'Sign In';
+      if (submitIcon) submitIcon.setAttribute('data-lucide', 'log-in');
+    } else {
+      if (tabLogin) {
+        tabLogin.className = 'py-1.5 rounded-lg text-xs font-bold transition text-center text-slate-400 hover:text-white cursor-pointer';
+      }
+      if (tabRegister) {
+        tabRegister.className = 'py-1.5 rounded-lg text-xs font-bold transition text-center bg-teal-500/20 text-teal-300 border border-teal-500/30 cursor-pointer';
+      }
+      if (modalTitle) modalTitle.textContent = 'Create New Profile';
+      if (modalSubtitle) modalSubtitle.textContent = 'Your own isolated searches, items & sniper targets';
+      if (submitLabel) submitLabel.textContent = 'Create Profile & Sign In';
+      if (submitIcon) submitIcon.setAttribute('data-lucide', 'user-plus');
+    }
+    if (window.lucide) lucide.createIcons();
+  }
+
+  fillAdminCredentials() {
+    this.switchAuthMode('login');
+    const u = document.getElementById('auth-username');
+    const p = document.getElementById('auth-password');
+    if (u) u.value = 'ADMIN';
+    if (p) p.value = 'ADMIN';
+    this.clearAuthError();
+    this.showToast('ADMIN credentials auto-filled', 'info');
+  }
+
+  togglePasswordVisibility() {
+    const input = document.getElementById('auth-password');
+    const icon = document.getElementById('auth-password-eye-icon');
+    if (!input) return;
+    if (input.type === 'password') {
+      input.type = 'text';
+      if (icon) icon.setAttribute('data-lucide', 'eye-off');
+    } else {
+      input.type = 'password';
+      if (icon) icon.setAttribute('data-lucide', 'eye');
+    }
+    if (window.lucide) lucide.createIcons();
+  }
+
+  showAuthError(msg) {
+    const alert = document.getElementById('auth-error-alert');
+    const msgEl = document.getElementById('auth-error-message');
+    if (alert && msgEl) {
+      msgEl.textContent = msg;
+      alert.classList.remove('hidden');
+    }
+  }
+
+  clearAuthError() {
+    const alert = document.getElementById('auth-error-alert');
+    if (alert) alert.classList.add('hidden');
+  }
+
+  async handleAuthSubmit(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (this.authSubmitting) return;
+
+    const usernameInput = document.getElementById('auth-username');
+    const passwordInput = document.getElementById('auth-password');
+    const username = (usernameInput ? usernameInput.value : '').trim();
+    const password = (passwordInput ? passwordInput.value : '').trim();
+
+    if (!username || !password) {
+      this.showAuthError('Please enter both username and password.');
+      return;
+    }
+
+    this.authSubmitting = true;
+    const submitBtn = document.getElementById('auth-submit-btn');
+    const originalText = submitBtn ? submitBtn.innerHTML : '';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="inline-block animate-spin mr-2">◌</span> Processing…';
+    }
+
+    try {
+      const endpoint = this.authMode === 'register' ? '/api/auth/register' : '/api/auth/login';
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || 'Authentication failed');
+      }
+
+      if (data.token) {
+        localStorage.setItem('vinted_auth_token', data.token);
+      }
+      this.currentUser = data.user;
+      this.updateUserProfileUI();
+      this.hideAuthModal();
+      this.showToast(`Signed in as ${this.currentUser.username}`, 'success');
+
+      // Initialize workspace with user's isolated data
+      await this.initAuthenticatedSession();
+    } catch (err) {
+      this.showAuthError(err.message || 'Login failed');
+    } finally {
+      this.authSubmitting = false;
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+  }
+
+  async handleLogout() {
+    try {
+      // Stop live activities
+      if (this.sniperActive) {
+        await this.stopSniper();
+      }
+      if (this.schedulerTickTimer) {
+        clearInterval(this.schedulerTickTimer);
+        this.schedulerTickTimer = null;
+      }
+
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (e) {
+      console.warn('Logout network error:', e);
+    }
+
+    localStorage.removeItem('vinted_auth_token');
+    this.currentUser = null;
+    this.updateUserProfileUI();
+
+    // Reset isolated state
+    this.searches = [];
+    this.currentSearchId = null;
+    this.sniperDeals = [];
+    this.sniperTargets.clear();
+    this.batchTargets.clear();
+    this.renderSidebar();
+    this.renderSniperTargets();
+    this.renderSniperDeals();
+
+    const uInput = document.getElementById('auth-username');
+    const pInput = document.getElementById('auth-password');
+    if (uInput) uInput.value = '';
+    if (pInput) pInput.value = '';
+
+    this.showToast('Signed out successfully', 'info');
+    this.showAuthModal();
+  }
+
+  handleSessionExpired() {
+    if (this.sniperActive) {
+      try { this.stopSniper(); } catch (e) {}
+    }
+    if (this.schedulerTickTimer) {
+      clearInterval(this.schedulerTickTimer);
+      this.schedulerTickTimer = null;
+    }
+    this.currentUser = null;
+    this.updateUserProfileUI();
+    this.showAuthError('Your session has expired. Please sign in again.');
+    this.showAuthModal();
   }
 
   // ── Apple Fluid Motion & Physics Engine Handlers ────────────────────────────

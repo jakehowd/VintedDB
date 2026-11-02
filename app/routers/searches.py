@@ -6,8 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from ..auth import get_current_user
 from ..database import get_db
-from ..models import ProductVariant, SoldItem, TrackedSearch
+from ..models import ProductVariant, SoldItem, TrackedSearch, User
 from ..schemas import (
     SearchCreate,
     SearchUpdate,
@@ -53,9 +54,17 @@ def suggest_classification(data: SuggestClassificationRequest):
 
 
 @router.get("/searches")
-def list_searches(db: Session = Depends(get_db)):
-    """Return all tracked searches with their item counts and classification metadata."""
-    searches = db.query(TrackedSearch).order_by(TrackedSearch.id).all()
+def list_searches(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return all tracked searches belonging to the current user with item counts and metadata."""
+    searches = (
+        db.query(TrackedSearch)
+        .filter(TrackedSearch.user_id == current_user.id)
+        .order_by(TrackedSearch.id)
+        .all()
+    )
     result = []
     for s in searches:
         count = (
@@ -98,19 +107,28 @@ def list_searches(db: Session = Depends(get_db)):
 
 
 @router.post("/searches")
-def create_search(data: SearchCreate, db: Session = Depends(get_db)):
-    """Add a new search term to track with brand, category, and anti-rep filtering."""
+def create_search(
+    data: SearchCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Add a new search term to track under the authenticated user's profile."""
     text = data.search_text.strip()
     if not text:
         raise HTTPException(status_code=400, detail="Search text cannot be empty")
 
     existing = (
         db.query(TrackedSearch)
-        .filter(TrackedSearch.search_text == text)
+        .filter(
+            TrackedSearch.user_id == current_user.id,
+            func.lower(TrackedSearch.search_text) == func.lower(text),
+        )
         .first()
     )
     if existing:
-        raise HTTPException(status_code=400, detail="Search already exists")
+        raise HTTPException(
+            status_code=400, detail="You are already tracking this search term in your profile"
+        )
 
     # Resolve brand and categories
     brand = (data.brand or "").strip()
@@ -128,6 +146,7 @@ def create_search(data: SearchCreate, db: Session = Depends(get_db)):
     antirep_json = json.dumps(data.antirep_settings) if data.antirep_settings else None
 
     search = TrackedSearch(
+        user_id=current_user.id,
         search_text=text,
         brand=brand or None,
         category=cat_json,
@@ -173,9 +192,18 @@ def create_search(data: SearchCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/searches/{search_id}")
-def update_search(search_id: int, data: SearchUpdate, db: Session = Depends(get_db)):
+def update_search(
+    search_id: int,
+    data: SearchUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Update brand, categories, and anti-rep filters on an existing search, pushing rules immediately."""
-    search = db.query(TrackedSearch).filter(TrackedSearch.id == search_id).first()
+    search = (
+        db.query(TrackedSearch)
+        .filter(TrackedSearch.id == search_id, TrackedSearch.user_id == current_user.id)
+        .first()
+    )
     if not search:
         raise HTTPException(status_code=404, detail="Search not found")
 
@@ -293,9 +321,17 @@ def update_search(search_id: int, data: SearchUpdate, db: Session = Depends(get_
 
 
 @router.post("/searches/{search_id}/toggle-child-filter")
-def toggle_search_child_filter(search_id: int, db: Session = Depends(get_db)):
+def toggle_search_child_filter(
+    search_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """1-click toggle to exclude or allow child sizes on a tracked search."""
-    search = db.query(TrackedSearch).filter(TrackedSearch.id == search_id).first()
+    search = (
+        db.query(TrackedSearch)
+        .filter(TrackedSearch.id == search_id, TrackedSearch.user_id == current_user.id)
+        .first()
+    )
     if not search:
         raise HTTPException(status_code=404, detail="Search not found")
 
@@ -338,9 +374,17 @@ def toggle_search_child_filter(search_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/searches/{search_id}/purge-child-sizes")
-def purge_search_child_sizes(search_id: int, db: Session = Depends(get_db)):
+def purge_search_child_sizes(
+    search_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Permanently delete all child and youth listings captured for this search."""
-    search = db.query(TrackedSearch).filter(TrackedSearch.id == search_id).first()
+    search = (
+        db.query(TrackedSearch)
+        .filter(TrackedSearch.id == search_id, TrackedSearch.user_id == current_user.id)
+        .first()
+    )
     if not search:
         raise HTTPException(status_code=404, detail="Search not found")
 
@@ -364,9 +408,17 @@ def purge_search_child_sizes(search_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/searches/{search_id}/cleanup")
-def cleanup_search_items(search_id: int, db: Session = Depends(get_db)):
+def cleanup_search_items(
+    search_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Purge existing items that contradict brand, category, or anti-rep filters."""
-    search = db.query(TrackedSearch).filter(TrackedSearch.id == search_id).first()
+    search = (
+        db.query(TrackedSearch)
+        .filter(TrackedSearch.id == search_id, TrackedSearch.user_id == current_user.id)
+        .first()
+    )
     if not search:
         raise HTTPException(status_code=404, detail="Search not found")
 
@@ -425,9 +477,17 @@ def cleanup_search_items(search_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/searches/{search_id}")
-def delete_search(search_id: int, db: Session = Depends(get_db)):
+def delete_search(
+    search_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Remove a tracked search and all its associated items."""
-    search = db.query(TrackedSearch).filter(TrackedSearch.id == search_id).first()
+    search = (
+        db.query(TrackedSearch)
+        .filter(TrackedSearch.id == search_id, TrackedSearch.user_id == current_user.id)
+        .first()
+    )
     if not search:
         raise HTTPException(status_code=404, detail="Search not found")
 
@@ -437,9 +497,17 @@ def delete_search(search_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/searches/{search_id}/refresh")
-def refresh_search(search_id: int, db: Session = Depends(get_db)):
+def refresh_search(
+    search_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Manually trigger a scrape for a specific search, enforcing spam & anti-rep filters."""
-    search = db.query(TrackedSearch).filter(TrackedSearch.id == search_id).first()
+    search = (
+        db.query(TrackedSearch)
+        .filter(TrackedSearch.id == search_id, TrackedSearch.user_id == current_user.id)
+        .first()
+    )
     if not search:
         raise HTTPException(status_code=404, detail="Search not found")
 

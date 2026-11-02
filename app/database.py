@@ -1,5 +1,6 @@
 """SQLAlchemy database engine, session factory, and base class."""
 
+from datetime import datetime, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -40,11 +41,48 @@ def get_db():
 
 
 def ensure_db_schema(target_engine=engine):
-    """Ensure newly added columns exist in existing SQLite tables."""
+    """Ensure newly added columns and user auth tables exist in existing SQLite database."""
     with target_engine.connect() as conn:
         cursor = conn.connection.cursor()
         
-        # 0. Ensure product_variants table exists
+        # 0. Ensure users and user_sessions tables exist
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                is_admin BOOLEAN DEFAULT 0 NOT NULL,
+                created_at DATETIME
+            );
+        """)
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_username ON users (username);")
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                session_token TEXT NOT NULL UNIQUE,
+                created_at DATETIME,
+                expires_at DATETIME NOT NULL
+            );
+        """)
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_user_sessions_token ON user_sessions (session_token);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS ix_user_sessions_user ON user_sessions (user_id);")
+
+        # Seed ADMIN user if not present (Username: ADMIN, Password: ADMIN)
+        from .auth import hash_password
+        admin_row = cursor.execute("SELECT id FROM users WHERE username = 'ADMIN' OR username = 'admin'").fetchone()
+        if not admin_row:
+            admin_hash = hash_password("ADMIN")
+            cursor.execute(
+                "INSERT INTO users (username, password_hash, is_admin, created_at) VALUES ('ADMIN', ?, 1, ?)",
+                (admin_hash, datetime.now(timezone.utc)),
+            )
+            admin_id = cursor.lastrowid
+        else:
+            admin_id = admin_row[0]
+
+        # 0b. Ensure product_variants table exists
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS product_variants (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -83,6 +121,8 @@ def ensure_db_schema(target_engine=engine):
         # 1. tracked_searches columns
         ts_cols = [c[1] for c in cursor.execute("PRAGMA table_info(tracked_searches)").fetchall()]
         if ts_cols:
+            if "user_id" not in ts_cols:
+                cursor.execute("ALTER TABLE tracked_searches ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;")
             if "antirep_settings" not in ts_cols:
                 cursor.execute("ALTER TABLE tracked_searches ADD COLUMN antirep_settings TEXT;")
             if "exclude_child_sizes" not in ts_cols:
@@ -91,6 +131,10 @@ def ensure_db_schema(target_engine=engine):
                 cursor.execute("ALTER TABLE tracked_searches ADD COLUMN variants_enabled BOOLEAN DEFAULT 0;")
             if "catalogue_summary" not in ts_cols:
                 cursor.execute("ALTER TABLE tracked_searches ADD COLUMN catalogue_summary TEXT;")
+            
+            # Migrate any unowned searches to the ADMIN user
+            cursor.execute("UPDATE tracked_searches SET user_id = ? WHERE user_id IS NULL", (admin_id,))
+            cursor.execute("CREATE INDEX IF NOT EXISTS ix_tracked_searches_user_id ON tracked_searches (user_id);")
         
         # 2. sold_items columns
         si_cols = [c[1] for c in cursor.execute("PRAGMA table_info(sold_items)").fetchall()]

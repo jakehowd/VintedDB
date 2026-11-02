@@ -1,9 +1,13 @@
 """Endpoints for batch scraping and scheduler/polling controls."""
 
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
+from ..auth import get_current_user
+from ..database import get_db
+from ..models import TrackedSearch, User
 from ..scheduler import (
     batch_scrape_searches,
     get_scheduler_status,
@@ -23,11 +27,34 @@ class ScheduleUpdateRequest(BaseModel):
 
 
 @router.post("/batch-scrape")
-def run_batch_scrape(data: BatchScrapeRequest):
-    """Trigger an immediate batch scrape across multiple selected or all active items."""
+def run_batch_scrape(
+    data: BatchScrapeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Trigger an immediate batch scrape across multiple selected or all active items for the current user."""
     try:
-        summary = batch_scrape_searches(search_ids=data.search_ids)
+        user_searches = db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id)
+        if data.search_ids:
+            valid_ids = [s_id for (s_id,) in user_searches.filter(TrackedSearch.id.in_(data.search_ids)).all()]
+            if not valid_ids:
+                raise HTTPException(status_code=400, detail="No matching searches found for current user.")
+            summary = batch_scrape_searches(search_ids=valid_ids)
+        else:
+            valid_ids = [s_id for (s_id,) in user_searches.filter(TrackedSearch.is_active.is_(True)).all()]
+            if not valid_ids:
+                return {
+                    "total_searches": 0,
+                    "total_new_items": 0,
+                    "total_spam_blocked": 0,
+                    "total_rep_blocked": 0,
+                    "results": [],
+                    "message": "No active searches to scrape for this user profile.",
+                }
+            summary = batch_scrape_searches(search_ids=valid_ids)
         return summary
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Batch scrape failed: {exc}")
 

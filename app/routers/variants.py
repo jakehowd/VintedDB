@@ -15,8 +15,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from ..auth import get_current_user
 from ..database import get_db
-from ..models import ProductVariant, SoldItem, TrackedSearch
+from ..models import ProductVariant, SoldItem, TrackedSearch, User
 from ..services.llm_router import llm_router
 from ..services.variant_vision import _build_stop_tokens, variant_vision_service
 
@@ -665,9 +666,16 @@ def test_ai_pipeline():
 # ── Variant Catalogue, Training & Classification Endpoints ──────────────────
 
 @router.get("/searches/{search_id}/variants")
-def list_search_variants(search_id: int, db: Session = Depends(get_db)):
+def list_search_variants(
+    search_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Return all product variants, facet dimensions, and live market breakdowns for a tracked search."""
-    search = db.query(TrackedSearch).filter(TrackedSearch.id == search_id).first()
+    search = db.query(TrackedSearch).filter(
+        TrackedSearch.id == search_id,
+        TrackedSearch.user_id == current_user.id,
+    ).first()
     if not search:
         raise HTTPException(status_code=404, detail="Tracked search not found")
     return serialize_search_variants(db, search)
@@ -677,10 +685,14 @@ def list_search_variants(search_id: int, db: Session = Depends(get_db)):
 def research_search_variants(
     search_id: int,
     data: ResearchVariantsRequest = ResearchVariantsRequest(),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Run Deep Research on broad product, build multi-category catalogue, train prototypes, and classify DB items."""
-    search = db.query(TrackedSearch).filter(TrackedSearch.id == search_id).first()
+    search = db.query(TrackedSearch).filter(
+        TrackedSearch.id == search_id,
+        TrackedSearch.user_id == current_user.id,
+    ).first()
     if not search:
         raise HTTPException(status_code=404, detail="Tracked search not found")
 
@@ -694,9 +706,16 @@ def research_search_variants(
 
 
 @router.post("/searches/{search_id}/variants/train")
-def train_local_vision_for_search(search_id: int, db: Session = Depends(get_db)):
+def train_local_vision_for_search(
+    search_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Re-train and calibrate local per-dimension prototypes and re-classify items."""
-    search = db.query(TrackedSearch).filter(TrackedSearch.id == search_id).first()
+    search = db.query(TrackedSearch).filter(
+        TrackedSearch.id == search_id,
+        TrackedSearch.user_id == current_user.id,
+    ).first()
     if not search:
         raise HTTPException(status_code=404, detail="Tracked search not found")
 
@@ -712,10 +731,14 @@ def train_local_vision_for_search(search_id: int, db: Session = Depends(get_db))
 def classify_existing_items_for_search(
     search_id: int,
     data: ClassifyExistingRequest = ClassifyExistingRequest(),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Run local multi-category classifier across stored items for this search."""
-    search = db.query(TrackedSearch).filter(TrackedSearch.id == search_id).first()
+    search = db.query(TrackedSearch).filter(
+        TrackedSearch.id == search_id,
+        TrackedSearch.user_id == current_user.id,
+    ).first()
     if not search:
         raise HTTPException(status_code=404, detail="Tracked search not found")
 
@@ -737,10 +760,14 @@ def classify_existing_items_for_search(
 def bulk_select_variant_sniping(
     search_id: int,
     data: BulkVariantSnipeSelectRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Select 'all', 'none', or 'only' specific variants (or multi-category combinations) for Deal Sniper."""
-    search = db.query(TrackedSearch).filter(TrackedSearch.id == search_id).first()
+    search = db.query(TrackedSearch).filter(
+        TrackedSearch.id == search_id,
+        TrackedSearch.user_id == current_user.id,
+    ).first()
     if not search:
         raise HTTPException(status_code=404, detail="Tracked search not found")
 
@@ -769,10 +796,14 @@ def bulk_select_variant_sniping(
 def create_custom_variant(
     search_id: int,
     data: VariantCreateUpdateRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Add a custom Top-Level Model (`parent_variant_id=None`) or Exclusive Sub-Style (`parent_variant_id=<model_id>`)."""
-    search = db.query(TrackedSearch).filter(TrackedSearch.id == search_id).first()
+    search = db.query(TrackedSearch).filter(
+        TrackedSearch.id == search_id,
+        TrackedSearch.user_id == current_user.id,
+    ).first()
     if not search:
         raise HTTPException(status_code=404, detail="Tracked search not found")
 
@@ -845,10 +876,19 @@ def create_custom_variant(
 def update_variant(
     variant_id: int,
     data: VariantCreateUpdateRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Update a Model or Exclusive Style's sniping status, custom target max buy price, or detection keywords."""
-    v = db.query(ProductVariant).filter(ProductVariant.id == variant_id).first()
+    v = (
+        db.query(ProductVariant)
+        .join(TrackedSearch, ProductVariant.tracked_search_id == TrackedSearch.id)
+        .filter(
+            ProductVariant.id == variant_id,
+            TrackedSearch.user_id == current_user.id,
+        )
+        .first()
+    )
     if not v:
         raise HTTPException(status_code=404, detail="Variant not found")
 
@@ -898,9 +938,21 @@ def update_variant(
 
 
 @router.delete("/variants/{variant_id}")
-def delete_variant(variant_id: int, db: Session = Depends(get_db)):
+def delete_variant(
+    variant_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Remove a Model (plus its exclusive sub-styles) or a single Sub-Style and clean item references."""
-    v = db.query(ProductVariant).filter(ProductVariant.id == variant_id).first()
+    v = (
+        db.query(ProductVariant)
+        .join(TrackedSearch, ProductVariant.tracked_search_id == TrackedSearch.id)
+        .filter(
+            ProductVariant.id == variant_id,
+            TrackedSearch.user_id == current_user.id,
+        )
+        .first()
+    )
     if not v:
         raise HTTPException(status_code=404, detail="Variant not found")
 
@@ -940,12 +992,57 @@ def delete_variant(variant_id: int, db: Session = Depends(get_db)):
 def assign_item_variant(
     item_id: int,
     data: AssignItemVariantRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Manually assign 0, 1, or multiple category variants to an item and update local prototypes."""
-    item = db.query(SoldItem).filter(SoldItem.id == item_id).first()
+    item = (
+        db.query(SoldItem)
+        .join(TrackedSearch, SoldItem.tracked_search_id == TrackedSearch.id)
+        .filter(
+            SoldItem.id == item_id,
+            TrackedSearch.user_id == current_user.id,
+        )
+        .first()
+    )
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
+
+    requested_ids: List[int] = []
+    if data.variant_ids is not None:
+        for vid in data.variant_ids:
+            if vid is not None and int(vid) not in requested_ids:
+                requested_ids.append(int(vid))
+    elif data.variant_id is not None:
+        requested_ids = [int(data.variant_id)]
+
+    target_variants: List[ProductVariant] = []
+    if requested_ids:
+        found = (
+            db.query(ProductVariant)
+            .filter(
+                ProductVariant.id.in_(requested_ids),
+                ProductVariant.tracked_search_id == item.tracked_search_id,
+            )
+            .order_by(ProductVariant.id)
+            .all()
+        )
+        if len(found) != len(requested_ids):
+            raise HTTPException(status_code=404, detail="One or more target variants do not belong to this item's search")
+        target_variants = found
+
+    variant_vision_service.record_manual_feedback(db=db, item=item, target_variants=target_variants)
+    return {
+        "ok": True,
+        "item_id": item.id,
+        "variant_id": item.variant_id,
+        "variant_ids": item.parsed_variant_ids(),
+        "variant_name": item.variant_name,
+        "variant_names": item.parsed_variant_names(),
+        "variant_confidence": item.variant_confidence,
+        "variant_method": item.variant_method,
+        "variant_evidence": item.variant_evidence,
+    }
 
     requested_ids: List[int] = []
     if data.variant_ids is not None:

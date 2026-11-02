@@ -10,8 +10,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, and_, desc, asc, case
 
+from ..auth import get_current_user
 from ..database import get_db
-from ..models import ProductVariant, SoldItem, TrackedSearch, ScrapedPhotoRecord
+from ..models import ProductVariant, SoldItem, TrackedSearch, ScrapedPhotoRecord, User
 from ..config import DB_PATH
 from ..services.antirep import extract_photo_key, is_new_with_tags, record_photo_fingerprint
 from ..services.item_classifier import is_child_size
@@ -43,10 +44,15 @@ class ClearSearchDataRequest(BaseModel):
 # ── Specialized Database Analytics ──────────────────────────────────────────
 
 @router.get("/analytics")
-def get_database_analytics(db: Session = Depends(get_db)):
-    """Return specialized high-resolution analytics for all stored items, sales vs replicas, and flag reasons."""
-    total_items = db.query(SoldItem).count()
-    if total_items == 0:
+def get_database_analytics(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return specialized high-resolution analytics for all stored items belonging to the current user."""
+    user_search_ids = [
+        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
+    ]
+    if not user_search_ids:
         return {
             "total_items": 0,
             "clean_items": 0,
@@ -66,31 +72,67 @@ def get_database_analytics(db: Session = Depends(get_db)):
             "searches": [],
         }
 
+    user_item_filter = SoldItem.tracked_search_id.in_(user_search_ids)
+    total_items = db.query(SoldItem).filter(user_item_filter).count()
+    if total_items == 0:
+        searches = db.query(TrackedSearch).filter(TrackedSearch.user_id == current_user.id).all()
+        return {
+            "total_items": 0,
+            "clean_items": 0,
+            "replica_items": 0,
+            "replica_rate_pct": 0.0,
+            "sold_count": 0,
+            "active_count": 0,
+            "clean_avg_price": 0.0,
+            "sold_avg_price": 0.0,
+            "active_avg_price": 0.0,
+            "replica_avg_price": 0.0,
+            "total_volume_gbp": 0.0,
+            "sold_volume_gbp": 0.0,
+            "reasons_breakdown": [],
+            "monthly_trend": [],
+            "top_brands": [],
+            "searches": [
+                {
+                    "id": s.id,
+                    "search_text": s.search_text,
+                    "brand": s.brand or "",
+                    "total": 0,
+                    "clean": 0,
+                    "replicas": 0,
+                    "replica_pct": 0.0,
+                    "sold_count": 0,
+                    "avg_clean_price": 0.0,
+                }
+                for s in searches
+            ],
+        }
+
     # Clean vs Replica counts
-    replica_items = db.query(SoldItem).filter(SoldItem.is_replica == True).count()
+    replica_items = db.query(SoldItem).filter(user_item_filter, SoldItem.is_replica == True).count()
     clean_items = total_items - replica_items
     replica_rate_pct = round((replica_items / total_items * 100), 1) if total_items else 0.0
 
     # Child vs Adult size counts
-    child_items_count = db.query(SoldItem).filter(SoldItem.is_child_size == True).count()
+    child_items_count = db.query(SoldItem).filter(user_item_filter, SoldItem.is_child_size == True).count()
     adult_items_count = total_items - child_items_count
 
     # Sold vs Active listings
-    sold_count = db.query(SoldItem).filter(SoldItem.is_sold == True).count()
-    active_count = db.query(SoldItem).filter(SoldItem.is_sold == False).count()
+    sold_count = db.query(SoldItem).filter(user_item_filter, SoldItem.is_sold == True).count()
+    active_count = db.query(SoldItem).filter(user_item_filter, SoldItem.is_sold == False).count()
 
     # Price and Volume metrics
-    clean_avg_price = db.query(func.avg(SoldItem.price)).filter(SoldItem.is_replica.isnot(True)).scalar() or 0.0
-    sold_avg_price = db.query(func.avg(SoldItem.price)).filter(SoldItem.is_sold == True, SoldItem.is_replica.isnot(True)).scalar() or 0.0
-    active_avg_price = db.query(func.avg(SoldItem.price)).filter(SoldItem.is_sold == False, SoldItem.is_replica.isnot(True)).scalar() or 0.0
-    replica_avg_price = db.query(func.avg(SoldItem.price)).filter(SoldItem.is_replica == True).scalar() or 0.0
-    total_volume_gbp = db.query(func.sum(SoldItem.price)).scalar() or 0.0
-    sold_volume_gbp = db.query(func.sum(SoldItem.price)).filter(SoldItem.is_sold == True).scalar() or 0.0
+    clean_avg_price = db.query(func.avg(SoldItem.price)).filter(user_item_filter, SoldItem.is_replica.isnot(True)).scalar() or 0.0
+    sold_avg_price = db.query(func.avg(SoldItem.price)).filter(user_item_filter, SoldItem.is_sold == True, SoldItem.is_replica.isnot(True)).scalar() or 0.0
+    active_avg_price = db.query(func.avg(SoldItem.price)).filter(user_item_filter, SoldItem.is_sold == False, SoldItem.is_replica.isnot(True)).scalar() or 0.0
+    replica_avg_price = db.query(func.avg(SoldItem.price)).filter(user_item_filter, SoldItem.is_replica == True).scalar() or 0.0
+    total_volume_gbp = db.query(func.sum(SoldItem.price)).filter(user_item_filter).scalar() or 0.0
+    sold_volume_gbp = db.query(func.sum(SoldItem.price)).filter(user_item_filter, SoldItem.is_sold == True).scalar() or 0.0
 
     # Categorize replica reasons
     replica_reasons_rows = (
         db.query(SoldItem.replica_reason)
-        .filter(SoldItem.is_replica == True, SoldItem.replica_reason != None)
+        .filter(user_item_filter, SoldItem.is_replica == True, SoldItem.replica_reason != None)
         .all()
     )
 
@@ -149,7 +191,7 @@ def get_database_analytics(db: Session = Depends(get_db)):
             func.sum(case((SoldItem.is_replica.isnot(True), 1), else_=0)).label("clean"),
             func.round(func.avg(SoldItem.price), 2).label("avg_price"),
         )
-        .filter(SoldItem.captured_at != None)
+        .filter(user_item_filter, SoldItem.captured_at != None)
         .group_by("month_key")
         .order_by(func.strftime("%Y-%m", SoldItem.captured_at).desc())
         .all()
@@ -180,7 +222,7 @@ def get_database_analytics(db: Session = Depends(get_db)):
             func.count(SoldItem.id).label("total"),
             func.sum(case((SoldItem.is_replica == True, 1), else_=0)).label("replicas"),
         )
-        .filter(SoldItem.brand != None, SoldItem.brand != "")
+        .filter(user_item_filter, SoldItem.brand != None, SoldItem.brand != "")
         .group_by(SoldItem.brand)
         .order_by(func.count(SoldItem.id).desc())
         .limit(10)
@@ -199,7 +241,7 @@ def get_database_analytics(db: Session = Depends(get_db)):
     # Searches breakdown
     from .variants import item_has_variant_clause
 
-    searches = db.query(TrackedSearch).filter(TrackedSearch.is_active == True).all()
+    searches = db.query(TrackedSearch).filter(TrackedSearch.is_active == True, TrackedSearch.user_id == current_user.id).all()
     search_stats = []
     for s in searches:
         t_cnt = db.query(SoldItem).filter(SoldItem.tracked_search_id == s.id).count()
@@ -294,12 +336,47 @@ def get_database_items(
     sort_by: Optional[str] = Query("newest", description="'newest', 'oldest', 'price_asc', 'price_desc'"),
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Retrieve filtered, paginated database items with complete replica and duplicate image diagnostics."""
+    """Retrieve filtered, paginated database items belonging to the current user."""
+    user_search_ids = [
+        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
+    ]
+    if not user_search_ids or (search_id and search_id not in user_search_ids):
+        return {
+            "items": [],
+            "total": 0,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": 0,
+            "clean_count": 0,
+            "replica_count": 0,
+            "sold_count": 0,
+            "active_count": 0,
+            "filter_diagnostics": {},
+            "aggregates": {
+                "total_items": 0,
+                "clean_count": 0,
+                "replica_count": 0,
+                "sold_count": 0,
+                "active_count": 0,
+                "overall_avg_price": 0.0,
+                "clean_avg_price": 0.0,
+                "replica_avg_price": 0.0,
+                "sold_avg_price": 0.0,
+                "active_avg_price": 0.0,
+                "min_price": 0.0,
+                "max_price": 0.0,
+                "total_volume": 0.0,
+                "sold_volume": 0.0,
+            },
+        }
+
     query = (
         db.query(SoldItem, TrackedSearch.search_text)
         .outerjoin(TrackedSearch, SoldItem.tracked_search_id == TrackedSearch.id)
+        .filter(SoldItem.tracked_search_id.in_(user_search_ids))
     )
 
     # 0. Repeating Photo Fingerprint Filter (filters whole database by photo_key)
@@ -863,10 +940,25 @@ def toggle_item_replica(item_id: int, db: Session = Depends(get_db)):
 # ── General Database Maintenance & Summary ──────────────────────────────────
 
 @router.get("/summary")
-def get_database_summary(db: Session = Depends(get_db)):
-    """Return comprehensive database health metrics, monthly slices, and file statistics."""
-    total_items = db.query(SoldItem).count()
-    total_searches = db.query(TrackedSearch).filter(TrackedSearch.is_active == True).count()
+def get_database_summary(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return comprehensive database health metrics, monthly slices, and file statistics belonging to the user."""
+    user_search_ids = [
+        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
+    ]
+    if not user_search_ids:
+        return {
+            "total_items": 0,
+            "total_searches": 0,
+            "db_size_mb": 0.0,
+            "months": [],
+            "searches": [],
+        }
+
+    total_items = db.query(SoldItem).filter(SoldItem.tracked_search_id.in_(user_search_ids)).count()
+    total_searches = len(user_search_ids)
 
     # Size on disk
     db_size_mb = 0.0
@@ -884,7 +976,7 @@ def get_database_summary(db: Session = Depends(get_db)):
             func.avg(SoldItem.price).label("avg_price"),
             func.count(func.distinct(SoldItem.tracked_search_id)).label("searches_count"),
         )
-        .filter(SoldItem.captured_at != None)
+        .filter(SoldItem.tracked_search_id.in_(user_search_ids), SoldItem.captured_at != None)
         .group_by("month_key")
         .order_by(func.strftime("%Y-%m", SoldItem.captured_at).desc())
         .all()
@@ -909,7 +1001,7 @@ def get_database_summary(db: Session = Depends(get_db)):
         })
 
     # Search breakdown
-    searches = db.query(TrackedSearch).filter(TrackedSearch.is_active == True).all()
+    searches = db.query(TrackedSearch).filter(TrackedSearch.is_active == True, TrackedSearch.user_id == current_user.id).all()
     search_stats = []
     for s in searches:
         count = db.query(SoldItem).filter(SoldItem.tracked_search_id == s.id).count()
@@ -929,18 +1021,28 @@ def get_database_summary(db: Session = Depends(get_db)):
 
 
 @router.post("/delete-month")
-def delete_month_data(data: DeleteMonthRequest, db: Session = Depends(get_db)):
-    """Delete all recorded items belonging to a specific month (e.g. '2026-10')."""
+def delete_month_data(
+    data: DeleteMonthRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete all recorded items belonging to a specific month for the current user."""
+    user_search_ids = [
+        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
+    ]
     query = db.query(SoldItem).filter(
-        func.strftime("%Y-%m", SoldItem.captured_at) == data.month
+        SoldItem.tracked_search_id.in_(user_search_ids),
+        func.strftime("%Y-%m", SoldItem.captured_at) == data.month,
     )
     if data.search_id:
+        if data.search_id not in user_search_ids:
+            raise HTTPException(status_code=403, detail="Search does not belong to your profile")
         query = query.filter(SoldItem.tracked_search_id == data.search_id)
 
     deleted_count = query.delete(synchronize_session=False)
     db.commit()
 
-    remaining_total = db.query(SoldItem).count()
+    remaining_total = db.query(SoldItem).filter(SoldItem.tracked_search_id.in_(user_search_ids)).count()
 
     try:
         dt = datetime.strptime(data.month, "%Y-%m")
@@ -958,17 +1060,29 @@ def delete_month_data(data: DeleteMonthRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/prune-older-than")
-def prune_older_data(data: PruneOlderRequest, db: Session = Depends(get_db)):
-    """Delete all records older than a specified number of days."""
+def prune_older_data(
+    data: PruneOlderRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete all records older than a specified number of days for the current user."""
+    user_search_ids = [
+        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
+    ]
     cutoff = datetime.now(timezone.utc) - timedelta(days=data.older_than_days)
-    query = db.query(SoldItem).filter(SoldItem.captured_at < cutoff)
+    query = db.query(SoldItem).filter(
+        SoldItem.tracked_search_id.in_(user_search_ids),
+        SoldItem.captured_at < cutoff,
+    )
     if data.search_id:
+        if data.search_id not in user_search_ids:
+            raise HTTPException(status_code=403, detail="Search does not belong to your profile")
         query = query.filter(SoldItem.tracked_search_id == data.search_id)
 
     deleted_count = query.delete(synchronize_session=False)
     db.commit()
 
-    remaining_total = db.query(SoldItem).count()
+    remaining_total = db.query(SoldItem).filter(SoldItem.tracked_search_id.in_(user_search_ids)).count()
     return {
         "ok": True,
         "deleted_count": deleted_count,
@@ -978,15 +1092,25 @@ def prune_older_data(data: PruneOlderRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/clear-search-data")
-def clear_search_data(data: ClearSearchDataRequest, db: Session = Depends(get_db)):
-    """Clear all recorded items for a specific tracked search."""
+def clear_search_data(
+    data: ClearSearchDataRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Clear all recorded items for a specific tracked search belonging to the user."""
+    user_search_ids = [
+        s.id for s in db.query(TrackedSearch.id).filter(TrackedSearch.user_id == current_user.id).all()
+    ]
+    if data.search_id not in user_search_ids:
+        raise HTTPException(status_code=403, detail="Search does not belong to your profile")
+
     deleted_count = (
         db.query(SoldItem)
         .filter(SoldItem.tracked_search_id == data.search_id)
         .delete(synchronize_session=False)
     )
     db.commit()
-    remaining_total = db.query(SoldItem).count()
+    remaining_total = db.query(SoldItem).filter(SoldItem.tracked_search_id.in_(user_search_ids)).count()
     return {
         "ok": True,
         "deleted_count": deleted_count,

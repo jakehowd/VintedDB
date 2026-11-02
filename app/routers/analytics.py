@@ -5,8 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from ..auth import get_current_user
 from ..database import get_db
-from ..models import SoldItem, TrackedSearch
+from ..models import SoldItem, TrackedSearch, User
 from .variants import build_variant_filter_clauses
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
@@ -31,10 +32,15 @@ def sales_over_time(
     search_id: int,
     period: str = Query("week", pattern="^(day|week|month|year)$"),
     variant_id: Optional[str] = Query(None, description="Optional variant ID or 'unclassified'"),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Aggregate item count + price stats per time bucket."""
-    search = db.query(TrackedSearch).filter(TrackedSearch.id == search_id).first()
+    search = (
+        db.query(TrackedSearch)
+        .filter(TrackedSearch.id == search_id, TrackedSearch.user_id == current_user.id)
+        .first()
+    )
     if not search:
         raise HTTPException(status_code=404, detail="Search not found")
 
@@ -83,10 +89,15 @@ def sales_over_time(
 def get_summary(
     search_id: int,
     variant_id: Optional[str] = Query(None, description="Optional variant ID or 'unclassified'"),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Overall statistics for a tracked search."""
-    search = db.query(TrackedSearch).filter(TrackedSearch.id == search_id).first()
+    search = (
+        db.query(TrackedSearch)
+        .filter(TrackedSearch.id == search_id, TrackedSearch.user_id == current_user.id)
+        .first()
+    )
     if not search:
         raise HTTPException(status_code=404, detail="Search not found")
 
@@ -163,12 +174,17 @@ def recent_sales(
     limit: int = Query(50, le=200),
     offset: int = Query(0, ge=0),
     variant_id: Optional[str] = Query(None, description="Optional variant ID or 'unclassified'"),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Paginated list of recent individual items."""
     from ..services.antirep import extract_photo_key
 
-    search = db.query(TrackedSearch).filter(TrackedSearch.id == search_id).first()
+    search = (
+        db.query(TrackedSearch)
+        .filter(TrackedSearch.id == search_id, TrackedSearch.user_id == current_user.id)
+        .first()
+    )
     if not search:
         raise HTTPException(status_code=404, detail="Search not found")
 
@@ -252,11 +268,14 @@ def recent_sales(
 
 
 @router.get("/overview")
-def get_overview(db: Session = Depends(get_db)):
-    """Dashboard overview — summary stats for every active tracked search (unskewed by replicas)."""
+def get_overview(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Dashboard overview — summary stats for every active tracked search belonging to the user."""
     searches = (
         db.query(TrackedSearch)
-        .filter(TrackedSearch.is_active.is_(True))
+        .filter(TrackedSearch.is_active.is_(True), TrackedSearch.user_id == current_user.id)
         .all()
     )
 
