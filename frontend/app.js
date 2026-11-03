@@ -3035,10 +3035,6 @@ class VintedApp {
       }
     }
 
-    const aiGateOn = document.getElementById('sniper-ai-gate-toggle')?.checked ?? true;
-    const minNetProfit = parseFloat(document.getElementById('sniper-min-net-profit')?.value) || 12.0;
-    const minRoi = parseFloat(document.getElementById('sniper-min-roi')?.value) || 30.0;
-
     const toggleBtn = document.getElementById('btn-sniper-toggle');
     const toggleText = document.getElementById('sniper-toggle-text');
     const toggleIcon = document.getElementById('sniper-toggle-icon');
@@ -3055,9 +3051,9 @@ class VintedApp {
           item_max_prices: itemMaxPricesObj,
           max_age_minutes: maxAge,
           poll_delay_seconds: 5.0,
-          ai_resale_gate_enabled: aiGateOn,
-          min_net_profit: minNetProfit,
-          min_roi_pct: minRoi
+          ai_resale_gate_enabled: false,
+          min_net_profit: 0.0,
+          min_roi_pct: 0.0
         })
       });
 

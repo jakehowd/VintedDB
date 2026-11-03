@@ -57,9 +57,9 @@ class DealSniperService:
         self.total_items_inspected: int = 0
         self.total_items_saved: int = 0
         self.total_snipes_found: int = 0
-        self.ai_resale_gate_enabled: bool = True
-        self.min_net_profit: float = 12.0
-        self.min_roi_pct: float = 30.0
+        self.ai_resale_gate_enabled: bool = False
+        self.min_net_profit: float = 0.0
+        self.min_roi_pct: float = 0.0
 
         # Monotonic Vinted ID cutoff: any item with int(id) <= _oldest_expired_vinted_id
         # is guaranteed to have been uploaded before that item (> max_age_minutes ago)

@@ -20,9 +20,9 @@ class SniperStartRequest(BaseModel):
     item_max_prices: Optional[Dict[int, float]] = Field(None, description="Per-item maximum price (£) overrides")
     max_age_minutes: int = Field(15, description="Maximum listing age in minutes to qualify as a deal")
     poll_delay_seconds: float = Field(5.0, description="Polite pause between targets in seconds")
-    ai_resale_gate_enabled: Optional[bool] = Field(True, description="Enforce AI Resale Profitability Gate")
-    min_net_profit: Optional[float] = Field(12.0, description="Minimum projected net profit (£) threshold")
-    min_roi_pct: Optional[float] = Field(30.0, description="Minimum projected ROI (%) threshold")
+    ai_resale_gate_enabled: Optional[bool] = Field(False, description="Enforce AI Resale Profitability Gate")
+    min_net_profit: Optional[float] = Field(0.0, description="Minimum projected net profit (£) threshold")
+    min_roi_pct: Optional[float] = Field(0.0, description="Minimum projected ROI (%) threshold")
 
 
 @router.get("/status")
